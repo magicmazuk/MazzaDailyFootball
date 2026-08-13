@@ -12,7 +12,7 @@ export default function StatusWord({ fixture }) {
     );
   }
   if (fixture.status === 'ft') {
-    return <span className="font-sans text-[11px] text-muted">FT</span>;
+    return <span className="font-sans text-[10px] uppercase tracking-[.14em] text-muted">FT</span>;
   }
   if (fixture.status === 'postponed' || fixture.status === 'canceled') {
     return (
