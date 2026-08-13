@@ -78,14 +78,18 @@ export function adaptStandings(json) {
 }
 
 export function adaptTeams(json) {
-  return (json?.sports?.[0]?.leagues?.[0]?.teams ?? []).map(({ team: t }) => ({
-    id: t.id,
-    name: t.displayName,
-    shortName: t.shortDisplayName ?? t.abbreviation ?? t.displayName,
-    crestUrl: t.logos?.[0]?.href ?? null,
-    monogram: monogram(t.displayName ?? ''),
-    colour: t.color ?? null,
-  }));
+  return (json?.sports?.[0]?.leagues?.[0]?.teams ?? []).map(x => {
+    const t = x?.team ?? {};
+    const name = t.displayName ?? 'Unknown';
+    return {
+      id: t.id ?? null,
+      name,
+      shortName: t.shortDisplayName ?? t.abbreviation ?? name,
+      crestUrl: t.logos?.[0]?.href ?? null,
+      monogram: monogram(name),
+      colour: t.color ?? null,
+    };
+  });
 }
 
 export function adaptSquad(json) {

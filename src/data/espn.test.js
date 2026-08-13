@@ -120,6 +120,23 @@ test('teams: id, colour and crest come through', () => {
     crestUrl: 'abz.png', monogram: 'AB', colour: 'C8142F' });
 });
 
+test('teams: null-safe with missing team key and missing logos/color', () => {
+  const teamsWithMissing = {
+    sports: [{ leagues: [{ teams: [
+      { team: null },
+      { },
+      { team: { id: '999', displayName: 'Minimal Team' } },
+    ] }] }],
+  };
+  const results = adaptTeams(teamsWithMissing);
+  expect(results[0]).toEqual({ id: null, name: 'Unknown', shortName: 'Unknown',
+    crestUrl: null, monogram: 'UN', colour: null });
+  expect(results[1]).toEqual({ id: null, name: 'Unknown', shortName: 'Unknown',
+    crestUrl: null, monogram: 'UN', colour: null });
+  expect(results[2]).toEqual({ id: '999', name: 'Minimal Team', shortName: 'Minimal Team',
+    crestUrl: null, monogram: 'MT', colour: null });
+});
+
 const squad = {
   team: { id: '256', athletes: [
     { id: '227283', displayName: 'Ross Doohan',
