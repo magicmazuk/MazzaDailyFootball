@@ -3,6 +3,7 @@ import AppShell from './ui/AppShell.jsx';
 import TodayScreen from './features/today/TodayScreen.jsx';
 import CompetitionsScreen from './features/competitions/CompetitionsScreen.jsx';
 import CompetitionScreen from './features/competition/CompetitionScreen.jsx';
+import TeamScreen from './features/team/TeamScreen.jsx';
 
 const Stub = ({ name }) => <p className="text-muted">{name}</p>;
 
@@ -14,7 +15,7 @@ export default function App() {
         <Route path="competitions" element={<CompetitionsScreen />} />
         <Route path="competition/:compId" element={<CompetitionScreen />} />
         <Route path="clubs" element={<Stub name="Clubs" />} />
-        <Route path="team/:compId/:teamId" element={<Stub name="Team" />} />
+        <Route path="team/:compId/:teamId" element={<TeamScreen />} />
         <Route path="match/:compId/:eventId" element={<Stub name="Match" />} />
       </Route>
     </Routes>
