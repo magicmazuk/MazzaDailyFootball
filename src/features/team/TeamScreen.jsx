@@ -27,10 +27,11 @@ export default function TeamScreen() {
   const comp = byId(compId);
   const teams = useTeams(comp ?? { id: 'none', source: 'bbc' });
   const seasons = useAllSeasonFixtures(COMPETITIONS);
-  const squad = useSquad(comp, teamId);
+  const squad = useSquad(comp ?? { id: 'none', hasSquads: false }, teamId);
 
   const allFixtures = seasons.flatMap(r => r.data?.fixtures ?? []);
   const { all, next, last } = teamFixtures(allFixtures, teamId);
+  const followedIds = new Set(Object.keys(usePrefs(s => s.followed)));
   // Team identity: teams endpoint when the source has one, else from any fixture.
   const fromFixture = all[0]
     ? (all[0].home.teamId === teamId ? all[0].home : all[0].away) : null;
@@ -55,11 +56,11 @@ export default function TeamScreen() {
 
       {next && (<section className="mb-8">
         <SectionLabel>Next</SectionLabel>
-        <FixtureRow fixture={next} followedIds={new Set()} />
+        <FixtureRow fixture={next} followedIds={followedIds} />
       </section>)}
       {last && (<section className="mb-8">
         <SectionLabel muted>Last</SectionLabel>
-        <FixtureRow fixture={last} followedIds={new Set()} />
+        <FixtureRow fixture={last} followedIds={followedIds} />
       </section>)}
 
       <section className="mb-8">
@@ -83,12 +84,13 @@ export default function TeamScreen() {
           </div>
         )}
         {comp?.hasSquads && squad.isLoading && <p className="text-muted">Loading squad…</p>}
+        {comp?.hasSquads && squad.isError && <p className="font-sans text-[11px] text-muted">Squad unavailable right now.</p>}
       </section>
 
       <section>
         <SectionLabel muted>Season</SectionLabel>
         {all.map(f => <FixtureRow key={`${f.compId}-${f.id}`} fixture={f}
-          followedIds={new Set()} />)}
+          followedIds={followedIds} />)}
       </section>
     </main>
   );
