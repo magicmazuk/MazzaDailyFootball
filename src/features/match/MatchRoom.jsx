@@ -51,9 +51,11 @@ function Timeline({ events }) {
   );
 }
 
-function Stats({ teamStats }) {
+function Stats({ teamStats, fixture }) {
   if (!teamStats) return null;
-  const [h, a] = teamStats;
+  const h = teamStats.find(t => t.teamId === fixture.home.teamId) ?? teamStats[0];
+  const a = teamStats.find(t => t.teamId === fixture.away.teamId) ?? teamStats[1];
+  if (!h || !a || h === a) return null;
   const keys = Object.keys(STAT_LABELS).filter(k => h.stats[k] != null && a.stats[k] != null);
   if (!keys.length) return null;
   const hp = Number(h.stats.possessionPct ?? 50);
@@ -121,7 +123,7 @@ export default function MatchRoom({ fixture, comp, detail }) {
       {comp.hasMatchDetail
         ? (<>
             <Timeline events={detail?.events} />
-            <Stats teamStats={detail?.teamStats} />
+            <Stats teamStats={detail?.teamStats} fixture={fixture} />
             <Lineups lineups={detail?.lineups} fixture={fixture} />
           </>)
         : (

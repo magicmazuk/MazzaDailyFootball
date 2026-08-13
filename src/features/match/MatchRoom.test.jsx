@@ -43,6 +43,25 @@ test('renders team stats when present', () => {
   expect(screen.getByText('58%')).toBeInTheDocument();
 });
 
+test('renders team stats correctly even with away-first array order', () => {
+  const detailAwayFirst = {
+    ...detail,
+    teamStats: [
+      { teamId: 'Rangers', name: 'Rangers', stats: { possessionPct: '42', totalShots: '9' } },
+      { teamId: 'Celtic', name: 'Celtic', stats: { possessionPct: '58', totalShots: '14' } },
+    ],
+  };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={detailAwayFirst} />
+  </MemoryRouter>);
+  expect(screen.getByText('Possession')).toBeInTheDocument();
+  // Verify home possession (58%) appears on the left
+  const possessionRow = screen.getByText('Possession').closest('div');
+  const stats = possessionRow.parentElement.querySelectorAll('.tabular-nums');
+  expect(stats[0].textContent).toBe('58%');
+  expect(stats[1].textContent).toBe('42%');
+});
+
 test('BBC competitions get the honest degraded line, not empty shelves', () => {
   render(<MemoryRouter>
     <MatchRoom fixture={{ ...fixture, compId: 'scottish-league-one' }}
