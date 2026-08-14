@@ -1,7 +1,7 @@
 import data from './tvListings.json';
 import { byId } from '../domain/competitions.js';
 
-const CHANNELS = new Set(['Sky Sports', 'TNT Sports', 'BBC', 'ITV', 'Amazon Prime', 'Premier Sports']);
+const CHANNELS = new Set(['Sky Sports', 'TNT Sports', 'BBC', 'ITV', 'Amazon Prime', 'Premier Sports', 'Premier Player']);
 
 test('every curated listing is well-formed', () => {
   for (const l of data.listings) {
