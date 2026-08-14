@@ -79,13 +79,17 @@ export default function ClubsScreen() {
             <div key={t.id} className="flex items-center gap-3 py-3 border-b border-rule/70">
               <Crest side={t} size={24} />
               <span className="flex-1 text-[16px] truncate">{t.name}</span>
-              <button type="button"
-                aria-label={`${isFollowed ? 'Unfollow' : 'Follow'} ${t.name}`}
-                onClick={() => (isFollowed ? unfollow(t.id) : follow(t))}
-                className="font-sans text-[9px] uppercase tracking-[.14em] underline
-                           underline-offset-4 text-ink">
-                {isFollowed ? '★ Following' : '☆ Follow'}
-              </button>
+              {t.id === CELTIC.id
+                ? <span className="font-sans text-[9px] uppercase tracking-[.14em] text-accent">
+                    Your club
+                  </span>
+                : <button type="button"
+                    aria-label={`${isFollowed ? 'Unfollow' : 'Follow'} ${t.name}`}
+                    onClick={() => (isFollowed ? unfollow(t.id) : follow(t))}
+                    className="font-sans text-[9px] uppercase tracking-[.14em] underline
+                               underline-offset-4 text-ink">
+                    {isFollowed ? '★ Following' : '☆ Follow'}
+                  </button>}
             </div>
           );
         })}

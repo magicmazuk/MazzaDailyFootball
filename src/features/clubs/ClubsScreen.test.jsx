@@ -6,6 +6,8 @@ import { usePrefs, CELTIC } from '../../store/prefs.js';
 
 vi.mock('../../data/queries.js', () => ({
   useAllTeams: () => [{ data: { teams: [
+    { id: '256', name: 'Celtic', shortName: 'Celtic', crestUrl: null,
+      monogram: 'CE', colour: null },
     { id: '254', name: 'Falkirk', shortName: 'Falkirk', crestUrl: null,
       monogram: 'FA', colour: null },
   ] } }],
@@ -33,4 +35,12 @@ test('competition visibility toggles write to the store', async () => {
   render(<MemoryRouter><ClubsScreen /></MemoryRouter>);
   await userEvent.click(screen.getByRole('checkbox', { name: /FA Cup/ }));
   expect(usePrefs.getState().hiddenComps).toContain('eng.fa');
+});
+
+test('Celtic in search results shows Your club label, never unfollow button', async () => {
+  render(<MemoryRouter><ClubsScreen /></MemoryRouter>);
+  await userEvent.type(screen.getByPlaceholderText('Search for a club…'), 'celt');
+  expect(screen.queryByRole('button', { name: /Unfollow Celtic/ })).not.toBeInTheDocument();
+  const yourClubLabels = screen.getAllByText('Your club');
+  expect(yourClubLabels).toHaveLength(2); // One in Following section, one in search results
 });
