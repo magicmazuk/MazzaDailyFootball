@@ -1631,7 +1631,7 @@ git commit -m "feat: BBC proxy and Vercel rewrites"
 - Produces:
   - `espnUrl(rest, params?) → string`, `bbcUrl(tournament, start, end) → string`, `getJson(url) → Promise<{data, asOf: string|null}>` (`asOf` from the `x-lkg-at` header).
   - `pollMs(fixtures, now?) → 30000|60000|false` — the live-polling gate, exported for tests.
-  - Hooks: `useSeasonFixtures(comp)` → `{fixtures, asOf}`; `useAllSeasonFixtures(comps)` (useQueries array); `useTodayWindows(comps)` → per-comp `{fixtures, asOf}` covering yesterday+today with live polling; `useTable(comp)` → `{rows, asOf, fixtures}` (ESPN standings or computed); `useTeams(comp)`; `useSquad(comp, teamId)`; `useMatchDetail(comp, eventId, isLive)`.
+  - Hooks: `useSeasonFixtures(comp)` → `{fixtures, asOf}`; `useAllSeasonFixtures(comps)` (useQueries array); `useTodayWindows(comps)` → per-comp `{fixtures, asOf}` covering yesterday+today with live polling; `useTable(comp)` → `{rows, asOf, fixtures}` (ESPN standings or computed); `useTeams(comp)`; `useAllTeams(comps)` (useQueries array, one entry per comp); `useSquad(comp, teamId)`; `useMatchDetail(comp, eventId, isLive)`.
 
 - [ ] **Step 1: failing tests**
 
@@ -1818,8 +1818,8 @@ export function useTable(comp) {
   };
 }
 
-export function useTeams(comp) {
-  return useQuery({
+export function teamsQuery(comp) {
+  return {
     queryKey: ['teams', comp.id],
     enabled: comp.source === 'espn',
     staleTime: 24 * HOUR,
@@ -1827,8 +1827,11 @@ export function useTeams(comp) {
       const { data, asOf } = await getJson(espnUrl(`${SOCCER}/${comp.id}/teams`));
       return { teams: adaptTeams(data), asOf };
     },
-  });
+  };
 }
+
+export const useTeams = comp => useQuery(teamsQuery(comp));
+export const useAllTeams = comps => useQueries({ queries: comps.map(teamsQuery) });
 
 export function useSquad(comp, teamId) {
   return useQuery({
@@ -3306,10 +3309,10 @@ import { beforeEach, expect, test, vi } from 'vitest';
 import { usePrefs, CELTIC } from '../../store/prefs.js';
 
 vi.mock('../../data/queries.js', () => ({
-  useTeams: () => ({ data: { teams: [
+  useAllTeams: () => [{ data: { teams: [
     { id: '254', name: 'Falkirk', shortName: 'Falkirk', crestUrl: null,
       monogram: 'FA', colour: null },
-  ] } }),
+  ] } }],
   useAllSeasonFixtures: () => [],
 }));
 
@@ -3369,7 +3372,7 @@ export function searchTeams(teams, q) {
 ```jsx
 import { useState } from 'react';
 import { COMPETITIONS } from '../../domain/competitions.js';
-import { useAllSeasonFixtures, useTeams } from '../../data/queries.js';
+import { useAllSeasonFixtures, useAllTeams } from '../../data/queries.js';
 import { CELTIC, usePrefs } from '../../store/prefs.js';
 import Crest from '../../ui/Crest.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
@@ -3401,8 +3404,7 @@ export default function ClubsScreen() {
   const followed = usePrefs(s => s.followed);
   const hidden = usePrefs(s => s.hiddenComps);
 
-  // Hook count must be stable: one useTeams per ESPN competition.
-  const espnTeamResults = ESPN_COMPS.map(c => useTeams(c)); // eslint-disable-line react-hooks/rules-of-hooks
+  const espnTeamResults = useAllTeams(ESPN_COMPS);
   const bbcSeasonResults = useAllSeasonFixtures(BBC_COMPS);
   const allTeams = [
     ...espnTeamResults.flatMap(r => r.data?.teams ?? []),
