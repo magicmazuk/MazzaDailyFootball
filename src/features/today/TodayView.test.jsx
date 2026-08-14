@@ -35,3 +35,35 @@ test('a completely quiet day says so', () => {
   );
   expect(screen.getByText('No matches today.')).toBeInTheDocument();
 });
+
+const nextUpFixture = {
+  id: '3', compId: 'sco.1', kickoff: '2026-08-25T18:45:00Z', status: 'scheduled', tv: [],
+  home: { teamId: '256', name: 'Celtic', score: null },
+  away: { teamId: '250', name: 'Aberdeen', score: null },
+};
+const nextUpEntry = {
+  club: { id: '256', name: 'Celtic', crestUrl: null, monogram: 'CE' },
+  fixture: nextUpFixture,
+};
+const emptyPartition = { yours: [], live: [], later: [], earlier: [], yesterday: [] };
+
+test('a nextUp-only day still renders the Your clubs section with its Next up sub-list', () => {
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-22T15:00:00Z')} followedIds={new Set()}
+        partition={emptyPartition} nextUp={[nextUpEntry]} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText('★ Your clubs')).toBeInTheDocument();
+  expect(screen.getByText('Next up')).toBeInTheDocument();
+});
+
+test('nextUp does not count as activity for the quiet-day check', () => {
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-22T15:00:00Z')} followedIds={new Set()}
+        partition={emptyPartition} nextUp={[nextUpEntry]} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText('No matches today.')).toBeInTheDocument();
+});

@@ -46,7 +46,7 @@ export default function TeamScreen() {
           <h1 className="text-[24px] truncate">{team.name}</h1>
         </div>
         <FollowButton team={{ id: teamId, name: team.name, crestUrl: team.crestUrl ?? null,
-          monogram: team.monogram, colour: team.colour ?? null }} />
+          monogram: team.monogram, colour: team.colour ?? null, compId }} />
       </div>
       <p className="font-sans text-[10px] uppercase tracking-[.18em] text-muted mb-8">
         {comp?.name ?? ''}

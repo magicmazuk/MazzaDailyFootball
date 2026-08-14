@@ -6,6 +6,7 @@ import { SEASON } from '../domain/competitions.js';
 import { computeTable } from '../domain/table.js';
 import { adaptScoreboard, adaptStandings, adaptSquad, adaptSummary, adaptTeams } from './espn.js';
 import { adaptBbcFixtures } from './bbc.js';
+import { applyTv } from './tv.js';
 import { bbcUrl, espnUrl, getJson } from './client.js';
 
 const SOCCER = '/apis/site/v2/sports/soccer';
@@ -57,13 +58,13 @@ export function seasonFixturesQuery(comp) {
         const results = await Promise.all(
           windows.map(w => getJson(bbcUrl(comp.id, w.start, w.end))));
         return {
-          fixtures: results.flatMap(({ data }) => adaptBbcFixtures(data, comp.id)),
+          fixtures: applyTv(results.flatMap(({ data }) => adaptBbcFixtures(data, comp.id))),
           asOf: results.map(r => r.asOf).find(Boolean) ?? null,
         };
       }
       const { data, asOf } = await getJson(
         espnUrl(`${SOCCER}/${comp.id}/scoreboard`, { dates: SEASON.espnRange, limit: 500 }));
-      return { fixtures: adaptScoreboard(data, comp.id), asOf };
+      return { fixtures: applyTv(adaptScoreboard(data, comp.id)), asOf };
     },
   };
 }
@@ -91,13 +92,13 @@ export function todayWindowQuery(comp, now = new Date()) {
           getJson(bbcUrl(comp.id, isoDay(now), isoDay(now))),
         ]);
         return {
-          fixtures: [...adaptBbcFixtures(y.data, comp.id), ...adaptBbcFixtures(t.data, comp.id)],
+          fixtures: applyTv([...adaptBbcFixtures(y.data, comp.id), ...adaptBbcFixtures(t.data, comp.id)]),
           asOf: y.asOf ?? t.asOf ?? null,
         };
       }
       const { data, asOf } = await getJson(
         espnUrl(`${SOCCER}/${comp.id}/scoreboard`, { dates: `${ymd(yesterday)}-${ymd(now)}` }));
-      return { fixtures: adaptScoreboard(data, comp.id), asOf };
+      return { fixtures: applyTv(adaptScoreboard(data, comp.id)), asOf };
     },
   };
 }
@@ -143,7 +144,7 @@ export function teamsQuery(comp) {
     staleTime: 24 * HOUR,
     queryFn: async () => {
       const { data, asOf } = await getJson(espnUrl(`${SOCCER}/${comp.id}/teams`));
-      return { teams: adaptTeams(data), asOf };
+      return { teams: adaptTeams(data).map(t => ({ ...t, compId: comp.id })), asOf };
     },
   };
 }

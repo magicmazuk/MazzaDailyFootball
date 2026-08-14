@@ -128,3 +128,13 @@ test('BBC competitions get the honest degraded line, not empty shelves', () => {
   expect(screen.getByText("Detailed stats aren't published for Scottish League One."))
     .toBeInTheDocument();
 });
+
+test('score header sides link to team pages and tv renders', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, tv: ['TNT Sports'] }} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  const links = screen.getAllByRole('link');
+  expect(links.some(l => l.getAttribute('href') === '/team/sco.1/Celtic')).toBe(true);
+  expect(links.some(l => l.getAttribute('href') === '/team/sco.1/Rangers')).toBe(true);
+  expect(screen.getByText('TNT')).toBeInTheDocument();
+});

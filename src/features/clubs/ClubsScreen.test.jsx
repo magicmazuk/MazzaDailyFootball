@@ -7,9 +7,9 @@ import { usePrefs, CELTIC } from '../../store/prefs.js';
 vi.mock('../../data/queries.js', () => ({
   useAllTeams: () => [{ data: { teams: [
     { id: '256', name: 'Celtic', shortName: 'Celtic', crestUrl: null,
-      monogram: 'CE', colour: null },
+      monogram: 'CE', colour: null, compId: 'sco.1' },
     { id: '254', name: 'Falkirk', shortName: 'Falkirk', crestUrl: null,
-      monogram: 'FA', colour: null },
+      monogram: 'FA', colour: null, compId: 'sco.1' },
   ] } }],
   useAllSeasonFixtures: () => [],
 }));
@@ -43,4 +43,11 @@ test('Celtic in search results shows Your club label, never unfollow button', as
   expect(screen.queryByRole('button', { name: /Unfollow Celtic/ })).not.toBeInTheDocument();
   const yourClubLabels = screen.getAllByText('Your club');
   expect(yourClubLabels).toHaveLength(2); // One in Following section, one in search results
+});
+
+test('search result name links to the team page', async () => {
+  render(<MemoryRouter><ClubsScreen /></MemoryRouter>);
+  await userEvent.type(screen.getByPlaceholderText('Search for a club…'), 'falk');
+  const link = await screen.findByRole('link', { name: /Falkirk/ });
+  expect(link).toHaveAttribute('href', '/team/sco.1/254');
 });
