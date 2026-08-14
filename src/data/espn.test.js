@@ -216,7 +216,8 @@ const summary = {
 
 test('summary: events null-safe, team stats keyed by name, lineups mapped', () => {
   const d = adaptSummary(summary);
-  expect(d.events[0]).toEqual({ minute: "11'", type: 'Goal', player: 'Daizen Maeda', teamId: '256' });
+  expect(d.events[0]).toEqual({ minute: "11'", type: 'Goal', player: 'Daizen Maeda',
+    playerOff: null, teamId: '256', scoringPlay: false });
   expect(d.events[1].player).toBeNull();
   expect(d.teamStats[0].stats.possessionPct).toBe('58');
   expect(d.lineups[0].players[0]).toEqual({ name: 'Kasper Schmeichel', shirt: '1',
@@ -226,6 +227,176 @@ test('summary: events null-safe, team stats keyed by name, lineups mapped', () =
 test('summary: missing boxscore yields null teamStats, not a crash', () => {
   expect(adaptSummary({}).teamStats).toBeNull();
   expect(adaptSummary({}).events).toEqual([]);
+});
+
+test('summary: adaptSummary({}) is fully null-safe for every enrichment field', () => {
+  const d = adaptSummary({});
+  expect(d.teamStats).toBeNull();
+  expect(d.events).toEqual([]);
+  expect(d.lineups).toEqual([]);
+  expect(d.liveScore).toBeNull();
+  expect(d.gameInfo).toBeNull();
+  expect(d.form).toBeNull();
+  expect(d.headToHead).toBeNull();
+  expect(d.standouts).toBeNull();
+});
+
+// --- keyEvents: participants (current ESPN shape) vs athletesInvolved (legacy) ---
+
+test('summary: goal event reads player from participants and carries scoringPlay', () => {
+  const goalViaParticipants = {
+    keyEvents: [
+      { type: { text: 'Goal' }, text: "Kasper Høgh (Celtic) Goal at 2'",
+        clock: { displayValue: "2'" }, scoringPlay: true,
+        team: { id: '256', displayName: 'Celtic' },
+        participants: [{ athlete: { id: '272624', displayName: 'Kasper Høgh' } }] },
+    ],
+  };
+  const d = adaptSummary(goalViaParticipants);
+  expect(d.events[0]).toEqual({
+    minute: "2'", type: 'Goal', player: 'Kasper Høgh', playerOff: null,
+    teamId: '256', scoringPlay: true,
+  });
+});
+
+test('summary: substitution maps player coming on and player going off from the two participants', () => {
+  const substitution = {
+    keyEvents: [
+      { type: { text: 'Substitution' }, clock: { displayValue: "45'" },
+        team: { id: '256' },
+        participants: [
+          { athlete: { id: '387200', displayName: 'Colby Donovan' } },
+          { athlete: { id: '293691', displayName: 'Alistair Johnston' } },
+        ] },
+    ],
+  };
+  const d = adaptSummary(substitution);
+  expect(d.events[0].player).toBe('Colby Donovan');
+  expect(d.events[0].playerOff).toBe('Alistair Johnston');
+  expect(d.events[0].scoringPlay).toBe(false);
+});
+
+test('summary: legacy payload with only athletesInvolved still yields a player (backward compat)', () => {
+  const legacy = {
+    keyEvents: [
+      { clock: { displayValue: "11'" }, type: { text: 'Goal' },
+        athletesInvolved: [{ displayName: 'Daizen Maeda' }], team: { id: '256' } },
+    ],
+  };
+  const d = adaptSummary(legacy);
+  expect(d.events[0].player).toBe('Daizen Maeda');
+  expect(d.events[0].playerOff).toBeNull();
+  expect(d.events[0].scoringPlay).toBe(false);
+});
+
+// --- gameInfo ---
+
+test('summary: gameInfo maps attendance, referee pick and venue with city', () => {
+  const withGameInfo = {
+    gameInfo: {
+      venue: { fullName: 'The BBSP Stadium', address: { city: 'Kilmarnock', country: 'Scotland' } },
+      attendance: 8353,
+      officials: [{ displayName: 'Ryan Lee', position: { name: 'Referee', displayName: 'Referee' } }],
+    },
+  };
+  expect(adaptSummary(withGameInfo).gameInfo).toEqual({
+    attendance: 8353, referee: 'Ryan Lee', venue: 'The BBSP Stadium, Kilmarnock',
+  });
+});
+
+test('summary: gameInfo referee falls back to the first official when none is a Referee', () => {
+  const noRefereePosition = {
+    gameInfo: { officials: [{ displayName: 'Assistant One', position: { displayName: 'Assistant Referee' } }] },
+  };
+  expect(adaptSummary(noRefereePosition).gameInfo.referee).toBe('Assistant One');
+});
+
+test('summary: gameInfo venue without a city falls back to venue name alone; missing gameInfo is null', () => {
+  const noCity = { gameInfo: { venue: { fullName: 'Neutral Ground' } } };
+  expect(adaptSummary(noCity).gameInfo).toEqual({ attendance: null, referee: null, venue: 'Neutral Ground' });
+  expect(adaptSummary({}).gameInfo).toBeNull();
+});
+
+// --- form ---
+
+test('summary: form is keyed by teamId, filtered to W/D/L and capped at 5', () => {
+  const withForm = {
+    lastFiveGames: [
+      { team: { id: '260' }, events: [
+        { gameResult: 'W' }, { gameResult: 'D' }, { gameResult: 'L' },
+        { gameResult: 'W' }, { gameResult: 'W' }, { gameResult: 'L' },
+      ] },
+      { team: { id: '256' }, events: [{ gameResult: 'W' }] },
+    ],
+  };
+  const d = adaptSummary(withForm);
+  expect(d.form['260']).toEqual(['W', 'D', 'L', 'W', 'W']);
+  expect(d.form['256']).toEqual(['W']);
+});
+
+test('summary: missing lastFiveGames yields null form', () => {
+  expect(adaptSummary({}).form).toBeNull();
+});
+
+// --- headToHead ---
+
+test('summary: headToHead maps completed meetings with scores and team names, skipping incomplete ones', () => {
+  const withSeries = {
+    seasonseries: [{
+      summary: 'CEL leads series 5-0',
+      events: [
+        { date: '2026-02-15T14:00:00Z', statusType: { completed: true },
+          competitors: [
+            { homeAway: 'home', team: { displayName: 'Kilmarnock' }, score: '2' },
+            { homeAway: 'away', team: { displayName: 'Celtic' }, score: '3' },
+          ] },
+        { date: '2026-09-01T14:00:00Z', statusType: { completed: false }, // not yet played
+          competitors: [
+            { homeAway: 'home', team: { displayName: 'Celtic' }, score: '' },
+            { homeAway: 'away', team: { displayName: 'Kilmarnock' }, score: '' },
+          ] },
+      ],
+    }],
+  };
+  const d = adaptSummary(withSeries);
+  expect(d.headToHead.summary).toBe('CEL leads series 5-0');
+  expect(d.headToHead.meetings).toEqual([
+    { date: '2026-02-15T14:00:00Z', homeName: 'Kilmarnock', awayName: 'Celtic', homeScore: 2, awayScore: 3 },
+  ]);
+});
+
+test('summary: missing seasonseries yields null headToHead', () => {
+  expect(adaptSummary({}).headToHead).toBeNull();
+});
+
+// --- standouts ---
+
+test('summary: standouts map shots/saves/passes leaders per team, skipping absent or empty categories', () => {
+  const withLeaders = {
+    leaders: [
+      { team: { id: '260', displayName: 'Kilmarnock' }, leaders: [
+        { name: 'totalShots', leaders: [{ displayValue: '3', athlete: { displayName: 'Joe Hugill' } }] },
+        { name: 'accuratePasses', leaders: [{ displayValue: '42', athlete: { displayName: 'Aaron Tshibola' } }] },
+        { name: 'saves', leaders: [] },
+      ] },
+      { team: { id: '256', displayName: 'Celtic' }, leaders: [
+        { name: 'totalShots', leaders: [{ displayValue: '9', athlete: { displayName: 'Kasper Høgh' } }] },
+      ] },
+    ],
+  };
+  const d = adaptSummary(withLeaders);
+  expect(d.standouts[0]).toEqual({
+    teamId: '260', teamName: 'Kilmarnock',
+    entries: [
+      { label: 'Shots', player: 'Joe Hugill', value: '3' },
+      { label: 'Passes', player: 'Aaron Tshibola', value: '42' },
+    ],
+  });
+  expect(d.standouts[1].entries).toEqual([{ label: 'Shots', player: 'Kasper Høgh', value: '9' }]);
+});
+
+test('summary: missing leaders yields null standouts', () => {
+  expect(adaptSummary({}).standouts).toBeNull();
 });
 
 test('summary: header competitors produce a fresher liveScore keyed by homeAway', () => {
