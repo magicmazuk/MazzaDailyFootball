@@ -568,3 +568,31 @@ client-side by necessity, HTTP-referrer-locked to the deployment domain in Googl
 Console, free quota (search costs 100 units of the 10,000/day). Reused from the World Cup
 dashboard's key. The app degrades gracefully without it: no key → no video section, no
 placeholder, everything else unaffected.
+
+### 13.10 The field — cup overview (agreed 2026-08-14; first slice of Release 2 §8)
+
+Cup competition pages gain an **Overview** tab (their default), carrying — graphical means
+favoured throughout:
+
+1. **Structure strip.** A horizontal Broadsheet flow describing the competition's shape:
+   stage nodes (count numeral + small label) joined by hairline separators — e.g.
+   `36 league phase › top 8 to last 16 › 9–24 play-off › knockout`. Wording per competition
+   is registry config (`structure`); knockout entry waves are annotated with counts derived
+   from the fixture data, never hardcoded.
+2. **The field.** Every club that appears in the competition's fixtures:
+   - **Still in** — large colour crests (monogram fallback) in a grid, grouped by **entry
+     tier** where entries stagger (tier = the round of a club's first fixture, labelled with
+     the prettified round name); single grid when everyone enters together.
+   - **Out** — small, greyed crests grouped by the round in which they fell (the K1
+     survival-board design validated in the original brainstorm).
+   - Every crest links to the team page (§13.2).
+3. **Survival logic** (pure, generic): rounds ordered by earliest kickoff; a club is OUT
+   when a completed round it appeared in is followed by published later-round fixtures it is
+   absent from — this single rule handles knockouts, group stages (absence from the knockout
+   = eliminated) and two-legged rounds. Refinement for single-leg comps (Scottish/English
+   cups): a decided completed tie (score or penalty shootout) eliminates its loser
+   immediately, without waiting for the next draw. Undecidable ties leave both clubs in.
+4. **European pre-draw state:** ESPN carries no qualifying-round data — before the league
+   phase is drawn the field shows the structure strip plus one honest line ("The league
+   phase draw hasn't been made yet"). Qualifying-team lists are out of scope until a source
+   exists.
