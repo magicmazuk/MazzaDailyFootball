@@ -235,3 +235,55 @@ test('residual behaviour: fixtures with round null are invisible to survival —
   // doesn't touch it) — the only exclusion under test here is Alpha/Bravo.
   expect(result.in.map(c => c.name)).toEqual(['Alpha', 'Bravo', 'Charlie', 'Echo']);
 });
+
+// Found wiring Task 2 (the field board) against live sco.cis/sco.challenge
+// data: both carry a group/league phase inside a singleLeg=true
+// competition (Scotland is always singleLeg per the brief), and every
+// live group match is a "decided ft tie" from rule 3's point of view —
+// so unmodified rule 3 eliminated a club for losing just ONE of several
+// round-robin games, long before the group itself finished.
+test('singleLeg round-robin safety: a club facing multiple distinct opponents in one round is not knocked out for losing one of them', () => {
+  const fixtures = [
+    fx('1', 'group-stage', '2026-01-01T15:00:00Z', 'ft', side('1', 'Alpha', 2), side('2', 'Bravo', 1)),
+    fx('2', 'group-stage', '2026-01-02T15:00:00Z', 'ft', side('2', 'Bravo', 2), side('3', 'Charlie', 0)),
+    fx('3', 'group-stage', '2026-01-03T15:00:00Z', 'ft', side('3', 'Charlie', 3), side('1', 'Alpha', 0)),
+  ];
+  const result = survivalState(fixtures, { singleLeg: true });
+  // Alpha, Bravo and Charlie have each won one and lost one — a real
+  // three-way group, not three single-leg ties. Nobody is out: the group
+  // isn't complete and no later round has been published.
+  expect(result.out).toEqual([]);
+  expect(result.in.map(c => c.name)).toEqual(['Alpha', 'Bravo', 'Charlie']);
+});
+
+test('singleLeg still eliminates immediately in a genuine knockout round, even alongside a round-robin round elsewhere', () => {
+  const fixtures = [
+    // group-stage: Alpha faces two distinct opponents -> round-robin-shaped
+    // (the second fixture is left scheduled so rule 2's separate
+    // round-completeness check can't also confound this rule-3-focused
+    // test — that interaction is exercised by the live-data cases noted
+    // in the task report, not by this unit test).
+    fx('1', 'group-stage', '2026-01-01T15:00:00Z', 'ft', side('1', 'Alpha', 2), side('2', 'Bravo', 1)),
+    fx('2', 'group-stage', '2026-01-02T15:00:00Z', 'scheduled', side('1', 'Alpha'), side('3', 'Charlie')),
+    // round-1 (the last published round): Delta faces exactly one
+    // opponent -> a genuine single-leg tie, decided and eliminated at once.
+    fx('3', 'round-1', '2026-02-01T15:00:00Z', 'ft', side('4', 'Delta', 2), side('5', 'Echo', 0)),
+  ];
+  const result = survivalState(fixtures, { singleLeg: true });
+  expect(result.out).toEqual([{ round: 'round-1', clubs: [
+    { teamId: '5', name: 'Echo', crestUrl: '5.png', monogram: 'EC', score: 0, penaltyScore: null },
+  ] }]);
+  expect(result.in.map(c => c.name).sort()).toEqual(['Alpha', 'Bravo', 'Charlie', 'Delta']);
+});
+
+test('singleLeg round-robin safety does not block a legitimate replay (same opponent twice) from eliminating the true loser', () => {
+  const fixtures = [
+    fx('1', 'round-1', '2026-01-01T15:00:00Z', 'ft', side('1', 'Alpha', 2), side('2', 'Bravo', 1)),
+    fx('2', 'round-1', '2026-01-08T15:00:00Z', 'ft', side('2', 'Bravo', 3), side('1', 'Alpha', 0)),
+  ];
+  const result = survivalState(fixtures, { singleLeg: true });
+  expect(result.out).toEqual([{ round: 'round-1', clubs: [
+    { teamId: '1', name: 'Alpha', crestUrl: '1.png', monogram: 'AL', score: 0, penaltyScore: null },
+  ] }]);
+  expect(result.in.map(c => c.name)).toEqual(['Bravo']);
+});

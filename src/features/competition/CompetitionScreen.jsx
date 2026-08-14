@@ -6,6 +6,8 @@ import { useSeasonFixtures, useTable } from '../../data/queries.js';
 import { usePrefs } from '../../store/prefs.js';
 import FixtureRow from '../../ui/FixtureRow.jsx';
 import LeagueTable from './LeagueTable.jsx';
+import StructureStrip from './StructureStrip.jsx';
+import FieldBoard from './FieldBoard.jsx';
 
 const groupByDate = fixtures => {
   const groups = new Map();
@@ -21,7 +23,11 @@ const groupByDate = fixtures => {
 export default function CompetitionScreen() {
   const { compId } = useParams();
   const comp = byId(compId);
-  const tabs = [...(comp?.hasTable ? ['Table'] : []), 'Fixtures', 'Results'];
+  // Cups (spec §13.10) lead with Overview; the three hasTable cups (the
+  // European competitions) also carry a Table tab. Leagues are unchanged.
+  const tabs = comp?.type === 'cup'
+    ? ['Overview', ...(comp.hasTable ? ['Table'] : []), 'Fixtures', 'Results']
+    : [...(comp?.hasTable ? ['Table'] : []), 'Fixtures', 'Results'];
   const [tab, setTab] = useState(tabs[0]);
   const followedIds = new Set(Object.keys(usePrefs(s => s.followed)));
   const table = useTable(comp ?? { id: 'none', hasTable: false, source: 'espn' });
@@ -54,6 +60,14 @@ export default function CompetitionScreen() {
           </button>
         ))}
       </div>
+      {tab === 'Overview' && (
+        <>
+          <StructureStrip structure={comp.structure} />
+          {season.isLoading
+            ? <p className="text-muted">Loading the field…</p>
+            : <FieldBoard fixtures={fixtures} comp={comp} followedIds={followedIds} />}
+        </>
+      )}
       {tab === 'Table' && (table.data
         ? <LeagueTable comp={comp} rows={table.data.rows}
             followedIds={followedIds} formByTeam={formByTeam} />

@@ -135,15 +135,36 @@ export function survivalState(fixtures, { singleLeg = false } = {}) {
 
   // Rule 3: singleLeg competitions eliminate a decided loser immediately,
   // without waiting for its round to complete or a later round to exist.
-  // A replay/re-ordered match means the same pairing can meet more than
-  // once within a round — group decisive meetings by round + pairing
-  // (order-independent) and let only the chronologically LAST decisive
-  // meeting of each pairing produce a loser, so an overturned earlier
-  // leg never eliminates both sides.
+  // This only makes sense for a genuine single-leg TIE — a club facing
+  // exactly one opponent within the round (a replay/re-ordered match
+  // means the same pairing can legitimately meet more than once). A round
+  // where any club faces more than one DISTINCT opponent is round-robin
+  // shaped (a group or league phase) even inside an otherwise singleLeg
+  // competition — sco.cis's group stage and sco.challenge's league phase
+  // both live under Scotland's singleLeg:true flag — and rule 2's
+  // round-completeness/absence check already covers elimination there
+  // correctly; firing rule 3 per-match would knock a club out for losing
+  // just one of several group games, well before the group finishes.
   if (singleLeg) {
-    const lastDecisive = new Map(); // `${round}|${pairKey}` -> { f, t, winner }
+    const opponentsInRound = new Map(); // `${round}|${teamId}` -> Set<opponentTeamId>
     for (const f of list) {
       if (f.round == null) continue;
+      const h = f.home, a = f.away;
+      if (h?.teamId == null || a?.teamId == null) continue;
+      for (const [side, opponent] of [[h, a], [a, h]]) {
+        const key = `${f.round}|${side.teamId}`;
+        if (!opponentsInRound.has(key)) opponentsInRound.set(key, new Set());
+        opponentsInRound.get(key).add(opponent.teamId);
+      }
+    }
+    const roundRobinRounds = new Set();
+    for (const [key, opponents] of opponentsInRound.entries()) {
+      if (opponents.size > 1) roundRobinRounds.add(key.slice(0, key.lastIndexOf('|')));
+    }
+
+    const lastDecisive = new Map(); // `${round}|${pairKey}` -> { f, t, winner }
+    for (const f of list) {
+      if (f.round == null || roundRobinRounds.has(f.round)) continue;
       const h = f.home, a = f.away;
       if (h?.teamId == null || a?.teamId == null) continue;
       const winner = decidedWinner(f);
