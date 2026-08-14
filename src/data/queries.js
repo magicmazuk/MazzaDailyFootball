@@ -88,6 +88,34 @@ async function espnTeamIndex() {
   };
 }
 
+// espnQualifier comps (the three UEFA club competitions, §13.11) merge
+// their own scoreboard with ESPN's separate qualifying-rounds code, so
+// qualifying clubs appear tiered alongside the league phase on one page.
+// Same degrade-independently shape as settledCupFixtures below: either
+// leg may be empty or failing, only throw when both are unavailable.
+// Both legs are adapted with the PARENT comp's id (never the qualifier
+// code) so every downstream cache key, route and TV match keys off one
+// compId. Fixtures are deduped by id (first — the main leg — wins) and
+// resorted by kickoff, since the two legs' rounds interleave rather than
+// one strictly preceding the other in fetch order.
+async function espnQualifierFixtures(mainPromise, qualPromise, compId) {
+  const [mainRes, qualRes] = await Promise.allSettled([mainPromise, qualPromise]);
+  if (mainRes.status === 'rejected' && qualRes.status === 'rejected') {
+    throw mainRes.reason;
+  }
+  const mainFixtures = mainRes.status === 'fulfilled' ? adaptScoreboard(mainRes.value.data, compId) : [];
+  const qualFixtures = qualRes.status === 'fulfilled' ? adaptScoreboard(qualRes.value.data, compId) : [];
+  const seen = new Set();
+  const fixtures = [...mainFixtures, ...qualFixtures]
+    .filter(f => (seen.has(f.id) ? false : seen.add(f.id)))
+    .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
+  const asOf = [
+    mainRes.status === 'fulfilled' ? mainRes.value.asOf : null,
+    qualRes.status === 'fulfilled' ? qualRes.value.asOf : null,
+  ].find(Boolean) ?? null;
+  return { fixtures, asOf };
+}
+
 // The three legs of a cup fallback fetch (ESPN scoreboard, BBC fixtures,
 // ESPN teams for re-identification) degrade independently rather than
 // all-or-nothing: one leg failing must never blank a page that has data
@@ -131,6 +159,14 @@ export function seasonFixturesQuery(comp) {
           comp.id,
         );
       }
+      if (comp.espnQualifier) {
+        const { fixtures, asOf } = await espnQualifierFixtures(
+          getJson(espnUrl(`${SOCCER}/${comp.id}/scoreboard`, { dates: SEASON.espnRange, limit: 500 })),
+          getJson(espnUrl(`${SOCCER}/${comp.espnQualifier}/scoreboard`, { dates: SEASON.espnRange, limit: 500 })),
+          comp.id,
+        );
+        return { fixtures: applyTv(fixtures), asOf };
+      }
       const { data, asOf } = await getJson(
         espnUrl(`${SOCCER}/${comp.id}/scoreboard`, { dates: SEASON.espnRange, limit: 500 }));
       return { fixtures: applyTv(adaptScoreboard(data, comp.id)), asOf };
@@ -166,6 +202,14 @@ export function todayWindowQuery(comp, now = new Date()) {
           espnTeamIndex(),
           comp.id,
         );
+      }
+      if (comp.espnQualifier) {
+        const { fixtures, asOf } = await espnQualifierFixtures(
+          getJson(espnUrl(`${SOCCER}/${comp.id}/scoreboard`, { dates: `${ymd(yesterday)}-${ymd(now)}` })),
+          getJson(espnUrl(`${SOCCER}/${comp.espnQualifier}/scoreboard`, { dates: `${ymd(yesterday)}-${ymd(now)}` })),
+          comp.id,
+        );
+        return { fixtures: applyTv(fixtures), asOf };
       }
       const { data, asOf } = await getJson(
         espnUrl(`${SOCCER}/${comp.id}/scoreboard`, { dates: `${ymd(yesterday)}-${ymd(now)}` }));

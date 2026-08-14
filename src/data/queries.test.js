@@ -200,3 +200,136 @@ test('a plain ESPN comp without a bbcTournament makes no BBC or teams requests (
   expect(calls).toHaveLength(1);
   expect(calls[0]).toContain('/scoreboard');
 });
+
+// F1 (spec §13.11): the three UEFA club competitions merge their own
+// scoreboard with a second ESPN code carrying qualifying rounds.
+const qualComp = { id: 'uefa.europa', source: 'espn', espnQualifier: 'uefa.europa_qual' };
+
+const mainScoreboard = () => JSON.stringify({
+  events: [{
+    id: 'main1', date: '2026-09-01T19:00:00Z', status: { type: { name: 'STATUS_SCHEDULED' } },
+    competitions: [{ competitors: [
+      { homeAway: 'home', team: { id: '10', displayName: 'Celtic' } },
+      { homeAway: 'away', team: { id: '20', displayName: 'Real Madrid' } },
+    ] }],
+  }],
+});
+
+const qualScoreboard = () => JSON.stringify({
+  events: [{
+    id: 'qual1', date: '2026-07-15T18:00:00Z', status: { type: { name: 'STATUS_SCHEDULED' } },
+    competitions: [{ competitors: [
+      { homeAway: 'home', team: { id: '30', displayName: 'Shamrock Rovers' } },
+      { homeAway: 'away', team: { id: '40', displayName: 'Ararat-Armenia' } },
+    ] }],
+  }],
+});
+
+// Both legs carry the SAME fixture id — an edge case dedupe must handle
+// even though it shouldn't occur with real ESPN data (main-draw and
+// qualifying-rounds events are distinct matches upstream).
+const dupeMainScoreboard = () => JSON.stringify({
+  events: [{
+    id: 'dup', date: '2026-07-20T19:00:00Z', status: { type: { name: 'STATUS_SCHEDULED' } },
+    competitions: [{ competitors: [
+      { homeAway: 'home', team: { id: '10', displayName: 'Main Side' } },
+      { homeAway: 'away', team: { id: '20', displayName: 'Real Madrid' } },
+    ] }],
+  }],
+});
+
+const dupeQualScoreboard = () => JSON.stringify({
+  events: [{
+    id: 'dup', date: '2026-07-20T19:00:00Z', status: { type: { name: 'STATUS_SCHEDULED' } },
+    competitions: [{ competitors: [
+      { homeAway: 'home', team: { id: '99', displayName: 'Qual Side' } },
+      { homeAway: 'away', team: { id: '20', displayName: 'Real Madrid' } },
+    ] }],
+  }],
+});
+
+function stubQualifierFetch({ failMain = false, failQual = false, dupe = false } = {}) {
+  const calls = [];
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    calls.push(url);
+    // uefa.europa_qual must be checked first — 'uefa.europa' is a prefix
+    // of it, so the reverse order would misroute the qualifier request.
+    if (url.includes('/uefa.europa_qual/scoreboard')) {
+      if (failQual) return new Response('down', { status: 500 });
+      return new Response(dupe ? dupeQualScoreboard() : qualScoreboard(), { status: 200 });
+    }
+    if (url.includes('/uefa.europa/scoreboard')) {
+      if (failMain) return new Response('down', { status: 500 });
+      return new Response(dupe ? dupeMainScoreboard() : mainScoreboard(), { status: 200 });
+    }
+    throw new Error(`unexpected url ${url}`);
+  }));
+  return calls;
+}
+
+test('season fixtures for an espnQualifier comp fetch both scoreboard codes and merge, sorted by kickoff, all under the parent compId', async () => {
+  const calls = stubQualifierFetch();
+  const { fixtures } = await seasonFixturesQuery(qualComp).queryFn();
+  expect(calls.some(u => u.includes('/uefa.europa/scoreboard'))).toBe(true);
+  expect(calls.some(u => u.includes('/uefa.europa_qual/scoreboard'))).toBe(true);
+  expect(fixtures).toHaveLength(2);
+  expect(fixtures.every(f => f.compId === 'uefa.europa')).toBe(true);
+  // qual1 (July) kicks off before main1 (September) — sorted, not just concatenated.
+  expect(fixtures.map(f => f.id)).toEqual(['qual1', 'main1']);
+});
+
+test('season fixtures for an espnQualifier comp dedupe a fixture id shared by both legs, main leg wins', async () => {
+  stubQualifierFetch({ dupe: true });
+  const { fixtures } = await seasonFixturesQuery(qualComp).queryFn();
+  expect(fixtures).toHaveLength(1);
+  expect(fixtures[0].home.name).toBe('Main Side');
+});
+
+test('season fixtures for an espnQualifier comp still return main-leg fixtures when the qualifier leg fails', async () => {
+  stubQualifierFetch({ failQual: true });
+  const { fixtures } = await seasonFixturesQuery(qualComp).queryFn();
+  expect(fixtures).toHaveLength(1);
+  expect(fixtures[0].id).toBe('main1');
+});
+
+test('season fixtures for an espnQualifier comp still return qualifier-leg fixtures when the main leg fails', async () => {
+  stubQualifierFetch({ failMain: true });
+  const { fixtures } = await seasonFixturesQuery(qualComp).queryFn();
+  expect(fixtures).toHaveLength(1);
+  expect(fixtures[0].id).toBe('qual1');
+});
+
+test('season fixtures for an espnQualifier comp throw when both legs fail', async () => {
+  stubQualifierFetch({ failMain: true, failQual: true });
+  await expect(seasonFixturesQuery(qualComp).queryFn()).rejects.toThrow();
+});
+
+test('today window for an espnQualifier comp fetches both scoreboard codes and merges under the parent compId', async () => {
+  const calls = stubQualifierFetch();
+  const now = new Date('2026-08-14T12:00:00Z');
+  const { fixtures } = await todayWindowQuery(qualComp, now).queryFn();
+  expect(calls.some(u => u.includes('/uefa.europa/scoreboard'))).toBe(true);
+  expect(calls.some(u => u.includes('/uefa.europa_qual/scoreboard'))).toBe(true);
+  expect(fixtures).toHaveLength(2);
+  expect(fixtures.every(f => f.compId === 'uefa.europa')).toBe(true);
+});
+
+test('today window for an espnQualifier comp still returns main-leg fixtures when the qualifier leg fails', async () => {
+  stubQualifierFetch({ failQual: true });
+  const now = new Date('2026-08-14T12:00:00Z');
+  const { fixtures } = await todayWindowQuery(qualComp, now).queryFn();
+  expect(fixtures).toHaveLength(1);
+  expect(fixtures[0].id).toBe('main1');
+});
+
+test('a plain ESPN comp without an espnQualifier makes no second scoreboard fetch (unchanged behaviour)', async () => {
+  const calls = [];
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    calls.push(url);
+    return new Response(espnScoreboard(), { status: 200 });
+  }));
+  const plain = { id: 'uefa.champions', source: 'espn' }; // no espnQualifier on this test double
+  await seasonFixturesQuery(plain).queryFn();
+  expect(calls).toHaveLength(1);
+  expect(calls[0]).toContain('/scoreboard');
+});

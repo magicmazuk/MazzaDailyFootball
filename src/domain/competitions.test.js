@@ -63,3 +63,9 @@ test('the three UEFA club competitions share the same structure strip', () => {
   expect(byId('uefa.europa').structure).toEqual(byId('uefa.europa.conf').structure);
   expect(byId('uefa.champions').structure[0]).toEqual({ n: 36, label: 'league phase' });
 });
+
+test('the three UEFA club competitions declare their ESPN qualifying-rounds code (spec §13.11)', () => {
+  expect(byId('uefa.champions').espnQualifier).toBe('uefa.champions_qual');
+  expect(byId('uefa.europa').espnQualifier).toBe('uefa.europa_qual');
+  expect(byId('uefa.europa.conf').espnQualifier).toBe('uefa.europa.conf_qual');
+});

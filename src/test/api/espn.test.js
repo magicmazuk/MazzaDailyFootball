@@ -91,3 +91,24 @@ test('failure with no stored fallback passes the upstream status through', async
   expect(res.statusCode).toBe(502);
   expect(res.headers['cache-control']).toBe('no-store');
 });
+
+// spec §13.11 — the three UEFA club competitions' qualifying rounds live
+// under a separate ESPN league code (queries.js's comp.espnQualifier).
+test('allowlists the UEFA qualifying-rounds codes for scoreboard only', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('{"events":[]}', { status: 200 })));
+  const res = await call(
+    '/api/espn/apis/site/v2/sports/soccer/uefa.europa_qual/scoreboard?dates=20260701-20270630&limit=500');
+  expect(res.statusCode).toBe(200);
+  expect(fetch).toHaveBeenCalledWith(
+    'https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa_qual/scoreboard?dates=20260701-20270630&limit=500',
+    expect.anything(),
+  );
+});
+
+test('rejects a qualifying-rounds code outside scoreboard (no teams/summary/standings need)', async () => {
+  const fetchSpy = vi.fn();
+  vi.stubGlobal('fetch', fetchSpy);
+  const res = await call('/api/espn/apis/site/v2/sports/soccer/uefa.champions_qual/teams');
+  expect(res.statusCode).toBe(400);
+  expect(fetchSpy).not.toHaveBeenCalled();
+});

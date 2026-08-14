@@ -27,6 +27,11 @@ const UEFA_STRUCTURE = [
   { n: null, label: 'knockout' },
 ];
 
+// espnQualifier (spec §13.11): ESPN publishes each UEFA club competition's
+// qualifying rounds under a separate league code from its league-phase-
+// onward code. queries.js fetches both and merges them under this comp's
+// id so qualifying clubs appear tiered on the same Overview page.
+
 export const COMPETITIONS = [
   { ...league, id: 'sco.1', name: 'Scottish Premiership', shortName: 'Premiership',
     country: 'Scotland', source: 'espn', splitAfter: 6,
@@ -69,15 +74,15 @@ export const COMPETITIONS = [
   { ...cup, id: 'uefa.champions', name: 'UEFA Champions League', shortName: 'Champions League',
     country: 'Europe', source: 'espn', hasTable: true,
     zones: { ...range(1, 8, 'adv'), ...range(9, 24, 'po') },
-    structure: UEFA_STRUCTURE },
+    structure: UEFA_STRUCTURE, espnQualifier: 'uefa.champions_qual' },
   { ...cup, id: 'uefa.europa', name: 'UEFA Europa League', shortName: 'Europa League',
     country: 'Europe', source: 'espn', hasTable: true,
     zones: { ...range(1, 8, 'adv'), ...range(9, 24, 'po') },
-    structure: UEFA_STRUCTURE },
+    structure: UEFA_STRUCTURE, espnQualifier: 'uefa.europa_qual' },
   { ...cup, id: 'uefa.europa.conf', name: 'UEFA Conference League', shortName: 'Conference League',
     country: 'Europe', source: 'espn', hasTable: true,
     zones: { ...range(1, 8, 'adv'), ...range(9, 24, 'po') },
-    structure: UEFA_STRUCTURE },
+    structure: UEFA_STRUCTURE, espnQualifier: 'uefa.europa.conf_qual' },
 ];
 
 export const byId = id => COMPETITIONS.find(c => c.id === id);
