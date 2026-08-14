@@ -1,0 +1,34 @@
+# MazzaDailyFootball
+
+A personal, ad-free football app for Scottish and English club football —
+fixtures, results, live scores, tables, squads — in a quality-newspaper
+design language. React learning project.
+
+**Stack:** Vite · React 19 · Tailwind · React Router · TanStack Query ·
+Zustand, deployed on Vercel. Two serverless functions proxy the public
+ESPN and BBC JSON feeds with edge caching. **No API keys, no accounts,
+no cost.**
+
+## Run it
+
+    npm install
+    npm run dev        # http://localhost:5173 — /api/* works via the dev shim
+    npm run test:run   # full test suite
+    npm run build      # production build
+
+## Deploy
+
+Push to GitHub, import the repo at vercel.com — no environment variables
+needed. `vercel.json` maps `/api/espn/*` to the proxy and everything else
+to the SPA.
+
+## Where things live
+
+- `api/` — the two proxies (allowlist + edge cache + last-known-good)
+- `src/domain/` — competition registry, computed tables, form, monograms
+- `src/data/` — source adapters (ESPN, BBC) and query hooks
+- `src/features/` — one folder per screen
+- `docs/superpowers/specs/` — the design spec this app implements
+
+Data quirks worth knowing before touching `src/data/`: see spec §3.5
+(the User-Agent trap, "Away at Home", round slugs, error bodies).
