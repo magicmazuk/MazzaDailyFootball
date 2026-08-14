@@ -1,9 +1,11 @@
 // The match room (spec §7.6): score and clock, then a vertical timeline
 // of moments newest first, then stats. Degrades to a clean scoreline
 // plus one honest line where the source publishes no detail.
+import { Link } from 'react-router-dom';
 import Crest from '../../ui/Crest.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
 import StatusWord from '../../ui/StatusWord.jsx';
+import TvBadge from '../../ui/TvBadge.jsx';
 
 const STAT_LABELS = {
   possessionPct: 'Possession', totalShots: 'Shots', shotsOnTarget: 'On target',
@@ -39,25 +41,29 @@ function penaltyResult(fixture) {
   };
 }
 
-function ScoreHeader({ fixture }) {
+function ScoreHeader({ fixture, comp }) {
   const pens = penaltyResult(fixture);
   return (
     <header className="mb-8">
       {[fixture.home, fixture.away].map(side => (
         <div key={side.teamId} className="flex items-center gap-3 py-1.5">
-          <Crest side={side} size={26} />
-          <span className="flex-1 text-[19px] truncate">{side.name}</span>
+          <Link to={`/team/${comp.id}/${side.teamId}`}
+            className="flex items-center gap-3 flex-1 min-w-0">
+            <Crest side={side} size={26} />
+            <span className="text-[19px] truncate">{side.name}</span>
+          </Link>
           <span className="text-[30px] tabular-nums">{side.score ?? '–'}</span>
         </div>
       ))}
-      <div className="mt-2">
+      <div className="mt-2 flex items-center gap-2.5">
         <StatusWord fixture={fixture} />
-        {pens && (
-          <p className="font-sans text-[10px] text-accent mt-1">
-            {pens.winnerName} win {pens.winnerScore}–{pens.loserScore} on penalties
-          </p>
-        )}
+        <TvBadge tv={fixture.tv} />
       </div>
+      {pens && (
+        <p className="font-sans text-[10px] text-accent mt-1">
+          {pens.winnerName} win {pens.winnerScore}–{pens.loserScore} on penalties
+        </p>
+      )}
       {fixture.venue && (
         <p className="font-sans text-[10px] text-muted mt-1.5">{fixture.venue}</p>
       )}
@@ -158,7 +164,7 @@ export default function MatchRoom({ fixture, comp, detail }) {
       <p className="font-sans text-[10px] uppercase tracking-[.22em] text-muted mb-5">
         {comp.name}
       </p>
-      <ScoreHeader fixture={headerFixture} />
+      <ScoreHeader fixture={headerFixture} comp={comp} />
       {comp.hasMatchDetail
         ? (<>
             <Timeline events={detail?.events} />

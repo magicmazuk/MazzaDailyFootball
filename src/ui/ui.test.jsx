@@ -52,3 +52,28 @@ test('FixtureRow links to the match and stars a followed side', () => {
   expect(screen.getByText('★')).toBeInTheDocument();
   expect(screen.getByText('2')).toBeInTheDocument();
 });
+
+test('FixtureRow: crest click navigates to the team page, not the match', async () => {
+  const user = (await import('@testing-library/user-event')).default.setup();
+  const { default: FixtureRowV2 } = await import('./FixtureRow.jsx');
+  const routes = (await import('react-router-dom'));
+  let where = null;
+  function Probe() { where = routes.useLocation().pathname; return null; }
+  render(
+    <MemoryRouter initialEntries={['/']}>
+      <FixtureRowV2 fixture={fixture('scheduled')} followedIds={new Set()} />
+      <routes.Routes>
+        <routes.Route path="*" element={<Probe />} />
+      </routes.Routes>
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByLabelText('Celtic team page'));
+  expect(where).toBe('/team/sco.1/256');
+});
+
+test('FixtureRow: tv badges render under the kickoff', () => {
+  render(<MemoryRouter>
+    <FixtureRow fixture={{ ...fixture('scheduled'), tv: ['Sky Sports'] }} followedIds={new Set()} />
+  </MemoryRouter>);
+  expect(screen.getByText('Sky')).toBeInTheDocument();
+});
