@@ -43,6 +43,9 @@ function penaltyResult(fixture) {
 
 function ScoreHeader({ fixture, comp }) {
   const pens = penaltyResult(fixture);
+  // ESPN reports score:"0" before kickoff — a scheduled or postponed fixture
+  // shows a dash, the same as a genuinely missing score, never a phantom 0-0.
+  const showScore = fixture.status === 'live' || fixture.status === 'ft';
   return (
     <header className="mb-8">
       {[fixture.home, fixture.away].map(side => (
@@ -52,7 +55,9 @@ function ScoreHeader({ fixture, comp }) {
             <Crest side={side} size={26} />
             <span className="text-[19px] truncate">{side.name}</span>
           </Link>
-          <span className="text-[30px] tabular-nums">{side.score ?? '–'}</span>
+          <span className="text-[30px] tabular-nums">
+            {showScore && side.score != null ? side.score : '–'}
+          </span>
         </div>
       ))}
       <div className="mt-2 flex items-center gap-2.5">

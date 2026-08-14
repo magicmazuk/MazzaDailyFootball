@@ -129,6 +129,16 @@ test('BBC competitions get the honest degraded line, not empty shelves', () => {
     .toBeInTheDocument();
 });
 
+test('a scheduled fixture with ESPN\'s phantom score:"0" shows a dash, not 0-0', () => {
+  const scheduledFixture = { ...fixture, status: 'scheduled', minute: null,
+    home: side('Celtic', 0), away: side('Rangers', 0) };
+  render(<MemoryRouter>
+    <MatchRoom fixture={scheduledFixture} comp={byId('sco.1')} detail={null} />
+  </MemoryRouter>);
+  expect(screen.getAllByText('–')).toHaveLength(2);
+  expect(screen.queryByText('0')).not.toBeInTheDocument();
+});
+
 test('score header sides link to team pages and tv renders', () => {
   render(<MemoryRouter>
     <MatchRoom fixture={{ ...fixture, tv: ['TNT Sports'] }} comp={byId('sco.1')} detail={detail} />

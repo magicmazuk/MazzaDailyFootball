@@ -77,3 +77,28 @@ test('FixtureRow: tv badges render under the kickoff', () => {
   </MemoryRouter>);
   expect(screen.getByText('Sky')).toBeInTheDocument();
 });
+
+test('FixtureRow: a scheduled fixture with ESPN\'s phantom score:"0" renders no score digits', () => {
+  render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('scheduled', {
+        home: side({ teamId: '256', name: 'Celtic', crestUrl: 'c.png', score: 0 }),
+        away: side({ teamId: '267', name: 'St Johnstone', score: 0 }),
+      })} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByText('0')).not.toBeInTheDocument();
+});
+
+test('FixtureRow: an ft fixture still shows its scores', () => {
+  render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('ft', {
+        home: side({ teamId: '256', name: 'Celtic', crestUrl: 'c.png', score: 3 }),
+        away: side({ teamId: '267', name: 'St Johnstone', score: 0 }),
+      })} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText('3')).toBeInTheDocument();
+  expect(screen.getByText('0')).toBeInTheDocument();
+});
