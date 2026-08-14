@@ -35,6 +35,7 @@ export default function TodayScreen() {
         { comp: byId('sco.1'), rows: spl.data?.rows ?? [] },
         { comp: byId('eng.1'), rows: epl.data?.rows ?? [] },
       ]}
+      followedClubs={Object.values(followed)}
     />
   );
 }

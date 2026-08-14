@@ -67,3 +67,17 @@ test('nextUp does not count as activity for the quiet-day check', () => {
   );
   expect(screen.getByText('No matches today.')).toBeInTheDocument();
 });
+
+test('followed clubs get calendar chips linking to their club calendar', () => {
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-22T15:00:00Z')} followedIds={new Set(['256'])}
+        partition={{ yours: [], live: [], later: [], earlier: [], yesterday: [] }}
+        nextUp={[]} quickTables={[]}
+        followedClubs={[{ id: '256', name: 'Celtic', crestUrl: null, monogram: 'CE' }]} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole('link', { name: 'Celtic calendar' }))
+    .toHaveAttribute('href', '/calendar/256');
+  expect(screen.getByText('No matches today.')).toBeInTheDocument(); // chips ≠ activity
+});
