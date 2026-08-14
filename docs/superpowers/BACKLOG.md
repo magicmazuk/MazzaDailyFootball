@@ -38,3 +38,15 @@ None block usage; candidates for a future 1.2 pass.
   Curators should follow the README.
 - **Cross-source club identity** (R1 note) — BBC team ids never match ESPN ids, so a
   followed League One club stars only its league fixtures.
+
+## From the 1.2 final review (2026-08-14)
+
+- **On TV can duplicate today's fixtures** already listed under Live/Later today (window
+  starts at now, not tomorrow) — product call.
+- **Calendar has no loading/error state** — cold cache shows an empty grid + "No fixtures
+  this day" until data lands (sub-second via proxy).
+- **selectedKey persists when paging months** — day list keeps showing a day from the
+  previous month; self-labelled but worth clearing on page.
+- **"No matches today." sits below On TV/Quick view** on quiet days — ordering call.
+- **Dead useMemo over useQueries array** in CalendarScreen (recompute per render, no loop).
+- **No live-status score test for FixtureRow** (only ft asserted; same boolean guards both).
