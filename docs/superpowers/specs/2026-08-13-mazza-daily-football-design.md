@@ -426,3 +426,66 @@ Priority areas, in order:
 
 GitHub repository, deployed to Vercel. No environment variables or secrets are required — a
 consequence of every source being public and keyless. `.superpowers/` is git-ignored.
+
+---
+
+## 13. Post-release additions (agreed 2026-08-14, after first live use)
+
+Four changes requested after Release 1 shipped. Items 13.1–13.3 form **Release 1.1**;
+item 13.4 amends the Release 2 cup page.
+
+### 13.1 Today screen enrichment
+
+- **Yesterday's results** — already present (§7.2); the launch day happened to be a quiet
+  Thursday, so the section had nothing to show. Kept, unchanged.
+- **"Next up" for followed clubs** — every followed club with no fixture today gets a row
+  under ★ Your clubs showing its next fixture with date and kickoff. Derived from the
+  season-fixture caches; no new requests.
+- **Mini league tables** — compact quick-views of the Scottish Premiership and the English
+  Premier League (top rows + any followed club's row, four columns of the T1 design) with
+  the whole widget linking to the full competition page.
+
+### 13.2 Universal club navigation rule
+
+A club's crest or name is always a link to its team page, **except** where another
+interaction takes precedence — the league-table row (tap = expand drawer; the drawer
+carries the team-page link) is the canonical exception. In fixture rows the crest is the
+team link and the rest of the row remains the match link. Applies to every current and
+future screen, including the match room header and the Release 2 cup widgets.
+
+### 13.3 TV broadcast metadata
+
+**Requirement:** fixtures carry UK broadcaster info (Sky Sports, TNT Sports, BBC, ITV,
+Amazon Prime Video) wherever fixtures render.
+
+**Feasibility (probed live 2026-08-14):** ESPN's `broadcasts`/`geoBroadcasts` carry US
+broadcasters only (NBC, Peacock, USA Net); `?region=gb` is ignored; Scottish fixtures carry
+none. The BBC feed has no broadcast fields. TheSportsDB's TV endpoint exists but its free
+tier is truncated to near-uselessness; its paid tier (~$9/mo) claims full listings but
+cannot be verified before subscribing. There is **no free, reliable API for UK football TV
+listings.**
+
+**Design consequence:** the domain model gains `Fixture.tv: string[]` (canonical channel
+names) filled by a **swappable tv-provider adapter**, and a `TvBadge` renders wherever a
+fixture does — fixture rows (compact), match room (full). The provider behind it is a
+data-source decision recorded when made:
+
+| Option | Cost | Trade-off |
+|---|---|---|
+| Curated JSON file in the repo | £0 | Accurate but manual — someone must update it from broadcaster announcements |
+| TheSportsDB Premium | ~$9/mo | Automatic; UK coverage unverifiable until subscribed |
+| Scraping a listings site | £0 | Fragile, and against most sites' terms — rejected |
+
+Whichever provider is chosen, missing TV data renders as nothing — never a placeholder.
+
+### 13.4 Release 2 amendment — "the field" widget
+
+Cup pages gain a **competing-teams widget**: every entrant's crest (monogram fallback),
+each linking to the team page per §13.2. Grouped meaningfully per competition type:
+
+- **European competitions, pre-league-phase:** *Qualified* vs *Still qualifying* —
+  derivable from round slugs (qualifying-round fixtures vs league-phase membership).
+- **Domestic cups:** grouped by entry round (the round structure is in the feed).
+
+This widget and the Release 2 survival board (§8) are siblings: the field before the
+competition starts, the survival board once it is underway. They can share layout DNA.
