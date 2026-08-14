@@ -33,7 +33,7 @@ export const COMPETITIONS = [
   { ...cup, id: 'sco.tennents', name: 'Scottish Cup', shortName: 'Scottish Cup',
     country: 'Scotland', source: 'espn' },
   { ...cup, id: 'sco.cis', name: 'Scottish League Cup', shortName: 'League Cup',
-    country: 'Scotland', source: 'espn' },
+    country: 'Scotland', source: 'espn', bbcTournament: 'scottish-league-cup' },
   { ...cup, id: 'sco.challenge', name: 'Scottish Challenge Cup', shortName: 'Challenge Cup',
     country: 'Scotland', source: 'espn' },
   { ...league, id: 'eng.1', name: 'English Premier League', shortName: 'Premier League',
