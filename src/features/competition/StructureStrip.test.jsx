@@ -40,3 +40,33 @@ test('a node with n: null renders label only, no numeral text for it', () => {
   expect(screen.getByText('clubs enter in waves')).toBeInTheDocument();
   expect(screen.getAllByText('›')).toHaveLength(1);
 });
+
+// F2 (spec §13.11): a wide strip swipes horizontally instead of wrapping
+// — a wrapped separator on its own line was an orphaned '›' on mobile.
+test('the strip scrolls horizontally instead of wrapping, and separator count is unchanged', () => {
+  const { container } = render(<StructureStrip structure={ucl.structure} />);
+  const scroller = container.querySelector('.overflow-x-auto');
+  expect(scroller).not.toBeNull();
+  expect(scroller.className).toContain('flex-nowrap');
+  expect(scroller.className).not.toMatch(/(^|\s)flex-wrap(\s|$)/);
+  expect(screen.getAllByText('›')).toHaveLength(ucl.structure.length - 1);
+});
+
+test('the bottom hairline lives on a wrapper that does not itself scroll, so the rule stays full-width', () => {
+  const { container } = render(<StructureStrip structure={ucl.structure} />);
+  const scroller = container.querySelector('.overflow-x-auto');
+  const hairline = container.querySelector('.border-b');
+  expect(hairline).not.toBeNull();
+  expect(hairline).not.toBe(scroller);
+  expect(hairline.className).not.toContain('overflow-x-auto');
+  expect(hairline.contains(scroller)).toBe(true);
+});
+
+test('each node is shrink-0 with the tightened 88px max-width', () => {
+  const { container } = render(<StructureStrip structure={ucl.structure} />);
+  const nodeBoxes = container.querySelectorAll('.max-w-\\[88px\\]');
+  expect(nodeBoxes).toHaveLength(ucl.structure.length);
+  for (const box of nodeBoxes) {
+    expect(box.className).toContain('shrink-0');
+  }
+});
