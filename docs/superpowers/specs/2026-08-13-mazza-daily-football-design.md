@@ -596,3 +596,16 @@ favoured throughout:
    phase is drawn the field shows the structure strip plus one honest line ("The league
    phase draw hasn't been made yet"). Qualifying-team lists are out of scope until a source
    exists.
+
+### 13.11 European qualifying (agreed 2026-08-15)
+
+ESPN publishes qualifying rounds as separate competitions (`uefa.champions_qual`,
+`uefa.europa_qual`, `uefa.europa.conf_qual`) — the main codes stay empty until the league
+phase is drawn, which is why the European pages looked dead mid-August. Each European
+competition declares `espnQualifier: '<code>'`; its fixture queries fetch both codes and
+concatenate (same id namespace — no re-identification needed; dedupe by event id, sort by
+kickoff). Qualifying round slugs join the round prettifier. Consequences: the Overview
+field shows qualifying clubs tiered by round; Today windows carry European qualifiers;
+§13.4's "qualified vs still qualifying" grouping becomes derived data. The structure strip
+also becomes horizontally scrollable (no wrapping — an orphaned separator wrapped badly on
+mobile).
