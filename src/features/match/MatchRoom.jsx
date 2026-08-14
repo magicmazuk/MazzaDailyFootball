@@ -11,6 +11,21 @@ const STAT_LABELS = {
   redCards: 'Red cards', offsides: 'Offsides', saves: 'Saves',
 };
 
+// The season/today cache can be up to an hour stale during a live match.
+// When the summary endpoint's fresher header score is available, overlay
+// it onto the fixture sides shown in the header — matched by teamId, with
+// a fallback to the cached fixture score for a side liveScore doesn't cover.
+function withLiveScore(fixture, liveScore) {
+  if (!liveScore) return fixture;
+  const overlay = side => {
+    const fresher = side.teamId === liveScore.home?.teamId ? liveScore.home
+      : side.teamId === liveScore.away?.teamId ? liveScore.away
+      : null;
+    return fresher && fresher.score != null ? { ...side, score: fresher.score } : side;
+  };
+  return { ...fixture, home: overlay(fixture.home), away: overlay(fixture.away) };
+}
+
 function ScoreHeader({ fixture }) {
   return (
     <header className="mb-8">
@@ -114,12 +129,15 @@ function Lineups({ lineups, fixture }) {
 }
 
 export default function MatchRoom({ fixture, comp, detail }) {
+  const headerFixture = fixture.status === 'live'
+    ? withLiveScore(fixture, detail?.liveScore)
+    : fixture;
   return (
     <main>
       <p className="font-sans text-[10px] uppercase tracking-[.22em] text-muted mb-5">
         {comp.name}
       </p>
-      <ScoreHeader fixture={fixture} />
+      <ScoreHeader fixture={headerFixture} />
       {comp.hasMatchDetail
         ? (<>
             <Timeline events={detail?.events} />

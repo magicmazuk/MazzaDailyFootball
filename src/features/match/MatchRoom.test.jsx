@@ -62,6 +62,34 @@ test('renders team stats correctly even with away-first array order', () => {
   expect(stats[1].textContent).toBe('42%');
 });
 
+test('a live fixture overlays the fresher summary score onto the header, not the stale cached one', () => {
+  const liveDetail = {
+    ...detail,
+    liveScore: { home: { teamId: 'Celtic', score: 3 }, away: { teamId: 'Rangers', score: 1 } },
+  };
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={liveDetail} />
+  </MemoryRouter>);
+  // fixture itself says 2-1 (stale cache); the summary header says 3-1.
+  const headerScores = [...container.querySelector('header').querySelectorAll('.tabular-nums')]
+    .map(el => el.textContent);
+  expect(headerScores).toEqual(['3', '1']);
+});
+
+test('a non-live fixture ignores liveScore even if present, and falls back to fixture scores', () => {
+  const ftFixture = { ...fixture, status: 'ft' };
+  const liveDetail = {
+    ...detail,
+    liveScore: { home: { teamId: 'Celtic', score: 9 }, away: { teamId: 'Rangers', score: 9 } },
+  };
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={ftFixture} comp={byId('sco.1')} detail={liveDetail} />
+  </MemoryRouter>);
+  const headerScores = [...container.querySelector('header').querySelectorAll('.tabular-nums')]
+    .map(el => el.textContent);
+  expect(headerScores).toEqual(['2', '1']);
+});
+
 test('BBC competitions get the honest degraded line, not empty shelves', () => {
   render(<MemoryRouter>
     <MatchRoom fixture={{ ...fixture, compId: 'scottish-league-one' }}

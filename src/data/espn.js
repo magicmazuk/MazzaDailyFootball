@@ -127,5 +127,22 @@ export function adaptSummary(json) {
       position: p.position?.abbreviation ?? null,
     })),
   }));
-  return { events, teamStats, lineups };
+  const liveScore = adaptLiveScore(json);
+  return { events, teamStats, lineups, liveScore };
+}
+
+// The season/today caches can be up to an hour stale during a live match;
+// the summary endpoint's header carries the current score. null when the
+// header is absent so callers can fall back to the cached fixture score.
+function adaptLiveScore(json) {
+  const competitors = json?.header?.competitions?.[0]?.competitors;
+  if (!competitors) return null;
+  const home = competitors.find(c => c.homeAway === 'home');
+  const away = competitors.find(c => c.homeAway === 'away');
+  if (!home || !away) return null;
+  const num = c => (c.score != null && c.score !== '' ? Number(c.score) : null);
+  return {
+    home: { teamId: home.team?.id ?? null, score: num(home) },
+    away: { teamId: away.team?.id ?? null, score: num(away) },
+  };
 }

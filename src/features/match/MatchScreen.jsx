@@ -8,7 +8,8 @@ export default function MatchScreen() {
   const comp = byId(compId);
   const season = useSeasonFixtures(comp ?? { id: 'none', source: 'espn' });
   const fixture = season.data?.fixtures.find(f => f.id === eventId);
-  const detail = useMatchDetail(comp, eventId, fixture?.status === 'live');
+  const detail = useMatchDetail(comp ?? { id: 'none', hasMatchDetail: false }, eventId,
+    fixture?.status === 'live');
 
   if (!comp) return <p className="text-muted">Unknown competition.</p>;
   if (!fixture) {

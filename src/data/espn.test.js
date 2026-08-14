@@ -186,3 +186,23 @@ test('summary: missing boxscore yields null teamStats, not a crash', () => {
   expect(adaptSummary({}).teamStats).toBeNull();
   expect(adaptSummary({}).events).toEqual([]);
 });
+
+test('summary: header competitors produce a fresher liveScore keyed by homeAway', () => {
+  const withHeader = {
+    ...summary,
+    header: { competitions: [{ competitors: [
+      { homeAway: 'home', team: { id: '256' }, score: '3' },
+      { homeAway: 'away', team: { id: '257' }, score: '1' },
+    ] }] },
+  };
+  const d = adaptSummary(withHeader);
+  expect(d.liveScore).toEqual({
+    home: { teamId: '256', score: 3 },
+    away: { teamId: '257', score: 1 },
+  });
+});
+
+test('summary: liveScore is null when the header is absent', () => {
+  expect(adaptSummary(summary).liveScore).toBeNull();
+  expect(adaptSummary({}).liveScore).toBeNull();
+});
