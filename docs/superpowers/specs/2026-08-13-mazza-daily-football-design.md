@@ -516,3 +516,25 @@ within the next 14 days, soonest first, capped at 8, grouped by day. Renders not
 no televised fixtures are known — never a placeholder. Placed between Earlier today and
 Quick view.
 
+
+### 13.7 Dual-source cup fixtures (agreed 2026-08-14)
+
+**Trigger:** ESPN's Scottish League Cup feed carries only the 80 group-stage fixtures —
+the knockout rounds (where Celtic and other seeded clubs enter) are absent even the day
+before they kick off. The BBC's `scottish-league-cup` tournament carries them.
+
+**Mechanism (generic, per-competition):** a competition may declare
+`bbcTournament: '<slug>'`. Its fixture queries then fetch both sources and merge:
+
+- ESPN fixtures are authoritative; a BBC fixture is added only when no ESPN fixture exists
+  for the same date + home + away (normalized names). If ESPN later publishes the round,
+  its fixture wins and the BBC copy disappears.
+- Merged BBC fixtures are **re-identified onto ESPN teams** by normalized name against the
+  ESPN team lists for the top two Scottish tiers (edge-cached requests) — so followed-club
+  matching (★, Next up, club calendars) and crests work. Clubs with no ESPN identity keep
+  their BBC identity and monogram.
+- Merged fixtures carry a `bbc-` prefixed id; their match rooms degrade to the scoreline
+  (no ESPN summary exists).
+
+Applied now to `sco.cis`; the BBC proxy allowlist also admits `scottish-cup` so the same
+flag can be flipped for `sco.tennents` if ESPN's feed goes similarly quiet in January.
