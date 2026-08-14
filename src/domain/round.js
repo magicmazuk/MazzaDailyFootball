@@ -13,9 +13,14 @@ const YEAR_PREFIXED = /^\d{4}-\d{2}-/;
 
 // A handful of round names are single compound words that don't split
 // cleanly on '-' the way 'fourth-round' does.
+// 'playoff-round' is the UEFA qualifying-rounds code's own slug for what
+// Broadsheet style spells "Play-off" (hyphenated, as in zones.js's `po`
+// label and the UEFA structure strip) — the generic splitter below would
+// otherwise render it "Playoff round".
 const IRREGULAR = {
   quarterfinals: 'Quarter-finals',
   semifinals: 'Semi-finals',
+  'playoff-round': 'Play-off round',
 };
 
 export function prettifyRound(slug) {

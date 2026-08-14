@@ -13,8 +13,14 @@ const UPSTREAM = 'https://site.api.espn.com';
 
 const LEAGUE =
   '(sco\\.1|sco\\.2|sco\\.tennents|sco\\.cis|sco\\.challenge|eng\\.1|eng\\.fa|eng\\.league_cup|uefa\\.champions|uefa\\.europa|uefa\\.europa\\.conf)';
+// The three UEFA club competitions' qualifying rounds (spec §13.11) live
+// under their own ESPN league code — scoreboard only, never teams/
+// summary/standings, since queries.js only ever fetches the qualifier
+// code's scoreboard and adapts it under the parent comp's id.
+const QUALIFIER = '(uefa\\.champions_qual|uefa\\.europa_qual|uefa\\.europa\\.conf_qual)';
 const ALLOWED = [
   new RegExp(`^/apis/site/v2/sports/soccer/${LEAGUE}/scoreboard$`),
+  new RegExp(`^/apis/site/v2/sports/soccer/${QUALIFIER}/scoreboard$`),
   new RegExp(`^/apis/site/v2/sports/soccer/${LEAGUE}/teams$`),
   new RegExp(`^/apis/site/v2/sports/soccer/${LEAGUE}/teams/\\d+$`),
   new RegExp(`^/apis/site/v2/sports/soccer/${LEAGUE}/summary$`),
