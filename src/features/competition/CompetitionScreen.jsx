@@ -29,6 +29,13 @@ export default function CompetitionScreen() {
     ? ['Overview', ...(comp.hasTable ? ['Table'] : []), 'Fixtures', 'Results']
     : [...(comp?.hasTable ? ['Table'] : []), 'Fixtures', 'Results'];
   const [tab, setTab] = useState(tabs[0]);
+  // React Router reuses this component instance across param changes on
+  // the same route (`competition/:compId`) rather than remounting it, so
+  // `tab` can be left over from a previous, differently-tabbed competition
+  // (e.g. 'Table' after leaving a league for a cup with no Table tab) —
+  // fall back to the new competition's first tab whenever the stored one
+  // isn't valid for it, without needing a remount/key trick.
+  const active = tabs.includes(tab) ? tab : tabs[0];
   const followedIds = new Set(Object.keys(usePrefs(s => s.followed)));
   const table = useTable(comp ?? { id: 'none', hasTable: false, source: 'espn' });
   const season = useSeasonFixtures(comp ?? { id: 'none', source: 'espn' });
@@ -55,12 +62,12 @@ export default function CompetitionScreen() {
         {tabs.map(t => (
           <button key={t} type="button" onClick={() => setTab(t)}
             className={`flex-1 py-2 text-[9.5px] uppercase tracking-[.1em] ${
-              tab === t ? 'bg-ink text-paper' : 'text-ink'}`}>
+              active === t ? 'bg-ink text-paper' : 'text-ink'}`}>
             {t}
           </button>
         ))}
       </div>
-      {tab === 'Overview' && (
+      {active === 'Overview' && (
         <>
           <StructureStrip structure={comp.structure} />
           {season.isLoading
@@ -68,17 +75,17 @@ export default function CompetitionScreen() {
             : <FieldBoard fixtures={fixtures} comp={comp} followedIds={followedIds} />}
         </>
       )}
-      {tab === 'Table' && (table.data
+      {active === 'Table' && (table.data
         ? <LeagueTable comp={comp} rows={table.data.rows}
             followedIds={followedIds} formByTeam={formByTeam} />
         : <p className="text-muted">{table.isError ? 'Table unavailable.' : 'Loading table…'}</p>)}
-      {tab === 'Fixtures' && groupByDate(upcoming).map(([day, list]) => (
+      {active === 'Fixtures' && groupByDate(upcoming).map(([day, list]) => (
         <section key={day} className="mb-6">
           <p className="font-sans text-[9.5px] uppercase tracking-[.18em] text-muted mb-2">{day}</p>
           {list.map(f => <FixtureRow key={f.id} fixture={f} followedIds={followedIds} />)}
         </section>
       ))}
-      {tab === 'Results' && groupByDate(results).map(([day, list]) => (
+      {active === 'Results' && groupByDate(results).map(([day, list]) => (
         <section key={day} className="mb-6">
           <p className="font-sans text-[9.5px] uppercase tracking-[.18em] text-muted mb-2">{day}</p>
           {list.map(f => <FixtureRow key={f.id} fixture={f} followedIds={followedIds} />)}

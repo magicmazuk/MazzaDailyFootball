@@ -92,11 +92,32 @@ test.each([
   ['Semifinal', 'semifinals'],
   ['Final', 'final'],
   ['final', 'final'],
-  ['Group A', null],
+  ['Group A', 'group-stage'],
+  ['group z', 'group-stage'], // case-insensitive
+  ['Group AB', null], // not a single letter — not a group label
   ['Saturday 1st August', null], // an eventGroup label, not a round label
   [null, null],
   [undefined, null],
   ['', null],
 ])('bbcRoundSlug(%j) -> %j', (label, expected) => {
   expect(bbcRoundSlug(label)).toBe(expected);
+});
+
+test('adaptBbcFixtures propagates group labels through to round: "group-stage", the same slug ESPN uses', () => {
+  const groupPayload = {
+    eventGroups: [{
+      displayLabel: 'Saturday 1st August',
+      secondaryGroups: [{
+        displayLabel: 'Group A',
+        events: [{
+          id: 'g-1', startDateTime: '2026-08-01T14:00:00Z', status: 'PreEvent',
+          periodLabel: null, statusComment: null,
+          home: { id: 'h1', fullName: 'Alloa Athletic' },
+          away: { id: 'a1', fullName: 'East Fife' },
+        }],
+      }],
+    }],
+  };
+  const fx = adaptBbcFixtures(groupPayload, 'sco.cis');
+  expect(fx[0].round).toBe('group-stage');
 });

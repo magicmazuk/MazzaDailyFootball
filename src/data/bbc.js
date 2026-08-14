@@ -22,8 +22,12 @@ function side(s = {}) {
 }
 
 // Numbered rounds ('1st Round' .. '<n>th Round') map to 'round-<n>';
-// knockout stage names map to the same slugs ESPN uses; anything else
-// (group/league phase labels, or no label at all) is null — the field
+// knockout stage names map to the same slugs ESPN uses; a single-letter
+// group label ('Group A' .. 'Group Z') maps to 'group-stage', matching
+// ESPN's own slug for the same phase — this is what lets a BBC-only group
+// stage tier alongside an ESPN one instead of falling through as an
+// unrounded (and therefore untiered/unfilterable) fixture. Anything else
+// (other league-phase labels, or no label at all) is null — the field
 // domain already treats a null round as invisible rather than an error.
 export function bbcRoundSlug(label) {
   if (!label) return null;
@@ -32,6 +36,7 @@ export function bbcRoundSlug(label) {
   if (/quarter.?finals?/i.test(label)) return 'quarterfinals';
   if (/semi.?finals?/i.test(label)) return 'semifinals';
   if (/^final$/i.test(label)) return 'final';
+  if (/^group [a-z]$/i.test(label)) return 'group-stage';
   return null;
 }
 
