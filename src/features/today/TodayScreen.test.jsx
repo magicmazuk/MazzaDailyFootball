@@ -7,6 +7,7 @@ import { usePrefs } from '../../store/prefs.js';
 vi.mock('../../data/queries.js', () => ({
   // Mirrors useQueries({ queries: [] }) === [] when there is nothing to fetch.
   useTodayWindows: comps => comps.map(() => ({ isLoading: true, data: undefined })),
+  useAllSeasonFixtures: comps => comps.map(() => ({ isLoading: true, data: undefined })),
 }));
 
 import TodayScreen from './TodayScreen.jsx';
