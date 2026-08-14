@@ -43,3 +43,22 @@ announce picks, add one object per televised match to `listings`:
 `comp` is the competition id from `src/domain/competitions.js`; `home` is
 case/punctuation-insensitive; channels are: Sky Sports, TNT Sports, BBC,
 ITV, Amazon Prime, Premier Sports. Commit and push — Vercel redeploys automatically.
+
+## Match video (the one API key)
+
+A finished fixture's match room can show a YouTube highlights card — the
+app's only API key, and it's necessarily client-side (browsers can't keep
+a secret from their own network tab). The key is:
+
+- **Locally:** `VITE_YOUTUBE_API_KEY` in `.env.local` (gitignored — never
+  commit it).
+- **On Vercel:** the same name, `VITE_YOUTUBE_API_KEY`, set as a project
+  environment variable.
+- **Locked down:** in Google Cloud Console, restrict the key's allowed
+  HTTP referrers to `https://mazza-daily-football.vercel.app/*` (plus
+  `http://localhost:5173/*` for local dev if you want the card to work
+  there too) so it's useless if scraped from a page source.
+
+Without a key set, the app behaves exactly as if no highlights exist —
+the video card simply never appears. Nothing else about the app depends
+on this key; every other data source goes through the two proxies above.

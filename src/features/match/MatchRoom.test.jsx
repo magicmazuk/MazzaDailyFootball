@@ -340,3 +340,39 @@ test('head-to-head section is absent without meetings', () => {
   </MemoryRouter>);
   expect(screen.queryByText('Head to head')).not.toBeInTheDocument();
 });
+
+// --- contextual match video (spec §13.9) ---
+
+const videos = [{ videoId: 'abc123', title: 'Celtic 2-1 Rangers highlights' }];
+
+test('the video card renders after head-to-head when videos are supplied', () => {
+  const h2hDetail = { ...detail, headToHead: {
+    meetings: [{ date: '2026-02-15T14:00:00Z', homeName: 'Rangers', awayName: 'Celtic',
+      homeScore: 1, awayScore: 2 }],
+  } };
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={h2hDetail}
+      videos={videos} />
+  </MemoryRouter>);
+  expect(screen.getByText('Celtic 2-1 Rangers highlights')).toBeInTheDocument();
+  const sectionLabels = [...container.querySelectorAll('h2')].map(h => h.textContent);
+  expect(sectionLabels.indexOf('Head to head')).toBeLessThan(sectionLabels.indexOf('Video'));
+});
+
+test('no videos supplied renders no video card', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={detail}
+      videos={[]} />
+  </MemoryRouter>);
+  expect(screen.queryByText('Video')).not.toBeInTheDocument();
+});
+
+test('the video card still renders in the BBC-degraded branch (no match detail) when videos are supplied', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, compId: 'scottish-league-one', status: 'ft' }}
+      comp={byId('scottish-league-one')} detail={null} videos={videos} />
+  </MemoryRouter>);
+  expect(screen.getByText("Detailed stats aren't published for Scottish League One."))
+    .toBeInTheDocument();
+  expect(screen.getByText('Celtic 2-1 Rangers highlights')).toBeInTheDocument();
+});

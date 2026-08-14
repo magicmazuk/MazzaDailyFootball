@@ -10,6 +10,7 @@ import SectionLabel from '../../ui/SectionLabel.jsx';
 import StatusWord from '../../ui/StatusWord.jsx';
 import TvBadge from '../../ui/TvBadge.jsx';
 import { prettifyRound } from '../../domain/round.js';
+import VideoCard from './VideoCard.jsx';
 
 const STAT_LABELS = {
   possessionPct: 'Possession', totalShots: 'Shots', shotsOnTarget: 'On target',
@@ -324,7 +325,7 @@ function HeadToHead({ headToHead }) {
   );
 }
 
-export default function MatchRoom({ fixture, comp, detail }) {
+export default function MatchRoom({ fixture, comp, detail, videos }) {
   const headerFixture = fixture.status === 'live'
     ? withLiveScore(fixture, detail?.liveScore)
     : fixture;
@@ -350,6 +351,10 @@ export default function MatchRoom({ fixture, comp, detail }) {
             Detailed stats aren't published for {comp.name}.
           </p>
         )}
+      {/* Gated on status ft + data only (spec §13.9) — never on
+          comp.hasMatchDetail, so a BBC-degraded fixture that finished can
+          still surface highlights even with no match detail to show. */}
+      <VideoCard videos={videos} />
     </main>
   );
 }

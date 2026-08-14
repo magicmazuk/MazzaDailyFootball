@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom';
 import { byId } from '../../domain/competitions.js';
 import { useMatchDetail, useSeasonFixtures } from '../../data/queries.js';
 import MatchRoom from './MatchRoom.jsx';
+import { useMatchVideos } from './video.js';
 
 // BBC-merged cup fixtures (spec §13.7) carry a synthetic `bbc-` id — there
 // is no matching ESPN event, so a summary fetch for it can only 404. Treat
@@ -24,10 +25,12 @@ export default function MatchScreen() {
   const roomComp = matchRoomComp(comp, eventId);
   const detail = useMatchDetail(roomComp ?? { id: 'none', hasMatchDetail: false }, eventId,
     fixture?.status === 'live');
+  const videos = useMatchVideos(fixture);
 
   if (!comp) return <p className="text-muted">Unknown competition.</p>;
   if (!fixture) {
     return <p className="text-muted">{season.isLoading ? 'Loading match…' : 'Match not found.'}</p>;
   }
-  return <MatchRoom fixture={fixture} comp={roomComp} detail={detail.data?.detail ?? null} />;
+  return <MatchRoom fixture={fixture} comp={roomComp} detail={detail.data?.detail ?? null}
+    videos={videos.data ?? []} />;
 }
