@@ -50,3 +50,10 @@ None block usage; candidates for a future 1.2 pass.
 - **"No matches today." sits below On TV/Quick view** on quiet days — ordering call.
 - **Dead useMemo over useQueries array** in CalendarScreen (recompute per render, no loop).
 - **No live-status score test for FixtureRow** (only ft asserted; same boolean guards both).
+
+## From the 2.0 final review (2026-08-14) — accepted behaviours
+
+- The two clubs of a not-yet-published knockout tie briefly show as fallen (rule 2); self-corrects when the tie publishes.
+- A postponed fixture stalls rule-2 eliminations for its whole round (singleLeg refinement still fires for decided ties).
+- Structure-strip numerals are registry config, not derived (spec §13.10.1 ambiguity accepted; derived counts live in the tier sub-labels).
+- Champion flourish untested against live data until a cup completes.

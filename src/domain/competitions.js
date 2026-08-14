@@ -17,6 +17,16 @@ const range = (from, to, zone) =>
 const league = { type: 'league', hasTable: true, hasSquads: true, hasMatchDetail: true };
 const cup = { type: 'cup', hasTable: false, hasSquads: true, hasMatchDetail: true, zones: {} };
 
+// Shared by the three UEFA club competitions (§13.10 structure strip):
+// a 36-team league phase, 1-8 straight through to the last 16, 9-24 in
+// a play-off round, then a straight knockout to the final.
+const UEFA_STRUCTURE = [
+  { n: 36, label: 'league phase' },
+  { n: 8, label: 'straight to last 16' },
+  { n: 16, label: '9th–24th play-off' },
+  { n: null, label: 'knockout' },
+];
+
 export const COMPETITIONS = [
   { ...league, id: 'sco.1', name: 'Scottish Premiership', shortName: 'Premiership',
     country: 'Scotland', source: 'espn', splitAfter: 6,
@@ -31,27 +41,43 @@ export const COMPETITIONS = [
     country: 'Scotland', source: 'bbc', hasTable: 'computed', hasSquads: false, hasMatchDetail: false,
     zones: { 1: 'promo', 9: 'po' } },
   { ...cup, id: 'sco.tennents', name: 'Scottish Cup', shortName: 'Scottish Cup',
-    country: 'Scotland', source: 'espn' },
+    country: 'Scotland', source: 'espn',
+    structure: [{ n: null, label: 'Straight knockout' }, { n: null, label: 'clubs enter in waves' }] },
   { ...cup, id: 'sco.cis', name: 'Scottish League Cup', shortName: 'League Cup',
-    country: 'Scotland', source: 'espn', bbcTournament: 'scottish-league-cup' },
+    country: 'Scotland', source: 'espn', bbcTournament: 'scottish-league-cup',
+    structure: [
+      { n: 40, label: 'group stage' },
+      { n: 8, label: 'groups of 5' },
+      { n: 16, label: 'last 16 — seeded clubs join' },
+      { n: null, label: 'knockout' },
+    ] },
   { ...cup, id: 'sco.challenge', name: 'Scottish Challenge Cup', shortName: 'Challenge Cup',
-    country: 'Scotland', source: 'espn' },
+    country: 'Scotland', source: 'espn',
+    structure: [{ n: null, label: 'league phase' }, { n: null, label: 'knockout' }] },
   { ...league, id: 'eng.1', name: 'English Premier League', shortName: 'Premier League',
     country: 'England', source: 'espn',
     zones: { ...range(1, 4, 'ucl'), 5: 'uecl', ...range(18, 20, 'rel') } },
   { ...cup, id: 'eng.fa', name: 'FA Cup', shortName: 'FA Cup',
-    country: 'England', source: 'espn' },
+    country: 'England', source: 'espn',
+    structure: [{ n: null, label: 'Straight knockout' }, { n: null, label: 'top flight joins in round 3' }] },
   { ...cup, id: 'eng.league_cup', name: 'Carabao Cup', shortName: 'Carabao Cup',
-    country: 'England', source: 'espn' },
+    country: 'England', source: 'espn',
+    structure: [
+      { n: null, label: 'Straight knockout' },
+      { n: null, label: 'European clubs join in round 3' },
+    ] },
   { ...cup, id: 'uefa.champions', name: 'UEFA Champions League', shortName: 'Champions League',
     country: 'Europe', source: 'espn', hasTable: true,
-    zones: { ...range(1, 8, 'adv'), ...range(9, 24, 'po') } },
+    zones: { ...range(1, 8, 'adv'), ...range(9, 24, 'po') },
+    structure: UEFA_STRUCTURE },
   { ...cup, id: 'uefa.europa', name: 'UEFA Europa League', shortName: 'Europa League',
     country: 'Europe', source: 'espn', hasTable: true,
-    zones: { ...range(1, 8, 'adv'), ...range(9, 24, 'po') } },
+    zones: { ...range(1, 8, 'adv'), ...range(9, 24, 'po') },
+    structure: UEFA_STRUCTURE },
   { ...cup, id: 'uefa.europa.conf', name: 'UEFA Conference League', shortName: 'Conference League',
     country: 'Europe', source: 'espn', hasTable: true,
-    zones: { ...range(1, 8, 'adv'), ...range(9, 24, 'po') } },
+    zones: { ...range(1, 8, 'adv'), ...range(9, 24, 'po') },
+    structure: UEFA_STRUCTURE },
 ];
 
 export const byId = id => COMPETITIONS.find(c => c.id === id);
