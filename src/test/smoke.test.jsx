@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from '../App.jsx';
 
-test('renders the three tabs', () => {
+test('renders the four tabs', () => {
   render(
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter initialEntries={['/']}>
@@ -12,6 +12,7 @@ test('renders the three tabs', () => {
     </QueryClientProvider>,
   );
   expect(screen.getByText('Today', { selector: 'a' })).toBeInTheDocument();
+  expect(screen.getByText('Calendar', { selector: 'a' })).toBeInTheDocument();
   expect(screen.getByText('Competitions', { selector: 'a' })).toBeInTheDocument();
   expect(screen.getByText('Clubs', { selector: 'a' })).toBeInTheDocument();
 });

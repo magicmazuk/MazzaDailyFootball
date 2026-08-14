@@ -67,3 +67,43 @@ test('nextUp does not count as activity for the quiet-day check', () => {
   );
   expect(screen.getByText('No matches today.')).toBeInTheDocument();
 });
+
+test('followed clubs get calendar chips linking to their club calendar', () => {
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-22T15:00:00Z')} followedIds={new Set(['256'])}
+        partition={{ yours: [], live: [], later: [], earlier: [], yesterday: [] }}
+        nextUp={[]} quickTables={[]}
+        followedClubs={[{ id: '256', name: 'Celtic', crestUrl: null, monogram: 'CE' }]} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole('link', { name: 'Celtic calendar' }))
+    .toHaveAttribute('href', '/calendar/256');
+  expect(screen.getByText('No matches today.')).toBeInTheDocument(); // chips ≠ activity
+});
+
+test('renders On TV section with televised fixture', () => {
+  const onTvFixture = {
+    id: 'f1',
+    compId: 'eng.1',
+    kickoff: '2026-08-21T19:00:00Z',
+    status: 'scheduled',
+    tv: ['Sky Sports'],
+    home: side('1', 'Home'),
+    away: side('2', 'Away'),
+  };
+
+  render(
+    <MemoryRouter>
+      <TodayView
+        date={new Date('2026-08-21T00:00:00Z')}
+        followedIds={new Set()}
+        partition={emptyPartition}
+        onTv={[onTvFixture]}
+      />
+    </MemoryRouter>,
+  );
+
+  expect(screen.getByText('On TV')).toBeInTheDocument();
+  expect(screen.getByText('Sky')).toBeInTheDocument();
+});

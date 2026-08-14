@@ -3,6 +3,7 @@ import { useAllSeasonFixtures, useTodayWindows, useTable } from '../../data/quer
 import { usePrefs } from '../../store/prefs.js';
 import { partitionToday } from './partition.js';
 import { nextUpForFollowed } from './nextUp.js';
+import { upcomingTv } from './onTv.js';
 import TodayView from './TodayView.jsx';
 
 export default function TodayScreen() {
@@ -19,6 +20,7 @@ export default function TodayScreen() {
   const asOf = results.map(r => r.data?.asOf).find(Boolean) ?? null;
   const allSeason = seasons.flatMap(r => r.data?.fixtures ?? []);
   const nextUp = nextUpForFollowed(Object.values(followed), allSeason, new Date());
+  const onTv = upcomingTv(allSeason, new Date());
   // results.every() on an empty array is vacuously true, so with zero
   // competitions (everything hidden) this must not read as "still loading".
   const loading = comps.length > 0 && results.every(r => r.isLoading);
@@ -31,10 +33,12 @@ export default function TodayScreen() {
       date={new Date()}
       asOf={asOf}
       nextUp={nextUp}
+      onTv={onTv}
       quickTables={[
         { comp: byId('sco.1'), rows: spl.data?.rows ?? [] },
         { comp: byId('eng.1'), rows: epl.data?.rows ?? [] },
       ]}
+      followedClubs={Object.values(followed)}
     />
   );
 }

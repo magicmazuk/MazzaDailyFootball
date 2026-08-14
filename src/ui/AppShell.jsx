@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 
 const TABS = [
   ['/', 'Today'],
+  ['/calendar', 'Calendar'],
   ['/competitions', 'Competitions'],
   ['/clubs', 'Clubs'],
 ];

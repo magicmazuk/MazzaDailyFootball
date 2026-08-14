@@ -6,7 +6,7 @@ import TvBadge from './TvBadge.jsx';
 // The club-link rule (spec §13.2): the crest is the team link, the rest
 // of the row is the match link. No nested anchors — the inner control
 // navigates programmatically.
-function TeamLine({ side, compId, followed, dim }) {
+function TeamLine({ side, compId, followed, dim, showScore }) {
   const navigate = useNavigate();
   const toTeam = e => {
     e.preventDefault();
@@ -23,7 +23,7 @@ function TeamLine({ side, compId, followed, dim }) {
         {side.name}
         {followed && <span className="text-accent text-[9px] align-middle ml-1.5">★</span>}
       </span>
-      {side.score != null && (
+      {showScore && side.score != null && (
         <span className="font-serif text-[17px] tabular-nums">{side.score}</span>
       )}
     </div>
@@ -32,6 +32,10 @@ function TeamLine({ side, compId, followed, dim }) {
 
 export default function FixtureRow({ fixture, followedIds = new Set() }) {
   const dim = fixture.status === 'postponed' || fixture.status === 'canceled';
+  // ESPN reports score:"0" before kickoff — never render a score for a
+  // fixture that hasn't started or finished, or every scheduled match
+  // in the calendar/On TV/fixture lists would show a phantom 0-0.
+  const showScore = fixture.status === 'live' || fixture.status === 'ft';
   return (
     <Link to={`/match/${fixture.compId}/${fixture.id}`}
       className="block py-3 border-b border-rule/70">
@@ -41,9 +45,9 @@ export default function FixtureRow({ fixture, followedIds = new Set() }) {
           <TvBadge tv={fixture.tv} />
         </div>
         <div className="flex-1 min-w-0 space-y-1.5">
-          <TeamLine side={fixture.home} compId={fixture.compId}
+          <TeamLine side={fixture.home} compId={fixture.compId} showScore={showScore}
             followed={followedIds.has(fixture.home.teamId)} dim={dim} />
-          <TeamLine side={fixture.away} compId={fixture.compId}
+          <TeamLine side={fixture.away} compId={fixture.compId} showScore={showScore}
             followed={followedIds.has(fixture.away.teamId)} dim={dim} />
         </div>
       </div>
