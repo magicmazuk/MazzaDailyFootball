@@ -4,7 +4,9 @@
 // two tournaments are permitted.
 
 const UPSTREAM = 'https://web-cdn.api.bbci.co.uk/wc-data/container/sport-data-scores-fixtures';
-const TOURNAMENTS = new Set(['scottish-league-one', 'scottish-league-two']);
+const TOURNAMENTS = new Set([
+  'scottish-league-one', 'scottish-league-two', 'scottish-league-cup', 'scottish-cup',
+]);
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const lastKnownGood = new Map();

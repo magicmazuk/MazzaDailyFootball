@@ -38,6 +38,14 @@ test('builds the upstream URL with the urn and passes the body through', async (
   expect(res.headers['cache-control']).toBe('public, s-maxage=3600, stale-while-revalidate=604800');
 });
 
+test('the League Cup tournament passes through with valid single-day dates', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('{"eventGroups":[]}', { status: 200 })));
+  const res = await call('/api/bbc?tournament=scottish-league-cup&start=2026-08-15&end=2026-08-15');
+  expect(res.statusCode).toBe(200);
+  const url = fetch.mock.calls[0][0];
+  expect(url).toContain(encodeURIComponent('urn:bbc:sportsdata:football:tournament:scottish-league-cup'));
+});
+
 test('a one-day window gets the tight live TTL', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{"eventGroups":[]}', { status: 200 })));
   const res = await call('/api/bbc?tournament=scottish-league-two&start=2026-08-12&end=2026-08-13');

@@ -39,3 +39,7 @@ test('season constants are the 2026-27 season', () => {
   expect(SEASON.espnRange).toBe('20260701-20270630');
   expect(SEASON.espnYear).toBe(2026);
 });
+
+test('the League Cup declares its BBC fallback tournament', () => {
+  expect(byId('sco.cis').bbcTournament).toBe('scottish-league-cup');
+});
