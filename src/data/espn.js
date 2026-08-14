@@ -111,12 +111,17 @@ export function adaptSquad(json) {
 }
 
 export function adaptSummary(json) {
-  const events = (json?.keyEvents ?? []).map(k => ({
-    minute: k.clock?.displayValue ?? '',
-    type: k.type?.text ?? '',
-    player: k.athletesInvolved?.[0]?.displayName ?? null,
-    teamId: k.team?.id ?? null,
-  }));
+  const events = (json?.keyEvents ?? []).map(k => {
+    const participants = k.participants ?? [];
+    return {
+      minute: k.clock?.displayValue ?? '',
+      type: k.type?.text ?? '',
+      player: participants[0]?.athlete?.displayName ?? k.athletesInvolved?.[0]?.displayName ?? null,
+      playerOff: participants[1]?.athlete?.displayName ?? null,
+      teamId: k.team?.id ?? null,
+      scoringPlay: k.scoringPlay ?? false,
+    };
+  });
   const boxTeams = json?.boxscore?.teams ?? [];
   const teamStats = boxTeams.length === 2
     ? boxTeams.map(t => ({
@@ -135,7 +140,96 @@ export function adaptSummary(json) {
     })),
   }));
   const liveScore = adaptLiveScore(json);
-  return { events, teamStats, lineups, liveScore };
+  const gameInfo = adaptGameInfo(json);
+  const form = adaptForm(json);
+  const headToHead = adaptHeadToHead(json);
+  const standouts = adaptStandouts(json);
+  return { events, teamStats, lineups, liveScore, gameInfo, form, headToHead, standouts };
+}
+
+// gameInfo.officials carries match officials in no guaranteed order; a
+// Referee is preferred over assistants/VAR, falling back to whichever
+// official is listed first when none is explicitly tagged Referee.
+function adaptGameInfo(json) {
+  const gi = json?.gameInfo;
+  if (!gi) return null;
+  const officials = gi.officials ?? [];
+  const referee = officials.find(o => o.position?.displayName === 'Referee') ?? officials[0] ?? null;
+  const venueObj = gi.venue ?? null;
+  const venue = venueObj?.fullName
+    ? (venueObj.address?.city ? `${venueObj.fullName}, ${venueObj.address.city}` : venueObj.fullName)
+    : null;
+  return {
+    attendance: gi.attendance ?? null,
+    referee: referee?.displayName ?? null,
+    venue,
+  };
+}
+
+// lastFiveGames is per-team recent form; each event's gameResult is a
+// single-letter code, but the feed sometimes carries results (e.g. an
+// abandoned match) outside the W/D/L set, so those are filtered out.
+function adaptForm(json) {
+  const lastFive = json?.lastFiveGames;
+  if (!Array.isArray(lastFive) || lastFive.length === 0) return null;
+  const form = {};
+  for (const t of lastFive) {
+    const teamId = t.team?.id;
+    if (teamId == null) continue;
+    form[teamId] = (t.events ?? [])
+      .map(e => e.gameResult)
+      .filter(r => r === 'W' || r === 'D' || r === 'L')
+      .slice(0, 5);
+  }
+  return form;
+}
+
+// seasonseries[0] is the head-to-head block for the two teams in this
+// fixture; its events[] mixes past meetings with a possible future fixture,
+// so only completed meetings with both scores present are kept.
+function adaptHeadToHead(json) {
+  const series = json?.seasonseries?.[0];
+  if (!series) return null;
+  const meetings = (series.events ?? [])
+    .filter(e => e.statusType?.completed)
+    .map(e => {
+      const competitors = e.competitors ?? [];
+      const home = competitors.find(c => c.homeAway === 'home');
+      const away = competitors.find(c => c.homeAway === 'away');
+      const num = c => (c?.score != null && c.score !== '' ? Number(c.score) : null);
+      return {
+        date: e.date ?? null,
+        homeName: home?.team?.displayName ?? null,
+        awayName: away?.team?.displayName ?? null,
+        homeScore: num(home),
+        awayScore: num(away),
+      };
+    })
+    .filter(m => m.homeScore != null && m.awayScore != null);
+  return { summary: series.summary ?? null, meetings };
+}
+
+const STANDOUT_CATEGORIES = [
+  { key: 'totalShots', label: 'Shots' },
+  { key: 'saves', label: 'Saves' },
+  { key: 'accuratePasses', label: 'Passes' },
+];
+
+function adaptStandouts(json) {
+  const leaders = json?.leaders;
+  if (!Array.isArray(leaders) || leaders.length === 0) return null;
+  return leaders.map(t => {
+    const categories = t.leaders ?? [];
+    const entries = STANDOUT_CATEGORIES.map(({ key, label }) => {
+      const top = categories.find(c => c.name === key)?.leaders?.[0];
+      return top ? { label, player: top.athlete?.displayName ?? null, value: top.displayValue ?? null } : null;
+    }).filter(Boolean);
+    return {
+      teamId: t.team?.id ?? null,
+      teamName: t.team?.displayName ?? null,
+      entries,
+    };
+  });
 }
 
 // The season/today caches can be up to an hour stale during a live match;

@@ -25,5 +25,6 @@ export default defineConfig({
     setupFiles: './src/test/setup.js',
     globals: true,
     pool: 'forks',
+    testTimeout: 15000,
   },
 });

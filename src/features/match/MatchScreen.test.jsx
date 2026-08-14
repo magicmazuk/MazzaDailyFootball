@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import MatchScreen, { matchRoomComp } from './MatchScreen.jsx';
 import { byId } from '../../domain/competitions.js';
 
@@ -74,4 +74,54 @@ test('a BBC-merged cup fixture never fires the doomed ESPN summary fetch and sho
 
   await screen.findByText("Detailed stats aren't published for Scottish League Cup.");
   expect(calls.some(u => u.includes('/summary'))).toBe(false);
+});
+
+// --- contextual match video wiring (spec §13.9) ---
+
+const ftScoreboard = JSON.stringify({
+  events: [{
+    id: 'e1', date: '2026-08-09T14:00:00Z', status: { type: { name: 'STATUS_FULL_TIME' } },
+    competitions: [{ competitors: [
+      { homeAway: 'home', team: { id: 'kil', displayName: 'Kilmarnock' } },
+      { homeAway: 'away', team: { id: 'cel', displayName: 'Celtic' } },
+    ] }],
+  }],
+});
+
+const originalYtKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+afterEach(() => {
+  if (originalYtKey === undefined) delete import.meta.env.VITE_YOUTUBE_API_KEY;
+  else import.meta.env.VITE_YOUTUBE_API_KEY = originalYtKey;
+});
+
+test('a finished fixture with a YouTube key fetches highlights and shows the video card', async () => {
+  import.meta.env.VITE_YOUTUBE_API_KEY = 'stub-key-for-test';
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    if (url.includes('googleapis.com')) {
+      return new Response(JSON.stringify({
+        items: [{ id: { videoId: 'v1' }, snippet: { title: 'Kilmarnock 1-2 Celtic highlights' } }],
+      }), { status: 200 });
+    }
+    if (url.includes('/scoreboard')) return new Response(ftScoreboard, { status: 200 });
+    return new Response('{}', { status: 200 });
+  }));
+
+  renderAt('/match/sco.1/e1');
+
+  await screen.findByText('Kilmarnock 1-2 Celtic highlights');
+});
+
+test('a finished fixture with no YouTube key never calls the YouTube API', async () => {
+  delete import.meta.env.VITE_YOUTUBE_API_KEY;
+  const calls = [];
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    calls.push(url);
+    if (url.includes('/scoreboard')) return new Response(ftScoreboard, { status: 200 });
+    return new Response('{}', { status: 200 });
+  }));
+
+  renderAt('/match/sco.1/e1');
+
+  await screen.findByText('Kilmarnock');
+  expect(calls.some(u => u.includes('googleapis.com'))).toBe(false);
 });
