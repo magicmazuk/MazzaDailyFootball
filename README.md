@@ -32,3 +32,14 @@ to the SPA.
 
 Data quirks worth knowing before touching `src/data/`: see spec §3.5
 (the User-Agent trap, "Away at Home", round slugs, error bodies).
+
+## TV listings (curated)
+
+The "on TV" badges read `src/data/tvListings.json`. When broadcasters
+announce picks, add one object per televised match to `listings`:
+
+    { "comp": "sco.1", "date": "2026-08-22", "home": "St Mirren", "tv": ["Sky Sports"] }
+
+`comp` is the competition id from `src/domain/competitions.js`; `home` is
+case/punctuation-insensitive; channels are: Sky Sports, TNT Sports, BBC,
+ITV, Amazon Prime. Commit and push — Vercel redeploys automatically.
