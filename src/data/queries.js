@@ -144,7 +144,7 @@ export function teamsQuery(comp) {
     staleTime: 24 * HOUR,
     queryFn: async () => {
       const { data, asOf } = await getJson(espnUrl(`${SOCCER}/${comp.id}/teams`));
-      return { teams: adaptTeams(data), asOf };
+      return { teams: adaptTeams(data).map(t => ({ ...t, compId: comp.id })), asOf };
     },
   };
 }

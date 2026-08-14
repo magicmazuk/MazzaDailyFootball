@@ -10,6 +10,7 @@ export const CELTIC = {
   crestUrl: 'https://a.espncdn.com/i/teamlogos/soccer/500/256.png',
   monogram: 'CE',
   colour: '009921',
+  compId: 'sco.1',
 };
 
 export const usePrefs = create(persist(
