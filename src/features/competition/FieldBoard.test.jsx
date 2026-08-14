@@ -96,3 +96,23 @@ test('followed clubs carry a star after their name', () => {
   const alphaLink = screen.getByText('Alpha').closest('a');
   expect(within(alphaLink).getByText('★')).toBeInTheDocument();
 });
+
+test('an in-club whose earliest fixture has no round still renders (in an untiered grid), count matches drawn crests', () => {
+  const fixtures = [
+    // Zulu/Yankee's only fixture carries no round — entryTiers skips them
+    // entirely (field.js: a null-round fixture is invisible to tiering) —
+    // but they're still `in` (round-null fixtures are also invisible to
+    // survivalState's elimination rules), so they must still be drawn.
+    fx('0', null, '2026-01-01T15:00:00Z', 'scheduled', side('9', 'Zulu'), side('10', 'Yankee')),
+    fx('1', 'round-1', '2026-01-02T15:00:00Z', 'scheduled', side('1', 'Alpha'), side('2', 'Bravo')),
+    fx('2', 'round-2', '2026-02-01T15:00:00Z', 'scheduled', side('3', 'Charlie'), side('4', 'Delta')),
+  ];
+  renderBoard({ fixtures, comp: scoCup, followedIds: new Set() });
+  expect(screen.getByText('Still in — 6')).toBeInTheDocument();
+  expect(screen.getByText('Also in · 2')).toBeInTheDocument();
+  expect(screen.getByText('Zulu')).toBeInTheDocument();
+  expect(screen.getByText('Yankee')).toBeInTheDocument();
+  // Six crests drawn total: two per tier plus the two untiered clubs — the
+  // count must match "Still in — 6", never silently dropping a survivor.
+  expect(screen.getAllByRole('img')).toHaveLength(6);
+});

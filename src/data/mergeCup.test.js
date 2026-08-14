@@ -177,3 +177,30 @@ test('(j) fixture-harvested identities never overwrite an existing teamIndex ent
   const extra = out.find(f => f.id === 'bbc-b8');
   expect(extra.away.teamId).toBe('canonical-256');
 });
+
+test('(k) alias-aware match: BBC "The Spartans" matches an ESPN team indexed as "Spartans FC"', () => {
+  const index = buildTeamIndex([
+    { id: '888', name: 'Spartans FC', shortName: 'Spartans',
+      crestUrl: 'https://espn/888.png', monogram: 'SP', colour: '000080' },
+  ]);
+  const bbc = [bbcFixture({
+    id: 'b9', kickoff: '2026-08-16T16:45:00Z',
+    home: bbcSide('The Spartans', 'bbc-spa'), away: bbcSide('Celtic', 'bbc-ce'),
+  })];
+  const out = mergeCupFixtures([], bbc, index, 'sco.cis');
+  expect(out[0].home.teamId).toBe('888');
+  expect(out[0].home.name).toBe('Spartans FC');
+});
+
+test('(l) dedupe compares post-alias names: an ESPN fixture and a BBC copy differing only by alias collapse to one row', () => {
+  const espn = [espnFixture({
+    home: espnSide('Spartans FC', '888'), away: espnSide('Celtic', '256'),
+  })];
+  const bbc = [bbcFixture({
+    id: 'b10',
+    home: bbcSide('The Spartans', 'bbc-spa'), away: bbcSide('Celtic', 'bbc-ce'),
+  })];
+  const out = mergeCupFixtures(espn, bbc, new Map(), 'sco.cis');
+  expect(out).toHaveLength(1);
+  expect(out[0].id).toBe('e1');
+});

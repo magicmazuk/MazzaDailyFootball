@@ -50,6 +50,14 @@ export default function FieldBoard({ fixtures, comp, followedIds }) {
   const inTierGroups = tiers
     .map(t => ({ round: t.round, clubs: t.clubs.filter(c => inTeamIds.has(c.teamId)) }))
     .filter(t => t.clubs.length > 0);
+  // entryTiers only groups a club under a round when its EARLIEST fixture
+  // carries one (field.js: a null-round fixture is invisible to tiering).
+  // A club whose first appearance happened to be an unrounded fixture but
+  // who is still `in` would otherwise never be drawn anywhere — collect
+  // any survivor absent from every tier and give it its own untiered grid
+  // so the crest count always matches the "Still in — N" total.
+  const tieredTeamIds = new Set(inTierGroups.flatMap(t => t.clubs.map(c => c.teamId)));
+  const untieredClubs = inClubs.filter(c => !tieredTeamIds.has(c.teamId));
   const outCount = out.reduce((n, g) => n + g.clubs.length, 0);
 
   return (
@@ -70,14 +78,26 @@ export default function FieldBoard({ fixtures, comp, followedIds }) {
         <section className="mb-8">
           <SectionLabel>Still in — {inClubs.length}</SectionLabel>
           {multiTier
-            ? inTierGroups.map(t => (
-              <div key={t.round} className="mb-6 last:mb-0">
-                <p className="font-sans text-[9px] uppercase tracking-[.14em] text-muted mb-3">
-                  {roundLabel(t.round)} entrants · {t.clubs.length}
-                </p>
-                <InGrid comp={comp} clubs={t.clubs} followedIds={followedIds} />
-              </div>
-            ))
+            ? (
+              <>
+                {inTierGroups.map(t => (
+                  <div key={t.round} className="mb-6 last:mb-0">
+                    <p className="font-sans text-[9px] uppercase tracking-[.14em] text-muted mb-3">
+                      {roundLabel(t.round)} entrants · {t.clubs.length}
+                    </p>
+                    <InGrid comp={comp} clubs={t.clubs} followedIds={followedIds} />
+                  </div>
+                ))}
+                {untieredClubs.length > 0 && (
+                  <div className="mb-6 last:mb-0">
+                    <p className="font-sans text-[9px] uppercase tracking-[.14em] text-muted mb-3">
+                      Also in · {untieredClubs.length}
+                    </p>
+                    <InGrid comp={comp} clubs={untieredClubs} followedIds={followedIds} />
+                  </div>
+                )}
+              </>
+            )
             : <InGrid comp={comp} clubs={inClubs} followedIds={followedIds} />}
         </section>
       )}
