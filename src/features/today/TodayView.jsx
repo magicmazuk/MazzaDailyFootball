@@ -8,6 +8,17 @@ import Crest from '../../ui/Crest.jsx';
 const longDate = d => d.toLocaleDateString('en-GB',
   { weekday: 'long', day: 'numeric', month: 'long' });
 
+const groupOnTvByDay = fixtures => {
+  const groups = new Map();
+  for (const f of fixtures) {
+    const day = new Date(f.kickoff).toLocaleDateString('en-GB',
+      { weekday: 'short', day: 'numeric', month: 'short' });
+    if (!groups.has(day)) groups.set(day, []);
+    groups.get(day).push(f);
+  }
+  return [...groups.entries()];
+};
+
 function CalendarGlyph() {
   return (
     <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden className="text-muted">
@@ -30,7 +41,7 @@ function Section({ label, muted, fixtures, followedIds }) {
   );
 }
 
-export default function TodayView({ partition, followedIds, date, asOf = null, nextUp = [], quickTables = [], followedClubs = [] }) {
+export default function TodayView({ partition, followedIds, date, asOf = null, nextUp = [], onTv = [], quickTables = [], followedClubs = [] }) {
   const { yours, live, later, earlier, yesterday } = partition;
   const quiet = !yours.length && !live.length && !later.length && !earlier.length;
   return (
@@ -73,6 +84,17 @@ export default function TodayView({ partition, followedIds, date, asOf = null, n
       <Section label="Live" fixtures={live} followedIds={followedIds} />
       <Section label="Later today" muted fixtures={later} followedIds={followedIds} />
       <Section label="Earlier today" muted fixtures={earlier} followedIds={followedIds} />
+      {onTv.length > 0 && (
+        <section className="mt-8">
+          <SectionLabel muted>On TV</SectionLabel>
+          {groupOnTvByDay(onTv).map(([day, list]) => (
+            <div key={day} className="mb-4">
+              <p className="font-sans text-[9.5px] uppercase tracking-[.18em] text-muted mb-1">{day}</p>
+              {list.map(f => <FixtureRow key={`${f.compId}-${f.id}`} fixture={f} followedIds={followedIds} />)}
+            </div>
+          ))}
+        </section>
+      )}
       {quickTables.some(q => q.rows?.length) && (
         <section className="mt-8">
           <SectionLabel muted>Quick view</SectionLabel>
