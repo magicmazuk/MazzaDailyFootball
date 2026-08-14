@@ -90,6 +90,36 @@ test('a non-live fixture ignores liveScore even if present, and falls back to fi
   expect(headerScores).toEqual(['2', '1']);
 });
 
+test('a penalty shootout renders a quiet winner line under the status', () => {
+  const pensFixture = {
+    ...fixture, status: 'ft',
+    home: { ...fixture.home, penaltyScore: 4 },
+    away: { ...fixture.away, penaltyScore: 3 },
+  };
+  render(<MemoryRouter>
+    <MatchRoom fixture={pensFixture} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  expect(screen.getByText('Celtic win 4–3 on penalties')).toBeInTheDocument();
+});
+
+test('the away side can win the shootout too, and no line renders without both penalty scores', () => {
+  const awayWins = {
+    ...fixture, status: 'ft',
+    home: { ...fixture.home, penaltyScore: 2 },
+    away: { ...fixture.away, penaltyScore: 5 },
+  };
+  const { unmount } = render(<MemoryRouter>
+    <MatchRoom fixture={awayWins} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  expect(screen.getByText('Rangers win 5–2 on penalties')).toBeInTheDocument();
+  unmount();
+
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  expect(screen.queryByText(/on penalties/)).not.toBeInTheDocument();
+});
+
 test('BBC competitions get the honest degraded line, not empty shelves', () => {
   render(<MemoryRouter>
     <MatchRoom fixture={{ ...fixture, compId: 'scottish-league-one' }}

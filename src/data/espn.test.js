@@ -71,6 +71,47 @@ test('scoreboard: postponed maps to postponed, not scheduled', () => {
   expect(adaptScoreboard(scoreboard, 'sco.1')[2].status).toBe('postponed');
 });
 
+const shootout = {
+  events: [
+    {
+      id: '4', date: '2026-08-22T14:00Z', name: 'F at E',
+      status: { type: { name: 'STATUS_FINAL_PEN', state: 'post', completed: true } },
+      competitions: [{
+        competitors: [
+          { homeAway: 'home', score: '1', shootoutScore: '4',
+            team: { id: '256', displayName: 'Celtic' } },
+          { homeAway: 'away', score: '1', shootoutScore: '3',
+            team: { id: '257', displayName: 'Rangers' } },
+        ],
+      }],
+    },
+    {
+      id: '5', date: '2026-08-22T14:00Z', name: 'H at G',
+      status: { type: { name: 'STATUS_FINAL_AET', state: 'post', completed: true } },
+      competitions: [{
+        competitors: [
+          { homeAway: 'home', score: '2', team: { id: '256', displayName: 'Celtic' } },
+          { homeAway: 'away', score: '1', team: { id: '257', displayName: 'Rangers' } },
+        ],
+      }],
+    },
+  ],
+};
+
+test('scoreboard: a penalty shootout carries penaltyScore and status STATUS_FINAL_PEN maps to ft', () => {
+  const [pens] = adaptScoreboard(shootout, 'eng.fa');
+  expect(pens.status).toBe('ft');
+  expect(pens.home.penaltyScore).toBe(4);
+  expect(pens.away.penaltyScore).toBe(3);
+});
+
+test('scoreboard: extra time without a shootout leaves penaltyScore null; STATUS_FINAL_AET maps to ft', () => {
+  const [, aet] = adaptScoreboard(shootout, 'eng.fa');
+  expect(aet.status).toBe('ft');
+  expect(aet.home.penaltyScore).toBeNull();
+  expect(aet.away.penaltyScore).toBeNull();
+});
+
 const standings = {
   children: [{
     standings: {

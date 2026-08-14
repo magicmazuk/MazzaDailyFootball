@@ -9,6 +9,11 @@ const STATUS_BY_NAME = {
   STATUS_CANCELED: 'canceled',
   STATUS_FULL_TIME: 'ft',
   STATUS_FINAL: 'ft',
+  // These already fall through to 'ft' via state === 'post', but are named
+  // explicitly so a penalty shootout or an AET finish is never mistaken for
+  // anything but full time.
+  STATUS_FINAL_PEN: 'ft',
+  STATUS_FINAL_AET: 'ft',
 };
 
 function fixtureStatus(type) {
@@ -29,6 +34,8 @@ function side(competitor = {}) {
     monogram: monogram(name),
     colour: t.color ?? null,
     score: competitor.score != null && competitor.score !== '' ? Number(competitor.score) : null,
+    penaltyScore: competitor.shootoutScore != null && competitor.shootoutScore !== ''
+      ? Number(competitor.shootoutScore) : null,
   };
 }
 

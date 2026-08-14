@@ -26,7 +26,21 @@ function withLiveScore(fixture, liveScore) {
   return { ...fixture, home: overlay(fixture.home), away: overlay(fixture.away) };
 }
 
+// Both sides carry a penaltyScore only after a shootout; the higher one won.
+function penaltyResult(fixture) {
+  const h = fixture.home.penaltyScore;
+  const a = fixture.away.penaltyScore;
+  if (h == null || a == null) return null;
+  const homeWon = h > a;
+  return {
+    winnerName: homeWon ? fixture.home.name : fixture.away.name,
+    winnerScore: homeWon ? h : a,
+    loserScore: homeWon ? a : h,
+  };
+}
+
 function ScoreHeader({ fixture }) {
+  const pens = penaltyResult(fixture);
   return (
     <header className="mb-8">
       {[fixture.home, fixture.away].map(side => (
@@ -36,7 +50,14 @@ function ScoreHeader({ fixture }) {
           <span className="text-[30px] tabular-nums">{side.score ?? '–'}</span>
         </div>
       ))}
-      <div className="mt-2"><StatusWord fixture={fixture} /></div>
+      <div className="mt-2">
+        <StatusWord fixture={fixture} />
+        {pens && (
+          <p className="font-sans text-[10px] text-accent mt-1">
+            {pens.winnerName} win {pens.winnerScore}–{pens.loserScore} on penalties
+          </p>
+        )}
+      </div>
       {fixture.venue && (
         <p className="font-sans text-[10px] text-muted mt-1.5">{fixture.venue}</p>
       )}
