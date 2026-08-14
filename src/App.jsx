@@ -7,8 +7,6 @@ import TeamScreen from './features/team/TeamScreen.jsx';
 import MatchScreen from './features/match/MatchScreen.jsx';
 import ClubsScreen from './features/clubs/ClubsScreen.jsx';
 
-const Stub = ({ name }) => <p className="text-muted">{name}</p>;
-
 export default function App() {
   return (
     <Routes>
