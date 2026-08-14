@@ -28,14 +28,38 @@ const visiblePoll = q =>
     ? pollMs(q.state.data?.fixtures)
     : false;
 
+// The BBC container endpoint only accepts a single day (start===end) or a
+// month window starting on the 1st and ending within that same month — it
+// 400s on anything wider (e.g. a season-long range). Split any start..end
+// range into one window per calendar month so callers can fan out requests
+// and concatenate the results.
+export function monthWindows(startIso, endIso) {
+  const pad = n => String(n).padStart(2, '0');
+  let [y, m] = startIso.split('-').slice(0, 2).map(Number);
+  const [endY, endM] = endIso.split('-').slice(0, 2).map(Number);
+  const windows = [];
+  while (y < endY || (y === endY && m <= endM)) {
+    const lastDay = new Date(y, m, 0).getDate(); // day 0 of next month = last day of this one
+    windows.push({ start: `${y}-${pad(m)}-01`, end: `${y}-${pad(m)}-${pad(lastDay)}` });
+    m += 1;
+    if (m > 12) { m = 1; y += 1; }
+  }
+  return windows;
+}
+
 export function seasonFixturesQuery(comp) {
   return {
     queryKey: ['season', comp.id],
     staleTime: HOUR,
     queryFn: async () => {
       if (comp.source === 'bbc') {
-        const { data, asOf } = await getJson(bbcUrl(comp.id, SEASON.bbcStart, SEASON.bbcEnd));
-        return { fixtures: adaptBbcFixtures(data, comp.id), asOf };
+        const windows = monthWindows(SEASON.bbcStart, SEASON.bbcEnd);
+        const results = await Promise.all(
+          windows.map(w => getJson(bbcUrl(comp.id, w.start, w.end))));
+        return {
+          fixtures: results.flatMap(({ data }) => adaptBbcFixtures(data, comp.id)),
+          asOf: results.map(r => r.asOf).find(Boolean) ?? null,
+        };
       }
       const { data, asOf } = await getJson(
         espnUrl(`${SOCCER}/${comp.id}/scoreboard`, { dates: SEASON.espnRange, limit: 500 }));
@@ -62,8 +86,14 @@ export function todayWindowQuery(comp, now = new Date()) {
     refetchInterval: visiblePoll,
     queryFn: async () => {
       if (comp.source === 'bbc') {
-        const { data, asOf } = await getJson(bbcUrl(comp.id, isoDay(yesterday), isoDay(now)));
-        return { fixtures: adaptBbcFixtures(data, comp.id), asOf };
+        const [y, t] = await Promise.all([
+          getJson(bbcUrl(comp.id, isoDay(yesterday), isoDay(yesterday))),
+          getJson(bbcUrl(comp.id, isoDay(now), isoDay(now))),
+        ]);
+        return {
+          fixtures: [...adaptBbcFixtures(y.data, comp.id), ...adaptBbcFixtures(t.data, comp.id)],
+          asOf: y.asOf ?? t.asOf ?? null,
+        };
       }
       const { data, asOf } = await getJson(
         espnUrl(`${SOCCER}/${comp.id}/scoreboard`, { dates: `${ymd(yesterday)}-${ymd(now)}` }));
