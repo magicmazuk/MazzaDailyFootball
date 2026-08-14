@@ -148,3 +148,195 @@ test('score header sides link to team pages and tv renders', () => {
   expect(links.some(l => l.getAttribute('href') === '/team/sco.1/Rangers')).toBe(true);
   expect(screen.getByText('TNT')).toBeInTheDocument();
 });
+
+// --- kicker: round prettifier wiring (spec §13.8) ---
+
+test('the kicker appends the prettified round for a knockout fixture', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, round: 'fourth-round' }} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  expect(screen.getByText('Scottish Premiership · Fourth round')).toBeInTheDocument();
+});
+
+test('the kicker has no round suffix for a regular-season fixture', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, round: 'regular-season' }} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  expect(screen.getByText('Scottish Premiership')).toBeInTheDocument();
+});
+
+// --- date line ---
+
+test('the date line shows the full en-GB date under the kicker', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  // fixture.kickoff is 2026-08-22, a Saturday
+  expect(screen.getByText(/Saturday,? 22 August 2026/)).toBeInTheDocument();
+});
+
+// --- metadata line (venue · attendance · referee) ---
+
+test('the metadata line renders venue, attendance and referee from gameInfo', () => {
+  const gameInfoDetail = { ...detail, gameInfo: {
+    venue: 'Hampden Park', attendance: 8353, referee: 'Nick Walsh',
+  } };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={gameInfoDetail} />
+  </MemoryRouter>);
+  expect(screen.getByText('Hampden Park · 8,353 · Nick Walsh')).toBeInTheDocument();
+});
+
+test('the metadata line falls back to fixture.venue when gameInfo carries none', () => {
+  const gameInfoDetail = { ...detail, gameInfo: { venue: null, attendance: null, referee: 'Nick Walsh' } };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={gameInfoDetail} />
+  </MemoryRouter>);
+  // fixture.venue is 'Celtic Park'; only the parts that exist are joined
+  expect(screen.getByText('Celtic Park · Nick Walsh')).toBeInTheDocument();
+});
+
+test('the metadata line is absent when gameInfo is absent', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  expect(screen.queryByText(/Nick Walsh|Hampden Park|Celtic Park/)).not.toBeInTheDocument();
+});
+
+// --- form coming in ---
+
+test('the form block renders five glyphs per side when form is present for both teams', () => {
+  const formDetail = { ...detail, form: {
+    Celtic: ['W', 'W', 'D', 'W', 'L'],
+    Rangers: ['L', 'D', 'W', 'W', 'W'],
+  } };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={formDetail} />
+  </MemoryRouter>);
+  expect(screen.getAllByText(/^[WDL]$/)).toHaveLength(10);
+});
+
+test('the form block is absent unless both sides have form', () => {
+  const formDetail = { ...detail, form: { Celtic: ['W', 'W', 'D', 'W', 'L'] } };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={formDetail} />
+  </MemoryRouter>);
+  expect(screen.queryAllByText(/^[WDL]$/)).toHaveLength(0);
+});
+
+// --- timeline: upgraded moments ---
+
+test('a plain goal shows just the scorer\'s name, with no redundant type word', () => {
+  const goalDetail = { ...detail, events: [
+    { minute: "67'", type: 'Goal', player: 'Daizen Maeda', playerOff: null,
+      teamId: 'Celtic', scoringPlay: true },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={goalDetail} />
+  </MemoryRouter>);
+  expect(screen.getByText('Daizen Maeda')).toBeInTheDocument();
+  expect(screen.queryByText('Goal')).not.toBeInTheDocument();
+});
+
+test('a qualified goal (e.g. an own goal) keeps its type word alongside the scorer', () => {
+  const ownGoalDetail = { ...detail, events: [
+    { minute: "30'", type: 'Own Goal', player: 'Connor Goldson', playerOff: null,
+      teamId: 'Rangers', scoringPlay: true },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={ownGoalDetail} />
+  </MemoryRouter>);
+  expect(screen.getByText('Connor Goldson')).toBeInTheDocument();
+  expect(screen.getByText('Own Goal')).toBeInTheDocument();
+});
+
+test('a substitution shows both names with on/off arrows, the outgoing name muted', () => {
+  const subDetail = { ...detail, events: [
+    { minute: "72'", type: 'Substitution', player: 'Luke McCowan', playerOff: 'Reo Hatate',
+      teamId: 'Celtic', scoringPlay: false },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={subDetail} />
+  </MemoryRouter>);
+  expect(screen.getByText(/Luke McCowan/)).toBeInTheDocument();
+  expect(screen.getByText(/↑/)).toBeInTheDocument();
+  expect(screen.getByText(/Reo Hatate/)).toBeInTheDocument();
+  expect(screen.getByText(/↓/)).toBeInTheDocument();
+});
+
+test('a yellow card row carries the player and a card tick element', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  expect(screen.getByText('James Tavernier')).toBeInTheDocument();
+  expect(screen.getByTestId('card-yellow')).toBeInTheDocument();
+});
+
+test('an event with a null player still renders the type word, never a blank row', () => {
+  const noPlayerDetail = { ...detail, events: [
+    { minute: "45'", type: 'Half Time', player: null, playerOff: null,
+      teamId: null, scoringPlay: false },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={noPlayerDetail} />
+  </MemoryRouter>);
+  expect(screen.getByText('Half Time')).toBeInTheDocument();
+});
+
+test('a timeline row shows the event team\'s crest when its teamId maps to a fixture side', () => {
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  // one Celtic crest in the score header, one more on the Celtic goal event row
+  expect(container.querySelectorAll('[aria-label="Celtic"]').length).toBe(2);
+});
+
+// --- standouts (post-match) ---
+
+test('standouts render per side when present', () => {
+  const standoutsDetail = { ...detail, standouts: [
+    { teamId: 'Celtic', teamName: 'Celtic', entries: [
+      { label: 'Shots', player: 'Daizen Maeda', value: '5' },
+    ] },
+    { teamId: 'Rangers', teamName: 'Rangers', entries: [
+      { label: 'Saves', player: 'Jack Butland', value: '4' },
+    ] },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={standoutsDetail} />
+  </MemoryRouter>);
+  expect(screen.getByText(/Shots: Daizen Maeda 5/)).toBeInTheDocument();
+  expect(screen.getByText(/Saves: Jack Butland 4/)).toBeInTheDocument();
+});
+
+test('standouts section is absent without data', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  expect(screen.queryByText('Standouts')).not.toBeInTheDocument();
+});
+
+// --- head-to-head ---
+
+test('head-to-head renders past meetings and an optional summary line', () => {
+  const h2hDetail = { ...detail, headToHead: {
+    summary: 'Celtic lead the series 3-1',
+    meetings: [
+      { date: '2026-02-15T14:00:00Z', homeName: 'Rangers', awayName: 'Celtic',
+        homeScore: 1, awayScore: 2 },
+    ],
+  } };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={h2hDetail} />
+  </MemoryRouter>);
+  expect(screen.getByText('Head to head')).toBeInTheDocument();
+  expect(screen.getByText('Celtic lead the series 3-1')).toBeInTheDocument();
+  expect(screen.getByText(/Rangers 1–2 Celtic/)).toBeInTheDocument();
+});
+
+test('head-to-head section is absent without meetings', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  expect(screen.queryByText('Head to head')).not.toBeInTheDocument();
+});

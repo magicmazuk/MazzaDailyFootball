@@ -3,26 +3,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Crest from '../../ui/Crest.jsx';
+import FormGlyphs from '../../ui/FormGlyphs.jsx';
 import { ZONE_META, zoneFor } from './zones.js';
-
-function FormGlyphs({ form }) {
-  if (!form?.length) return null;
-  return (
-    <div className="flex items-center gap-1.5 mt-4">
-      <span className="font-sans text-[8.5px] uppercase tracking-[.14em] text-muted mr-1">Form</span>
-      {form.map((r, i) => (
-        <span key={i} className={`w-[17px] h-[17px] rounded-full font-sans text-[9px] font-semibold
-          inline-flex items-center justify-center ${
-            r === 'W' ? 'bg-ink text-paper'
-            : r === 'D' ? 'bg-rule text-muted'
-            : 'border border-rule text-muted'
-          }`}>
-          {r}
-        </span>
-      ))}
-    </div>
-  );
-}
 
 function Drawer({ row, form }) {
   const cells = [
@@ -44,7 +26,12 @@ function Drawer({ row, form }) {
           {Math.abs(row.deduction)}-point deduction applied
         </p>
       )}
-      <FormGlyphs form={form} />
+      {form?.length > 0 && (
+        <div className="flex items-center gap-1.5 mt-4">
+          <span className="font-sans text-[8.5px] uppercase tracking-[.14em] text-muted mr-1">Form</span>
+          <FormGlyphs form={form} />
+        </div>
+      )}
       <Link to={`/team/${row.compId ?? ''}/${row.teamId}`}
         className="font-sans text-[9.5px] uppercase tracking-[.14em] text-muted underline
                    underline-offset-4 inline-block mt-4">

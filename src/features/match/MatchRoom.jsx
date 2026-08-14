@@ -1,17 +1,37 @@
-// The match room (spec §7.6): score and clock, then a vertical timeline
-// of moments newest first, then stats. Degrades to a clean scoreline
-// plus one honest line where the source publishes no detail.
+// The match room (spec §7.6, §13.8): kicker and date, score and clock,
+// venue/attendance/referee, form coming in, a vertical timeline of moments
+// newest first, then stats, standouts, lineups and head-to-head. Degrades
+// to a clean scoreline plus one honest line where the source publishes no
+// detail.
 import { Link } from 'react-router-dom';
 import Crest from '../../ui/Crest.jsx';
+import FormGlyphs from '../../ui/FormGlyphs.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
 import StatusWord from '../../ui/StatusWord.jsx';
 import TvBadge from '../../ui/TvBadge.jsx';
+import { prettifyRound } from '../../domain/round.js';
 
 const STAT_LABELS = {
   possessionPct: 'Possession', totalShots: 'Shots', shotsOnTarget: 'On target',
   wonCorners: 'Corners', foulsCommitted: 'Fouls', yellowCards: 'Yellow cards',
   redCards: 'Red cards', offsides: 'Offsides', saves: 'Saves',
 };
+
+const fullDate = iso => new Date(iso).toLocaleDateString('en-GB',
+  { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+const shortDate = iso => new Date(iso).toLocaleDateString('en-GB',
+  { day: 'numeric', month: 'short', year: 'numeric' });
+
+// Maps an event's teamId onto the fixture side (home/away) it belongs to,
+// so the timeline can show that side's crest. An unrecognised teamId (or
+// none at all) simply carries no crest — never a broken image.
+function sideForTeam(fixture, teamId) {
+  if (teamId == null) return null;
+  if (fixture.home.teamId === teamId) return fixture.home;
+  if (fixture.away.teamId === teamId) return fixture.away;
+  return null;
+}
 
 // The season/today cache can be up to an hour stale during a live match.
 // When the summary endpoint's fresher header score is available, overlay
@@ -41,7 +61,24 @@ function penaltyResult(fixture) {
   };
 }
 
-function ScoreHeader({ fixture, comp }) {
+// Venue, attendance and referee in one quiet line — only the parts the
+// source actually published, joined with ' · '. gameInfo.venue (which
+// carries the city too) is preferred over the fixture's bare venue name;
+// the whole line is absent when there's no gameInfo to draw from.
+function MetadataLine({ fixture, gameInfo }) {
+  if (!gameInfo) return null;
+  const venue = gameInfo.venue ?? fixture.venue;
+  const attendance = gameInfo.attendance != null
+    ? Number(gameInfo.attendance).toLocaleString('en-GB')
+    : null;
+  const parts = [venue, attendance, gameInfo.referee].filter(Boolean);
+  if (!parts.length) return null;
+  return (
+    <p className="font-sans text-[10px] text-muted mt-1.5">{parts.join(' · ')}</p>
+  );
+}
+
+function ScoreHeader({ fixture, comp, gameInfo }) {
   const pens = penaltyResult(fixture);
   // ESPN reports score:"0" before kickoff — a scheduled or postponed fixture
   // shows a dash, the same as a genuinely missing score, never a phantom 0-0.
@@ -69,30 +106,109 @@ function ScoreHeader({ fixture, comp }) {
           {pens.winnerName} win {pens.winnerScore}–{pens.loserScore} on penalties
         </p>
       )}
-      {fixture.venue && (
-        <p className="font-sans text-[10px] text-muted mt-1.5">{fixture.venue}</p>
-      )}
+      <MetadataLine fixture={fixture} gameInfo={gameInfo} />
     </header>
   );
 }
 
-function Timeline({ events }) {
+// Two rows of five W/D/L glyphs — one per side — reusing the league
+// table's glyph style. Gated on both sides actually having a guide; a
+// lopsided form object (one side only) renders nothing rather than a
+// half-empty block.
+function FormBlock({ form, fixture }) {
+  if (!form) return null;
+  const homeForm = form[fixture.home.teamId];
+  const awayForm = form[fixture.away.teamId];
+  if (!homeForm?.length || !awayForm?.length) return null;
+  return (
+    <section className="mb-8">
+      <SectionLabel muted>Form coming in</SectionLabel>
+      {[[fixture.home, homeForm], [fixture.away, awayForm]].map(([side, guide]) => (
+        <div key={side.teamId} className="flex items-center gap-3 py-1.5">
+          <Crest side={side} size={18} />
+          <FormGlyphs form={guide} />
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function TimelineRow({ e, fixture }) {
+  const teamSide = sideForTeam(fixture, e.teamId);
+  const type = e.type ?? '';
+  const isSub = /substitution/i.test(type);
+  const isYellow = type === 'Yellow Card';
+  const isRed = type === 'Red Card';
+  const isPlainGoal = type === 'Goal';
+
+  let content;
+  if (e.player == null) {
+    // Never a blank row: no player, so the type word carries the moment.
+    content = (
+      <span className="font-sans text-[9.5px] uppercase tracking-[.12em] text-muted">
+        {type}
+      </span>
+    );
+  } else if (isSub) {
+    content = (
+      <>
+        <span className="text-[15px]">{e.player} ↑</span>
+        {e.playerOff && (
+          <span className="text-[15px] text-muted ml-3">{e.playerOff} ↓</span>
+        )}
+      </>
+    );
+  } else if (isPlainGoal) {
+    // A plain 'Goal' needs no redundant type word — the bold-ish serif
+    // name alone says everything, with no accent colour and no ⚽.
+    content = <span className="text-[15px] font-semibold">{e.player}</span>;
+  } else if (isYellow || isRed) {
+    content = (
+      <>
+        <span className="text-[15px]">{e.player}</span>
+        <span className="font-sans text-[9.5px] uppercase tracking-[.12em] text-muted ml-2.5">
+          {type}
+        </span>
+        <span data-testid={isYellow ? 'card-yellow' : 'card-red'}
+          className={`inline-block w-2 h-[11px] rounded-sm ml-2.5 align-middle ${
+            isYellow ? 'bg-[#E7C24A]' : 'bg-accent'
+          }`} />
+      </>
+    );
+  } else {
+    // A qualified goal ('Own Goal', 'Penalty', ...) keeps its type word —
+    // that's exactly where it adds meaning — same treatment as any other
+    // named moment (kickoff subs aside, cards aside).
+    content = (
+      <>
+        <span className="text-[15px]">{e.player}</span>
+        <span className="font-sans text-[9.5px] uppercase tracking-[.12em] text-muted ml-2.5">
+          {type}
+        </span>
+      </>
+    );
+  }
+
+  return (
+    <div className="flex items-baseline gap-4 py-3 border-b border-rule/60">
+      <span className="w-9 font-sans text-[11px] text-accent tabular-nums shrink-0">
+        {e.minute}
+      </span>
+      <span className="w-4 h-4 shrink-0 self-center inline-flex items-center">
+        {teamSide && <Crest side={teamSide} size={16} />}
+      </span>
+      <div className="flex-1 min-w-0">{content}</div>
+    </div>
+  );
+}
+
+function Timeline({ events, fixture }) {
   if (!events?.length) return null;
   return (
     <section className="mb-8">
       <SectionLabel>The match</SectionLabel>
       {[...events].reverse().map((e, i) => (
-        <div key={i} className="flex items-baseline gap-4 py-3 border-b border-rule/60">
-          <span className="w-9 font-sans text-[11px] text-accent tabular-nums shrink-0">
-            {e.minute}
-          </span>
-          <div className="flex-1 min-w-0">
-            <span className="text-[15px]">{e.player ?? '—'}</span>
-            <span className="font-sans text-[9.5px] uppercase tracking-[.12em] text-muted ml-2.5">
-              {e.type}
-            </span>
-          </div>
-        </div>
+        <TimelineRow key={i} e={e} fixture={fixture} />
       ))}
     </section>
   );
@@ -135,6 +251,30 @@ function Stats({ teamStats, fixture }) {
   );
 }
 
+// Post-match standout performers per side — up to three quiet
+// "label: player value" rows. Absent whenever the source hasn't
+// published leaders (in practice: before full time).
+function Standouts({ standouts }) {
+  if (!standouts?.length) return null;
+  return (
+    <section className="mb-8">
+      <SectionLabel muted>Standouts</SectionLabel>
+      {standouts.map(s => (
+        <div key={s.teamId ?? s.teamName} className="mb-4 last:mb-0">
+          <p className="font-sans text-[10px] uppercase tracking-[.14em] text-muted mb-2">
+            {s.teamName}
+          </p>
+          {s.entries.slice(0, 3).map((en, i) => (
+            <p key={i} className="text-[13px] text-muted">
+              {en.label}: {en.player} {en.value}
+            </p>
+          ))}
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function Lineups({ lineups, fixture }) {
   if (!lineups?.some(l => l.players.length)) return null;
   const title = ha => (ha === 'home' ? fixture.home.name : fixture.away.name);
@@ -160,21 +300,50 @@ function Lineups({ lineups, fixture }) {
   );
 }
 
+// Prior meetings between these two sides — rendered pre-match too, since
+// history doesn't need kickoff to have happened.
+function HeadToHead({ headToHead }) {
+  if (!headToHead?.meetings?.length) return null;
+  return (
+    <section className="mb-8">
+      <SectionLabel muted>Head to head</SectionLabel>
+      {headToHead.summary && (
+        <p className="font-sans text-[10px] text-muted mb-3">{headToHead.summary}</p>
+      )}
+      {headToHead.meetings.map((m, i) => (
+        <div key={i} className="flex items-baseline gap-4 py-2 border-b border-rule/60">
+          <span className="w-20 font-sans text-[10px] text-muted tabular-nums shrink-0">
+            {shortDate(m.date)}
+          </span>
+          <span className="text-[14px] flex-1 min-w-0">
+            {m.homeName} {m.homeScore}–{m.awayScore} {m.awayName}
+          </span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 export default function MatchRoom({ fixture, comp, detail }) {
   const headerFixture = fixture.status === 'live'
     ? withLiveScore(fixture, detail?.liveScore)
     : fixture;
+  const round = prettifyRound(fixture.round);
   return (
     <main>
-      <p className="font-sans text-[10px] uppercase tracking-[.22em] text-muted mb-5">
-        {comp.name}
+      <p className="font-sans text-[10px] uppercase tracking-[.22em] text-muted">
+        {comp.name}{round && ` · ${round}`}
       </p>
-      <ScoreHeader fixture={headerFixture} comp={comp} />
+      <p className="text-[12px] text-muted mb-5">{fullDate(fixture.kickoff)}</p>
+      <ScoreHeader fixture={headerFixture} comp={comp} gameInfo={detail?.gameInfo} />
       {comp.hasMatchDetail
         ? (<>
-            <Timeline events={detail?.events} />
+            <FormBlock form={detail?.form} fixture={fixture} />
+            <Timeline events={detail?.events} fixture={fixture} />
             <Stats teamStats={detail?.teamStats} fixture={fixture} />
+            <Standouts standouts={detail?.standouts} />
             <Lineups lineups={detail?.lineups} fixture={fixture} />
+            <HeadToHead headToHead={detail?.headToHead} />
           </>)
         : (
           <p className="font-sans text-[11px] text-muted">
