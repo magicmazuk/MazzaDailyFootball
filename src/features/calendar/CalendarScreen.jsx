@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { COMPETITIONS } from '../../domain/competitions.js';
 import { addMonths, dayKey, fixturesByDay, monthGrid } from '../../domain/calendar.js';
 import { useAllSeasonFixtures } from '../../data/queries.js';
@@ -34,6 +34,10 @@ export default function CalendarScreen() {
     ? followed[teamId]
       ?? (fixtures[0] && (fixtures[0].home.teamId === teamId ? fixtures[0].home : fixtures[0].away))
     : null;
+  // The club-link rule (spec §13.2): the header crest+name must link to the
+  // team page. Followed club objects carry their own compId; a club derived
+  // from a fixture side doesn't, so fall back to that fixture's compId.
+  const clubCompId = club?.compId ?? fixtures[0]?.compId ?? 'sco.1';
   const followedIds = new Set(Object.keys(followed));
   const weeks = monthGrid(ym.year, ym.month);
   const dayFixtures = byDay.get(selectedKey) ?? [];
@@ -43,10 +47,11 @@ export default function CalendarScreen() {
     <main>
       <p className="font-sans text-[10px] uppercase tracking-[.22em] text-muted">Calendar</p>
       {club && (
-        <div className="flex items-center gap-2.5 mt-1">
+        <Link to={`/team/${clubCompId}/${teamId}`}
+          className="flex items-center gap-2.5 mt-1 w-fit">
           <Crest side={club} size={22} />
           <h1 className="text-[22px]">{club.name}</h1>
-        </div>
+        </Link>
       )}
       {!club && <h1 className="text-[27px]">Fixtures</h1>}
 
