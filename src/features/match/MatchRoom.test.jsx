@@ -291,19 +291,23 @@ test('a timeline row shows the event team\'s crest when its teamId maps to a fix
   expect(container.querySelectorAll('[aria-label="Celtic"]').length).toBe(2);
 });
 
-// --- standouts (post-match) ---
+// --- standouts (post-match only, spec §13.8 — ESPN publishes leaders even
+// on a scheduled fixture, using season-to-date numbers that would mislead
+// if shown before kickoff) ---
 
-test('standouts render per side when present', () => {
-  const standoutsDetail = { ...detail, standouts: [
-    { teamId: 'Celtic', teamName: 'Celtic', entries: [
-      { label: 'Shots', player: 'Daizen Maeda', value: '5' },
-    ] },
-    { teamId: 'Rangers', teamName: 'Rangers', entries: [
-      { label: 'Saves', player: 'Jack Butland', value: '4' },
-    ] },
-  ] };
+const standoutsData = [
+  { teamId: 'Celtic', teamName: 'Celtic', entries: [
+    { label: 'Shots', player: 'Daizen Maeda', value: '5' },
+  ] },
+  { teamId: 'Rangers', teamName: 'Rangers', entries: [
+    { label: 'Saves', player: 'Jack Butland', value: '4' },
+  ] },
+];
+
+test('standouts render per side on a full-time fixture', () => {
+  const standoutsDetail = { ...detail, standouts: standoutsData };
   render(<MemoryRouter>
-    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={standoutsDetail} />
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={standoutsDetail} />
   </MemoryRouter>);
   expect(screen.getByText(/Shots: Daizen Maeda 5/)).toBeInTheDocument();
   expect(screen.getByText(/Saves: Jack Butland 4/)).toBeInTheDocument();
@@ -311,9 +315,22 @@ test('standouts render per side when present', () => {
 
 test('standouts section is absent without data', () => {
   render(<MemoryRouter>
-    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={detail} />
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={detail} />
   </MemoryRouter>);
   expect(screen.queryByText('Standouts')).not.toBeInTheDocument();
+});
+
+test('standouts are withheld pre-match even when the source already publishes them', () => {
+  const scheduledFixture = { ...fixture, status: 'scheduled', minute: null };
+  const standoutsDetail = { ...detail, standouts: standoutsData };
+  render(<MemoryRouter>
+    <MatchRoom fixture={scheduledFixture} comp={byId('sco.1')} detail={standoutsDetail} />
+  </MemoryRouter>);
+  expect(screen.queryByText('Standouts')).not.toBeInTheDocument();
+  // 'Daizen Maeda' also scores in the shared `detail.events` timeline
+  // fixture, so assert on the formatted standout row specifically rather
+  // than the bare name, which would collide with that unrelated timeline row.
+  expect(screen.queryByText(/Shots: Daizen Maeda 5/)).not.toBeInTheDocument();
 });
 
 // --- head-to-head ---

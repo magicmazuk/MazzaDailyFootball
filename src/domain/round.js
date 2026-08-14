@@ -5,6 +5,12 @@
 // suffix), same as a fixture with no round at all.
 const EXCLUDED = new Set(['regular-season', 'league-phase', 'group-stage']);
 
+// League fixtures (as opposed to cup/knockout ones) carry the SEASON name
+// in season.slug instead — e.g. '2026-27-scottish-premiership' (sco.1),
+// '2025-26-english-premier-league' (eng.1). No real round slug starts with
+// a year, so this is rejected outright rather than prettified into noise.
+const YEAR_PREFIXED = /^\d{4}-\d{2}-/;
+
 // A handful of round names are single compound words that don't split
 // cleanly on '-' the way 'fourth-round' does.
 const IRREGULAR = {
@@ -13,7 +19,7 @@ const IRREGULAR = {
 };
 
 export function prettifyRound(slug) {
-  if (!slug || EXCLUDED.has(slug)) return null;
+  if (!slug || EXCLUDED.has(slug) || YEAR_PREFIXED.test(slug)) return null;
   if (IRREGULAR[slug]) return IRREGULAR[slug];
   const [first, ...rest] = slug.split('-');
   return [first.charAt(0).toUpperCase() + first.slice(1), ...rest].join(' ');

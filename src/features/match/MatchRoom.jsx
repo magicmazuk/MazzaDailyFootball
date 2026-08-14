@@ -253,10 +253,12 @@ function Stats({ teamStats, fixture }) {
 }
 
 // Post-match standout performers per side — up to three quiet
-// "label: player value" rows. Absent whenever the source hasn't
-// published leaders (in practice: before full time).
-function Standouts({ standouts }) {
-  if (!standouts?.length) return null;
+// "label: player value" rows. Gated on full time explicitly, not just on
+// data presence: ESPN's leaders endpoint publishes season-to-date numbers
+// even for a fixture that hasn't kicked off yet, which would mislead if
+// shown as if they were "this match's" standouts.
+function Standouts({ standouts, fixture }) {
+  if (fixture.status !== 'ft' || !standouts?.length) return null;
   return (
     <section className="mb-8">
       <SectionLabel muted>Standouts</SectionLabel>
@@ -342,7 +344,7 @@ export default function MatchRoom({ fixture, comp, detail, videos }) {
             <FormBlock form={detail?.form} fixture={fixture} />
             <Timeline events={detail?.events} fixture={fixture} />
             <Stats teamStats={detail?.teamStats} fixture={fixture} />
-            <Standouts standouts={detail?.standouts} />
+            <Standouts standouts={detail?.standouts} fixture={fixture} />
             <Lineups lineups={detail?.lineups} fixture={fixture} />
             <HeadToHead headToHead={detail?.headToHead} />
           </>)
