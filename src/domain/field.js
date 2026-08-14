@@ -135,11 +135,26 @@ export function survivalState(fixtures, { singleLeg = false } = {}) {
 
   // Rule 3: singleLeg competitions eliminate a decided loser immediately,
   // without waiting for its round to complete or a later round to exist.
+  // A replay/re-ordered match means the same pairing can meet more than
+  // once within a round — group decisive meetings by round + pairing
+  // (order-independent) and let only the chronologically LAST decisive
+  // meeting of each pairing produce a loser, so an overturned earlier
+  // leg never eliminates both sides.
   if (singleLeg) {
+    const lastDecisive = new Map(); // `${round}|${pairKey}` -> { f, t, winner }
     for (const f of list) {
       if (f.round == null) continue;
+      const h = f.home, a = f.away;
+      if (h?.teamId == null || a?.teamId == null) continue;
       const winner = decidedWinner(f);
       if (!winner) continue;
+      const pairKey = [h.teamId, a.teamId].sort().join('|');
+      const key = `${f.round}|${pairKey}`;
+      const t = new Date(f.kickoff).getTime();
+      const cur = lastDecisive.get(key);
+      if (!cur || t > cur.t) lastDecisive.set(key, { f, t, winner });
+    }
+    for (const { f, winner } of lastDecisive.values()) {
       markOut(f.round, winner === 'home' ? f.away : f.home);
     }
   }

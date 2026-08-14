@@ -188,3 +188,50 @@ test('incomplete round (one fixture still scheduled): no elimination from that r
   expect(result.out).toEqual([]);
   expect(result.in.map(c => c.name)).toEqual(['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo']);
 });
+
+test('singleLeg replay safety: a replay overturning the first leg eliminates only the true loser', () => {
+  // Alpha beats Bravo 2-1, then a replay in the SAME round has Bravo beat
+  // Alpha 3-0 — only the chronologically last decisive meeting counts.
+  const fixtures = [
+    fx('1', 'round-1', '2026-01-01T15:00:00Z', 'ft', side('1', 'Alpha', 2), side('2', 'Bravo', 1)),
+    fx('2', 'round-1', '2026-01-08T15:00:00Z', 'ft', side('2', 'Bravo', 3), side('1', 'Alpha', 0)),
+  ];
+  const result = survivalState(fixtures, { singleLeg: true });
+  // The eliminated side object comes from the replay (the decisive
+  // meeting that actually counted), not the overturned first leg.
+  expect(result.out).toEqual([{ round: 'round-1', clubs: [
+    { teamId: '1', name: 'Alpha', crestUrl: '1.png', monogram: 'AL', score: 0, penaltyScore: null },
+  ] }]);
+  expect(result.in.map(c => c.name)).toEqual(['Bravo']);
+});
+
+test('singleLeg replay safety is order-independent: reversing the fixtures array gives the same verdict', () => {
+  const fixtures = [
+    fx('2', 'round-1', '2026-01-08T15:00:00Z', 'ft', side('2', 'Bravo', 3), side('1', 'Alpha', 0)),
+    fx('1', 'round-1', '2026-01-01T15:00:00Z', 'ft', side('1', 'Alpha', 2), side('2', 'Bravo', 1)),
+  ];
+  const result = survivalState(fixtures, { singleLeg: true });
+  expect(result.out).toEqual([{ round: 'round-1', clubs: [
+    { teamId: '1', name: 'Alpha', crestUrl: '1.png', monogram: 'AL', score: 0, penaltyScore: null },
+  ] }]);
+  expect(result.in.map(c => c.name)).toEqual(['Bravo']);
+});
+
+test('residual behaviour: fixtures with round null are invisible to survival — those clubs stay in', () => {
+  // The accepted conservative default: a fixture that never resolved to a
+  // round slug (e.g. an unrecognised BBC secondaryGroup label) cannot
+  // enter roundOrder/lastRoundIdx, so its clubs are never candidates for
+  // elimination even when their meeting finished decisively.
+  const fixtures = [
+    fx('1', null, '2026-01-01T15:00:00Z', 'ft', side('1', 'Alpha', 2), side('2', 'Bravo', 0)),
+    fx('2', 'round-1', '2026-01-05T15:00:00Z', 'ft', side('3', 'Charlie', 1), side('4', 'Delta', 0)),
+    fx('3', 'round-2', '2026-02-01T15:00:00Z', 'scheduled', side('3', 'Charlie'), side('5', 'Echo')),
+  ];
+  const result = survivalState(fixtures);
+  expect(result.out).toEqual([{ round: 'round-1', clubs: [
+    { teamId: '4', name: 'Delta', crestUrl: '4.png', monogram: 'DE', score: 0, penaltyScore: null },
+  ] }]);
+  // Echo stays in too (round-2 is the last published round, so rule 2
+  // doesn't touch it) — the only exclusion under test here is Alpha/Bravo.
+  expect(result.in.map(c => c.name)).toEqual(['Alpha', 'Bravo', 'Charlie', 'Echo']);
+});

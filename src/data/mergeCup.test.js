@@ -97,6 +97,15 @@ test('(e) output is sorted by kickoff', () => {
   expect(out.map(f => f.id)).toEqual(['bbc-b-earlier', 'e-later']);
 });
 
+test('(g) round is preserved through the merge — mergeCupFixtures spreads the BBC fixture, not just its sides', () => {
+  const bbc = [bbcFixture({
+    id: 'b5', kickoff: '2026-08-16T16:45:00Z', round: 'round-2',
+    home: bbcSide('Ross County', 'bbc-rc'), away: bbcSide('Motherwell', 'bbc-mw'),
+  })];
+  const out = mergeCupFixtures([], bbc, new Map(), 'sco.cis');
+  expect(out[0].round).toBe('round-2');
+});
+
 test('(f) name matching is case/punctuation-insensitive but exact, no fuzzy', () => {
   const espn = [espnFixture()]; // 'Dundee United' v 'Celtic'
   const bbc = [
