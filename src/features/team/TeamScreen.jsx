@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { COMPETITIONS, byId } from '../../domain/competitions.js';
 import { formGuide } from '../../domain/form.js';
 import { useAllSeasonFixtures, useSquad, useTeams } from '../../data/queries.js';
@@ -6,7 +6,10 @@ import { usePrefs } from '../../store/prefs.js';
 import Crest from '../../ui/Crest.jsx';
 import FixtureRow from '../../ui/FixtureRow.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
+import CalendarGlyph from '../../ui/CalendarGlyph.jsx';
 import { teamFixtures } from './teamFixtures.js';
+
+const WATERMARK_OPACITY = 0.10; // the dial — user may want it stronger/weaker
 
 function FollowButton({ team }) {
   const { follow, unfollow } = usePrefs();
@@ -39,59 +42,69 @@ export default function TeamScreen() {
 
   if (!team) return <p className="text-muted">Loading team…</p>;
   return (
-    <main>
-      <div className="flex items-center gap-4 mb-2">
-        <Crest side={team} size={46} />
-        <div className="flex-1 min-w-0">
-          <h1 className="text-[24px] truncate">{team.name}</h1>
-        </div>
-        <FollowButton team={{ id: teamId, name: team.name, crestUrl: team.crestUrl ?? null,
-          monogram: team.monogram, colour: team.colour ?? null, compId }} />
-      </div>
-      <p className="font-sans text-[10px] uppercase tracking-[.18em] text-muted mb-8">
-        {comp?.name ?? ''}
-        {formGuide(allFixtures, teamId).length > 0 &&
-          ` · ${formGuide(allFixtures, teamId).join(' ')}`}
-      </p>
-
-      {next && (<section className="mb-8">
-        <SectionLabel>Next</SectionLabel>
-        <FixtureRow fixture={next} followedIds={followedIds} />
-      </section>)}
-      {last && (<section className="mb-8">
-        <SectionLabel muted>Last</SectionLabel>
-        <FixtureRow fixture={last} followedIds={followedIds} />
-      </section>)}
-
-      <section className="mb-8">
-        <SectionLabel muted>Squad</SectionLabel>
-        {comp?.hasSquads === false && (
-          <p className="font-sans text-[11px] text-muted">
-            Squad details aren't published for {comp.name}.
-          </p>
-        )}
-        {comp?.hasSquads && squad.data && (
-          <div>
-            {squad.data.players.map(p => (
-              <div key={p.id} className="flex items-baseline gap-3 py-2 border-b border-rule/60">
-                <span className="w-6 font-sans text-[11px] text-muted tabular-nums text-right">
-                  {p.shirt ?? '—'}
-                </span>
-                <span className="flex-1 text-[14.5px] truncate">{p.name}</span>
-                <span className="font-sans text-[10px] uppercase text-muted">{p.position ?? ''}</span>
-              </div>
-            ))}
+    <main className="relative overflow-hidden">
+      {team.crestUrl && (
+        <div aria-hidden className="pointer-events-none absolute -top-[140px] -right-[140px]
+                                    w-[420px] h-[420px] bg-no-repeat bg-contain"
+          style={{ backgroundImage: `url(${team.crestUrl})`, opacity: WATERMARK_OPACITY }} />
+      )}
+      <div className="relative">
+        <div className="flex items-center gap-4 mb-2">
+          <Crest side={team} size={46} />
+          <div className="flex-1 min-w-0">
+            <h1 className="text-[24px] truncate">{team.name}</h1>
           </div>
-        )}
-        {comp?.hasSquads && squad.isLoading && <p className="text-muted">Loading squad…</p>}
-        {comp?.hasSquads && squad.isError && <p className="font-sans text-[11px] text-muted">Squad unavailable right now.</p>}
-      </section>
+          <Link to={'/calendar/' + teamId} aria-label={team.name + ' calendar'} className="shrink-0 p-1.5">
+            <CalendarGlyph />
+          </Link>
+          <FollowButton team={{ id: teamId, name: team.name, crestUrl: team.crestUrl ?? null,
+            monogram: team.monogram, colour: team.colour ?? null, compId }} />
+        </div>
+        <p className="font-sans text-[10px] uppercase tracking-[.18em] text-muted mb-8">
+          {comp?.name ?? ''}
+          {formGuide(allFixtures, teamId).length > 0 &&
+            ` · ${formGuide(allFixtures, teamId).join(' ')}`}
+        </p>
 
-      <section>
-        <SectionLabel muted>Season</SectionLabel>
-        {all.map(f => <FixtureRow key={`${f.compId}-${f.id}`} fixture={f}
-          followedIds={followedIds} />)}
-      </section>
+        {next && (<section className="mb-8">
+          <SectionLabel>Next</SectionLabel>
+          <FixtureRow fixture={next} followedIds={followedIds} />
+        </section>)}
+        {last && (<section className="mb-8">
+          <SectionLabel muted>Last</SectionLabel>
+          <FixtureRow fixture={last} followedIds={followedIds} />
+        </section>)}
+
+        <section className="mb-8">
+          <SectionLabel muted>Squad</SectionLabel>
+          {comp?.hasSquads === false && (
+            <p className="font-sans text-[11px] text-muted">
+              Squad details aren't published for {comp.name}.
+            </p>
+          )}
+          {comp?.hasSquads && squad.data && (
+            <div>
+              {squad.data.players.map(p => (
+                <div key={p.id} className="flex items-baseline gap-3 py-2 border-b border-rule/60">
+                  <span className="w-6 font-sans text-[11px] text-muted tabular-nums text-right">
+                    {p.shirt ?? '—'}
+                  </span>
+                  <span className="flex-1 text-[14.5px] truncate">{p.name}</span>
+                  <span className="font-sans text-[10px] uppercase text-muted">{p.position ?? ''}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {comp?.hasSquads && squad.isLoading && <p className="text-muted">Loading squad…</p>}
+          {comp?.hasSquads && squad.isError && <p className="font-sans text-[11px] text-muted">Squad unavailable right now.</p>}
+        </section>
+
+        <section>
+          <SectionLabel muted>Season</SectionLabel>
+          {all.map(f => <FixtureRow key={`${f.compId}-${f.id}`} fixture={f}
+            followedIds={followedIds} />)}
+        </section>
+      </div>
     </main>
   );
 }

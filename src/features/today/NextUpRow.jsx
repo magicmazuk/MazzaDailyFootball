@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import Crest from '../../ui/Crest.jsx';
 import TvBadge from '../../ui/TvBadge.jsx';
+import CalendarGlyph from '../../ui/CalendarGlyph.jsx';
 
 const when = iso => new Date(iso).toLocaleDateString('en-GB',
   { weekday: 'short', day: 'numeric', month: 'short' })
@@ -12,6 +13,8 @@ export default function NextUpRow({ club, fixture }) {
   const venue = fixture.home.teamId === club.id ? 'H' : 'A';
   const toTeam = e => { e.preventDefault(); e.stopPropagation();
     navigate(`/team/${fixture.compId}/${club.id}`); };
+  const toCalendar = e => { e.preventDefault(); e.stopPropagation();
+    navigate(`/calendar/${club.id}`); };
   return (
     <Link to={`/match/${fixture.compId}/${fixture.id}`}
       className="flex items-center gap-2.5 py-2.5 border-b border-rule/60">
@@ -26,6 +29,10 @@ export default function NextUpRow({ club, fixture }) {
         {when(fixture.kickoff)}
       </span>
       <TvBadge tv={fixture.tv} />
+      <button type="button" onClick={toCalendar} aria-label={`${club.name} calendar`}
+        className="shrink-0 p-1">
+        <CalendarGlyph />
+      </button>
     </Link>
   );
 }
