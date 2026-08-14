@@ -1,6 +1,7 @@
 import SectionLabel from '../../ui/SectionLabel.jsx';
 import FixtureRow from '../../ui/FixtureRow.jsx';
 import NextUpRow from './NextUpRow.jsx';
+import MiniTable from './MiniTable.jsx';
 
 const longDate = d => d.toLocaleDateString('en-GB',
   { weekday: 'long', day: 'numeric', month: 'long' });
@@ -15,7 +16,7 @@ function Section({ label, muted, fixtures, followedIds }) {
   );
 }
 
-export default function TodayView({ partition, followedIds, date, asOf = null, nextUp = [] }) {
+export default function TodayView({ partition, followedIds, date, asOf = null, nextUp = [], quickTables = [] }) {
   const { yours, live, later, earlier, yesterday } = partition;
   const quiet = !yours.length && !live.length && !later.length && !earlier.length;
   return (
@@ -46,6 +47,14 @@ export default function TodayView({ partition, followedIds, date, asOf = null, n
       <Section label="Live" fixtures={live} followedIds={followedIds} />
       <Section label="Later today" muted fixtures={later} followedIds={followedIds} />
       <Section label="Earlier today" muted fixtures={earlier} followedIds={followedIds} />
+      {quickTables.some(q => q.rows?.length) && (
+        <section className="mt-8">
+          <SectionLabel muted>Quick view</SectionLabel>
+          {quickTables.map(q => (
+            <MiniTable key={q.comp.id} comp={q.comp} rows={q.rows} followedIds={followedIds} />
+          ))}
+        </section>
+      )}
       {quiet && <p className="text-muted mt-2">No matches today.</p>}
       <Section label="Yesterday" muted fixtures={yesterday} followedIds={followedIds} />
     </main>

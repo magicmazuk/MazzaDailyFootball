@@ -1,5 +1,5 @@
-import { COMPETITIONS } from '../../domain/competitions.js';
-import { useAllSeasonFixtures, useTodayWindows } from '../../data/queries.js';
+import { COMPETITIONS, byId } from '../../domain/competitions.js';
+import { useAllSeasonFixtures, useTodayWindows, useTable } from '../../data/queries.js';
 import { usePrefs } from '../../store/prefs.js';
 import { partitionToday } from './partition.js';
 import { nextUpForFollowed } from './nextUp.js';
@@ -11,6 +11,8 @@ export default function TodayScreen() {
   const comps = COMPETITIONS.filter(c => !hidden.includes(c.id));
   const results = useTodayWindows(comps);
   const seasons = useAllSeasonFixtures(comps);
+  const spl = useTable(byId('sco.1'));
+  const epl = useTable(byId('eng.1'));
 
   const followedIds = new Set(Object.keys(followed));
   const fixtures = results.flatMap(r => r.data?.fixtures ?? []);
@@ -29,6 +31,10 @@ export default function TodayScreen() {
       date={new Date()}
       asOf={asOf}
       nextUp={nextUp}
+      quickTables={[
+        { comp: byId('sco.1'), rows: spl.data?.rows ?? [] },
+        { comp: byId('eng.1'), rows: epl.data?.rows ?? [] },
+      ]}
     />
   );
 }
