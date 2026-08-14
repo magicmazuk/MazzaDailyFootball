@@ -1,0 +1,11 @@
+{
+  "_format": {
+    "comment": "Curated UK TV picks. Add one object per televised match to `listings`.",
+    "example": { "comp": "sco.1", "date": "2026-08-22", "home": "St Mirren", "tv": ["Sky Sports"] },
+    "comp": "competition id from src/domain/competitions.js",
+    "date": "kickoff date YYYY-MM-DD (UTC)",
+    "home": "home club name — case/punctuation insensitive",
+    "tv": "array of: Sky Sports | TNT Sports | BBC | ITV | Amazon Prime"
+  },
+  "listings": []
+}
