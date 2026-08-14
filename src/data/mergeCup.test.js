@@ -125,3 +125,55 @@ test('(f) name matching is case/punctuation-insensitive but exact, no fuzzy', ()
   expect(heartsFixture.home.teamId).toBe('bbc-hom');
   expect(heartsFixture.home.name).toBe('Heart of Midlothian');
 });
+
+test('(h) buildTeamIndex also indexes by shortName, so a BBC side matching only the ESPN shortName alias re-identifies', () => {
+  // ESPN's shortName for Inverness Caledonian Thistle is 'Inverness CT' — the
+  // exact form the BBC feed uses as its full name for the same club.
+  const index = buildTeamIndex([
+    { id: '253', name: 'Inverness Caledonian Thistle', shortName: 'Inverness CT',
+      crestUrl: 'https://espn/253.png', monogram: 'IN', colour: '00205b' },
+  ]);
+  const bbc = [bbcFixture({
+    id: 'b6', kickoff: '2026-08-16T16:45:00Z',
+    home: bbcSide('Inverness CT', 'bbc-ict'), away: bbcSide('Celtic', 'bbc-ce'),
+  })];
+  const out = mergeCupFixtures([], bbc, index, 'sco.cis');
+  expect(out[0].home.teamId).toBe('253');
+  expect(out[0].home.name).toBe('Inverness Caledonian Thistle');
+});
+
+test('(i) mergeCupFixtures harvests identities from espnFixtures sides, re-identifying clubs absent from any teams-endpoint list', () => {
+  // Ross County never appears in the sco.1/sco.2 teams-endpoint lists that
+  // feed buildTeamIndex, but it does appear as a side in an ESPN cup
+  // fixture (its group-stage match) — that alone should be enough to
+  // re-identify its later BBC-only fixture onto the same ESPN id.
+  const espn = [espnFixture({
+    id: 'e2', kickoff: '2026-07-20T14:00:00Z',
+    home: espnSide('Ross County', '251'), away: espnSide('Motherwell', '119'),
+  })];
+  const bbc = [bbcFixture({
+    id: 'b7', kickoff: '2026-08-16T16:45:00Z',
+    home: bbcSide('Ross County', 'bbc-rc'), away: bbcSide('Dundee United', 'bbc-du2'),
+  })];
+  const out = mergeCupFixtures(espn, bbc, new Map(), 'sco.cis'); // empty teamIndex
+  const extra = out.find(f => f.id === 'bbc-b7');
+  expect(extra.home.teamId).toBe('251');
+  expect(extra.home.crestUrl).toBe('https://espn/251.png');
+});
+
+test('(j) fixture-harvested identities never overwrite an existing teamIndex entry', () => {
+  const index = buildTeamIndex([
+    { id: 'canonical-256', name: 'Celtic', shortName: 'Celtic',
+      crestUrl: 'https://espn/canonical.png', monogram: 'CE', colour: '009921' },
+  ]);
+  // An ESPN fixture also carries a 'Celtic' side (a different id, as if two
+  // sources briefly disagreed) — the pre-existing index entry must win.
+  const espn = [espnFixture({ home: espnSide('Dundee United', '1'), away: espnSide('Celtic', 'other-id') })];
+  const bbc = [bbcFixture({
+    id: 'b8', kickoff: '2026-08-16T16:45:00Z',
+    home: bbcSide('Ayr United', 'bbc-ayr'), away: bbcSide('Celtic', 'bbc-ce'),
+  })];
+  const out = mergeCupFixtures(espn, bbc, index, 'sco.cis');
+  const extra = out.find(f => f.id === 'bbc-b8');
+  expect(extra.away.teamId).toBe('canonical-256');
+});
