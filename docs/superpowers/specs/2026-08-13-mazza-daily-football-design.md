@@ -490,3 +490,29 @@ each linking to the team page per §13.2. Grouped meaningfully per competition t
 
 This widget and the Release 2 survival board (§8) are siblings: the field before the
 competition starts, the survival board once it is underway. They can share layout DNA.
+
+### 13.5 Calendar (agreed 2026-08-14)
+
+A month-grid calendar becomes the app's **fourth tab** (Today · Calendar · Competitions ·
+Clubs). One component, two modes:
+
+- **General** (`/calendar`) — fixtures from every non-hidden competition. Day cells show up
+  to three crests (fixtures involving followed clubs first, shown by the followed club's
+  crest; otherwise the home crest) plus a `+n` overflow. Tapping a day selects it and lists
+  every fixture on that date beneath the grid as standard fixture rows (match links, TV
+  badges, the club-link rule — all inherited).
+- **Club** (`/calendar/:teamId`) — the same grid filtered to one club; each playing day
+  shows the **opponent's** crest. Reached from calendar chips in Today's ★ Your clubs
+  section: one chip per followed club (crest + calendar glyph).
+
+Broadsheet treatment: serif month title with ‹ › paging, sans letter-spaced weekday
+initials, hairline grid rules, tabular date numerals, today outlined in accent. Weeks start
+Monday. Days are keyed by the device's local date, consistent with Today's partitioning.
+
+### 13.6 What's on TV (agreed 2026-08-14)
+
+Today gains an **On TV** section: upcoming televised fixtures (curated TV data, §13.3)
+within the next 14 days, soonest first, capped at 8, grouped by day. Renders nothing when
+no televised fixtures are known — never a placeholder. Placed between Earlier today and
+Quick view.
+
