@@ -88,6 +88,32 @@ async function espnTeamIndex() {
   };
 }
 
+// The three legs of a cup fallback fetch (ESPN scoreboard, BBC fixtures,
+// ESPN teams for re-identification) degrade independently rather than
+// all-or-nothing: one leg failing must never blank a page that has data
+// from the others. Only throw when every leg is unavailable. A rejected
+// BBC leg means no extra fixtures; a rejected teams leg means BBC sides
+// keep their own BBC identity (no re-identification) — both acceptable
+// degradations, never a blank screen.
+async function settledCupFixtures(espnPromise, bbcPromise, teamsPromise, compId) {
+  const [espnRes, bbcRes, teamsRes] = await Promise.allSettled([espnPromise, bbcPromise, teamsPromise]);
+  if (espnRes.status === 'rejected' && bbcRes.status === 'rejected' && teamsRes.status === 'rejected') {
+    throw espnRes.reason;
+  }
+  const espnFixtures = espnRes.status === 'fulfilled' ? adaptScoreboard(espnRes.value.data, compId) : [];
+  const bbcFixtures = bbcRes.status === 'fulfilled' ? bbcRes.value.fixtures : [];
+  const index = teamsRes.status === 'fulfilled' ? teamsRes.value.index : new Map();
+  const asOf = [
+    espnRes.status === 'fulfilled' ? espnRes.value.asOf : null,
+    bbcRes.status === 'fulfilled' ? bbcRes.value.asOf : null,
+    teamsRes.status === 'fulfilled' ? teamsRes.value.asOf : null,
+  ].find(Boolean) ?? null;
+  return {
+    fixtures: applyTv(mergeCupFixtures(espnFixtures, bbcFixtures, index, compId)),
+    asOf,
+  };
+}
+
 export function seasonFixturesQuery(comp) {
   return {
     queryKey: ['season', comp.id],
@@ -98,17 +124,12 @@ export function seasonFixturesQuery(comp) {
         return { fixtures: applyTv(fixtures), asOf };
       }
       if (comp.bbcTournament) {
-        const [espnRes, bbcRes, teams] = await Promise.all([
+        return settledCupFixtures(
           getJson(espnUrl(`${SOCCER}/${comp.id}/scoreboard`, { dates: SEASON.espnRange, limit: 500 })),
           bbcSeasonFixtures(comp.bbcTournament, comp.id),
           espnTeamIndex(),
-        ]);
-        const espnFixtures = adaptScoreboard(espnRes.data, comp.id);
-        const asOf = [espnRes.asOf, bbcRes.asOf, teams.asOf].find(Boolean) ?? null;
-        return {
-          fixtures: applyTv(mergeCupFixtures(espnFixtures, bbcRes.fixtures, teams.index, comp.id)),
-          asOf,
-        };
+          comp.id,
+        );
       }
       const { data, asOf } = await getJson(
         espnUrl(`${SOCCER}/${comp.id}/scoreboard`, { dates: SEASON.espnRange, limit: 500 }));
@@ -139,17 +160,12 @@ export function todayWindowQuery(comp, now = new Date()) {
         return { fixtures: applyTv(fixtures), asOf };
       }
       if (comp.bbcTournament) {
-        const [espnRes, bbcRes, teams] = await Promise.all([
+        return settledCupFixtures(
           getJson(espnUrl(`${SOCCER}/${comp.id}/scoreboard`, { dates: `${ymd(yesterday)}-${ymd(now)}` })),
           bbcTodayWindowFixtures(comp.bbcTournament, comp.id, yesterday, now),
           espnTeamIndex(),
-        ]);
-        const espnFixtures = adaptScoreboard(espnRes.data, comp.id);
-        const asOf = [espnRes.asOf, bbcRes.asOf, teams.asOf].find(Boolean) ?? null;
-        return {
-          fixtures: applyTv(mergeCupFixtures(espnFixtures, bbcRes.fixtures, teams.index, comp.id)),
-          asOf,
-        };
+          comp.id,
+        );
       }
       const { data, asOf } = await getJson(
         espnUrl(`${SOCCER}/${comp.id}/scoreboard`, { dates: `${ymd(yesterday)}-${ymd(now)}` }));
