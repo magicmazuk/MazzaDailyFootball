@@ -472,7 +472,7 @@ data-source decision recorded when made:
 
 | Option | Cost | Trade-off |
 |---|---|---|
-| Curated JSON file in the repo | £0 | Accurate but manual — someone must update it from broadcaster announcements |
+| **Curated JSON file in the repo** (chosen 2026-08-14) | £0 | Accurate but manual — someone must update it from broadcaster announcements |
 | TheSportsDB Premium | ~$9/mo | Automatic; UK coverage unverifiable until subscribed |
 | Scraping a listings site | £0 | Fragile, and against most sites' terms — rejected |
 
