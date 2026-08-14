@@ -11,6 +11,7 @@ const SHORT = {
   'BBC': 'BBC',
   'ITV': 'ITV',
   'Amazon Prime': 'Prime',
+  'Premier Sports': 'Premier',
 };
 
 export const tvShortLabel = channel => SHORT[channel] ?? channel;

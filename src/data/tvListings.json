@@ -1,11 +1,179 @@
 {
   "_format": {
     "comment": "Curated UK TV picks. Add one object per televised match to `listings`.",
-    "example": { "comp": "sco.1", "date": "2026-08-22", "home": "St Mirren", "tv": ["Sky Sports"] },
+    "example": {
+      "comp": "sco.1",
+      "date": "2026-08-22",
+      "home": "St Mirren",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
     "comp": "competition id from src/domain/competitions.js",
     "date": "kickoff date YYYY-MM-DD (UTC)",
-    "home": "home club name — case/punctuation insensitive",
-    "tv": "array of: Sky Sports | TNT Sports | BBC | ITV | Amazon Prime"
+    "home": "home club name \u2014 case/punctuation insensitive",
+    "tv": "array of: Sky Sports | TNT Sports | BBC | ITV | Amazon Prime | Premier Sports"
   },
-  "listings": []
+  "listings": [
+    {
+      "comp": "eng.1",
+      "date": "2026-08-21",
+      "home": "Arsenal",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-08-22",
+      "home": "Hull City",
+      "tv": [
+        "TNT Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-08-22",
+      "home": "Brentford",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-08-23",
+      "home": "Brighton & Hove Albion",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-08-23",
+      "home": "Manchester City",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-08-23",
+      "home": "Newcastle United",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-08-24",
+      "home": "Fulham",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-08-28",
+      "home": "Crystal Palace",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-08-29",
+      "home": "Liverpool",
+      "tv": [
+        "TNT Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-08-29",
+      "home": "Tottenham Hotspur",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-08-30",
+      "home": "Chelsea",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-08-30",
+      "home": "Leeds United",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-08-30",
+      "home": "Sunderland",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-08-30",
+      "home": "Manchester United",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-08-31",
+      "home": "Aston Villa",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "sco.1",
+      "date": "2026-08-22",
+      "home": "Dundee United",
+      "tv": [
+        "Premier Sports"
+      ]
+    },
+    {
+      "comp": "sco.1",
+      "date": "2026-08-30",
+      "home": "Aberdeen",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "sco.1",
+      "date": "2026-09-02",
+      "home": "Falkirk",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "sco.1",
+      "date": "2026-09-05",
+      "home": "St Mirren",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "sco.1",
+      "date": "2026-09-20",
+      "home": "Celtic",
+      "tv": [
+        "Sky Sports"
+      ]
+    }
+  ]
 }

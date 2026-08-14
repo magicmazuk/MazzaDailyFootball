@@ -456,7 +456,8 @@ future screen, including the match room header and the Release 2 cup widgets.
 ### 13.3 TV broadcast metadata
 
 **Requirement:** fixtures carry UK broadcaster info (Sky Sports, TNT Sports, BBC, ITV,
-Amazon Prime Video) wherever fixtures render.
+Amazon Prime Video, Premier Sports) wherever fixtures render. *(Premier Sports added
+2026-08-14 — it holds live SPFL rights and was missing from the original list.)*
 
 **Feasibility (probed live 2026-08-14):** ESPN's `broadcasts`/`geoBroadcasts` carry US
 broadcasters only (NBC, Peacock, USA Net); `?region=gb` is ignored; Scottish fixtures carry

@@ -42,4 +42,4 @@ announce picks, add one object per televised match to `listings`:
 
 `comp` is the competition id from `src/domain/competitions.js`; `home` is
 case/punctuation-insensitive; channels are: Sky Sports, TNT Sports, BBC,
-ITV, Amazon Prime. Commit and push — Vercel redeploys automatically.
+ITV, Amazon Prime, Premier Sports. Commit and push — Vercel redeploys automatically.
