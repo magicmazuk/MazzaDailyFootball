@@ -538,3 +538,33 @@ before they kick off. The BBC's `scottish-league-cup` tournament carries them.
 
 Applied now to `sco.cis`; the BBC proxy allowlist also admits `scottish-cup` so the same
 flag can be flipped for `sco.tennents` if ESPN's feed goes similarly quiet in January.
+
+### 13.8 The rich match page (agreed 2026-08-14)
+
+The match room grows into the app's centrepiece, using summary-endpoint data verified live:
+
+- **Timeline with names.** ESPN carries event participants in `participants[]` (not the
+  `athletesInvolved` field the adapter previously read — the cause of bare "Goal" rows).
+  Goals name the scorer; substitutions carry both players (on/off); cards name the player.
+  Rendering stays one moment per row: minute, name(s), quiet type word, team crest.
+- **Date line + kicker.** Full date always; cup round in the kicker where present.
+- **Metadata line:** venue with city · attendance · referee, one quiet sans line.
+- **Form coming in:** five W/D/L glyphs per team (feed's `lastFiveGames`); renders
+  pre-match too.
+- **Head-to-head:** the feed's series summary plus its last meetings with scores;
+  renders pre-match too.
+- **Standouts:** post-match only — top performers per side (shots, saves, passes leaders).
+
+### 13.9 Contextual match videos (agreed 2026-08-14)
+
+Finished fixtures offer one YouTube video card: a deterministic search
+("{home} vs {away} highlights {date}") via the YouTube Data v3 API, showing the top
+result as an embedded player; an ✕ dismisses it and the next suggestion takes its place;
+after the last suggestion the card disappears. No AI query generation — the query is
+derived from fixture data.
+
+**Key exception (amends §12):** this is the app's one API key — `VITE_YOUTUBE_API_KEY`,
+client-side by necessity, HTTP-referrer-locked to the deployment domain in Google Cloud
+Console, free quota (search costs 100 units of the 10,000/day). Reused from the World Cup
+dashboard's key. The app degrades gracefully without it: no key → no video section, no
+placeholder, everything else unaffected.
