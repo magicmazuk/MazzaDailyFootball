@@ -647,3 +647,20 @@ drawers, calendar day selection) never do. Implemented as a pathname-keyed effec
   strike). "Reveal the rest" completes instantly. Completing (either way) marks the round's
   ties seen. Replayable afterwards from the cup Overview ("Replay the draw") — replays
   never re-hide. CSS animations, tap-paced, nothing autoplays (§8.3).
+
+### 13.15 League-phase draws (agreed 2026-08-16)
+
+Phase rounds (`league-phase`, `group-stage`) are excluded from tie-draw detection (§13.14)
+because a 144-fixture ceremony is meaningless. Instead they get a **club-centric** ceremony:
+
+- **Detection:** for each FOLLOWED club, a phase round in one of its competitions whose
+  fixtures for that club are all scheduled, all unseen, and ≥2 → an invitation on Today:
+  crest + "{CLUB}'S DRAW IS IN — {roundLabel} · {n} opponents". The club's unrevealed phase
+  fixtures are Today-hidden like tie draws.
+- **Ceremony** at `/draw/:compId/:round/:teamId`: bowl of the opponents' crests; one
+  opponent per tap (tumble → reveal crest + name + home/away marker → pulse → leave →
+  land); landed list = the campaign in kickoff order, each row `v {Opponent} (H|A)`.
+  Completion marks that club's phase tieIds seen. Replayable; browsable for ANY club via a
+  quiet "Replay the {roundLabel} draw" link on its team page when it has phase fixtures.
+- Engine gains an `opponents` mode (one fixture per reveal unit, subject club's opposite
+  side revealed); pool shuffle, tap pacing, seen-marking semantics all inherited.
