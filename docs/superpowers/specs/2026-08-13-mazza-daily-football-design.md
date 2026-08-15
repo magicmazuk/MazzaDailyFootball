@@ -664,3 +664,22 @@ because a 144-fixture ceremony is meaningless. Instead they get a **club-centric
   quiet "Replay the {roundLabel} draw" link on its team page when it has phase fixtures.
 - Engine gains an `opponents` mode (one fixture per reveal unit, subject club's opposite
   side revealed); pool shuffle, tap pacing, seen-marking semantics all inherited.
+
+### 13.16 Player pages (agreed 2026-08-16; un-defers §2's player detail)
+
+- **No portraits.** The feeds serve no player photos (verified: SPFL and EPL headshots 404).
+  No placeholder circles or initial roundels anywhere — player identity is typographic:
+  name, shirt number, position.
+- **The Splits design** (user-selected from mockups): bio line (nationality · age · height ·
+  games); position-aware stat sections rendered as two-tone proportion blocks — attacking
+  (shots on/off target, passes on/astray with the count-forward), discipline (fouls, cards,
+  tackles won); keepers swap attacking for saves / clean sheets / conceded. Data from the
+  core-API athlete + season-statistics endpoints (proxied; the proxy allowlist grows two
+  core-API shapes).
+- **Access:** full page at `/player/:compId/:playerId` from squad lists; from match
+  contexts (standouts, lineups, timeline names) a **bottom sheet** peek — name, club ·
+  position line, three headline numbers (position-aware), `Full profile →`. Drag-bar + ✕
+  dismiss; match context never lost. Every player name app-wide becomes tappable (§13.2
+  extended to people).
+- **Table movement** ships alongside: `rankChange` from the standings feed renders as a
+  small ▲/▼ beside moved clubs (zone-legend green/red), nothing for unmoved.
