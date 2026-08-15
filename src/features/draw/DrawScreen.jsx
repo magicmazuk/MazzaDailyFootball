@@ -12,7 +12,7 @@ import { useSeasonFixtures } from '../../data/queries.js';
 import { usePrefs } from '../../store/prefs.js';
 import Crest from '../../ui/Crest.jsx';
 import {
-  TIMINGS, drawMode, drawReducer, initDraw, isComplete, landedSides, remainingClubs,
+  TIMINGS, drawMode, drawReducer, initDraw, isComplete, landedSides, remainingClubs, seededShuffle,
 } from './drawEngine.js';
 
 // Stable per-index jumble for the bowl pool — a fixed table, never random,
@@ -27,6 +27,49 @@ const jumbleStyle = i => {
 };
 
 const roundLabelFor = round => prettifyRound(round) ?? fallbackRoundLabel(round) ?? round;
+
+// Filters a once-computed shuffle down to whichever clubs are still in the
+// pool, preserving the shuffle's relative order — the "filter" half of
+// shuffle-then-filter (hotfix: the bowl no longer telegraphs the draw by
+// rendering clubs in tie order). Never reshuffles the remainder, so a
+// club's position among its still-in-the-hat peers never moves just
+// because another club landed. Matched by teamId, counted so a genuine
+// replay pair (the same club appearing twice) is matched exactly once per
+// occurrence rather than over- or under-matched; falls back to the club
+// object itself for the rare side with no teamId.
+function filterToRemaining(shuffledAll, remaining) {
+  const counts = new Map();
+  for (const club of remaining) {
+    const key = club.teamId ?? club;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return shuffledAll.filter(club => {
+    const key = club.teamId ?? club;
+    const n = counts.get(key) ?? 0;
+    if (n <= 0) return false;
+    counts.set(key, n - 1);
+    return true;
+  });
+}
+
+// The club whose ball is currently on the Stage (bowl, phase 'revealed'
+// only) — mirrors Stage's own derivation below — so the pool can find its
+// position in the shuffled display order and pulse/collapse the right
+// item, which is no longer necessarily at index 0 now that display order
+// isn't reveal order.
+function revealingClub(state) {
+  if (state.mode !== 'bowl' || state.phase !== 'revealed') return null;
+  const tieIndex = Math.floor(state.landed / 2);
+  const side = state.landed % 2 === 0 ? 'home' : 'away';
+  return state.ties[tieIndex]?.[side] ?? null;
+}
+
+// The tie currently being drawn (rollcall, phase 'drawing' only) — so the
+// roll-call list can find its position in the shuffled display order and
+// highlight the right row.
+function currentTie(state) {
+  return state.mode === 'rollcall' && state.phase === 'drawing' ? state.ties[state.landed] : null;
+}
 
 // Each club's jumble transform and React key are keyed off a STABLE
 // ordinal (its first-appearance order in the original ties list, built
@@ -80,9 +123,22 @@ function RollcallList({ rows, currentTieIndex }) {
   );
 }
 
-function Pool({ mode, pool, state, rows, clubOrdinals }) {
-  const revealingIndex = mode === 'bowl' && state.phase === 'revealed' ? 0 : -1;
-  const currentTieIndex = mode === 'rollcall' && state.phase === 'drawing' ? state.landed : -1;
+function Pool({ mode, pool, state, rows, shuffledTies, clubOrdinals }) {
+  // pool and shuffledTies already carry the presentation-only display
+  // order (Ceremony); `indexOf` locates the specific item within that
+  // order, since a shuffled position is no longer derivable from `landed`.
+  const revealing = revealingClub(state);
+  const revealingIndex = revealing ? pool.indexOf(revealing) : -1;
+
+  const current = currentTie(state);
+  const currentTieIndex = current ? shuffledTies.indexOf(current) : -1;
+
+  // rows is landedSides(state) in original tie order; re-key by tie id so
+  // the roll-call list can render each tie's landed status in the shuffled
+  // display order instead.
+  const byTieId = new Map(rows.map(r => [r.tie.id, r]));
+  const displayRows = shuffledTies.map(t => byTieId.get(t.id));
+
   return (
     <section className="mb-6">
       <div className="flex items-baseline justify-between mb-2">
@@ -91,7 +147,7 @@ function Pool({ mode, pool, state, rows, clubOrdinals }) {
       </div>
       {mode === 'bowl'
         ? <BowlPool pool={pool} revealingIndex={revealingIndex} clubOrdinals={clubOrdinals} />
-        : <RollcallList rows={rows} currentTieIndex={currentTieIndex} />}
+        : <RollcallList rows={displayRows} currentTieIndex={currentTieIndex} />}
     </section>
   );
 }
@@ -223,6 +279,27 @@ function Ceremony({ comp, compId, round, ties, alreadySeen, markTiesSeen, follow
     return map;
   }, [ties]);
 
+  // Presentation-only display shuffle for the bowl pool and roll-call list
+  // (hotfix: the bowl rendered remaining clubs in tie order, so the
+  // leftmost badges — and the roll call's next un-struck pair — always
+  // telegraphed the next reveal). Deterministic per ceremony, seeded from
+  // `${compId}:${round}` so it's identical on every visit/replay but not
+  // in tie order. Computed ONCE here, from the FULL original club/tie
+  // list; the bowl pool is then filtered down to whichever clubs remain
+  // (shuffle-then-filter, never re-shuffling the remainder) so a club
+  // never jumps position just because another one landed. Reveal order
+  // itself (`landed`, strictly tie-sequential), stable ordinals for the
+  // jumble, keys and the engine state are all untouched — this only
+  // reorders what's drawn on screen.
+  const shuffledClubs = useMemo(
+    () => seededShuffle(remainingClubs(initDraw(ties, mode)), `${compId}:${round}`),
+    [ties, mode, compId, round],
+  );
+  const shuffledTies = useMemo(
+    () => seededShuffle(ties, `${compId}:${round}`),
+    [ties, compId, round],
+  );
+
   // Seen-marking (spec §8.5): fire exactly once, on reaching complete, by
   // taps or by Reveal the rest. An already-seen round on arrival is already
   // marked, so the ref starts true and this never fires again for it.
@@ -256,7 +333,7 @@ function Ceremony({ comp, compId, round, ties, alreadySeen, markTiesSeen, follow
 
   const canTap = state.phase === 'idle' || state.phase === 'landed';
   const rows = landedSides(state);
-  const pool = remainingClubs(state);
+  const pool = filterToRemaining(shuffledClubs, remainingClubs(state));
   const roundLabel = roundLabelFor(round);
 
   return (
@@ -266,7 +343,7 @@ function Ceremony({ comp, compId, round, ties, alreadySeen, markTiesSeen, follow
       </p>
       <h1 className="text-[24px] mb-6">The {roundLabel} draw</h1>
 
-      <Pool mode={mode} pool={pool} state={state} rows={rows} clubOrdinals={clubOrdinals} />
+      <Pool mode={mode} pool={pool} state={state} rows={rows} shuffledTies={shuffledTies} clubOrdinals={clubOrdinals} />
 
       {mode === 'bowl'
         ? <Stage state={state} canTap={canTap} onTap={() => canTap && dispatch({ type: 'TAP' })} />
