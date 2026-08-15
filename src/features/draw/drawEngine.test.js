@@ -156,6 +156,96 @@ test('rollcall TAP is ignored mid-draw', () => {
   expect(midDraw).toBe(state);
 });
 
+// --- opponents mode: one fixture per TAP, subject's side never revealed
+// (spec §13.15, task-1 brief) ---
+
+// Celtic is the subject, home in fixtures 1 and 3, away in fixture 2 —
+// mixed venues on purpose. Already in kickoff order, per the input
+// contract landedSides relies on.
+const opponentTies = [
+  tie('o1', celtic, rangers, '2026-09-01T15:00:00Z'),
+  tie('o2', aberdeen, celtic, '2026-09-02T15:00:00Z'),
+  tie('o3', celtic, hibs, '2026-09-03T15:00:00Z'),
+];
+
+test('opponents mode reveals one opponent per TAP, tumble->revealed->landed like bowl, with correct venue', () => {
+  let state = initDraw(opponentTies, 'opponents', { subjectTeamId: celtic.teamId });
+  expect(state.phase).toBe('idle');
+
+  state = drawReducer(state, { type: 'TAP' });
+  expect(state.phase).toBe('tumbling');
+  state = drawReducer(state, { type: 'TICK' });
+  expect(state.phase).toBe('revealed');
+  state = drawReducer(state, { type: 'TICK' });
+  expect(state.phase).toBe('landed');
+
+  const rows = landedSides(state);
+  expect(rows[0]).toEqual({ landed: true, opponent: rangers, venue: 'H', kickoff: opponentTies[0].kickoff });
+  expect(rows[1].landed).toBe(false);
+  expect(rows[2].landed).toBe(false);
+});
+
+test('opponents mode TAP is ignored mid-animation, same gating as bowl', () => {
+  let state = initDraw(opponentTies, 'opponents', { subjectTeamId: celtic.teamId });
+  state = drawReducer(state, { type: 'TAP' });
+  expect(state.phase).toBe('tumbling');
+
+  const midTumble = drawReducer(state, { type: 'TAP' });
+  expect(midTumble).toBe(state);
+
+  state = drawReducer(state, { type: 'TICK' });
+  expect(state.phase).toBe('revealed');
+  const midReveal = drawReducer(state, { type: 'TAP' });
+  expect(midReveal).toBe(state);
+});
+
+test('mixed home/away fixtures map venues correctly for every opponent', () => {
+  const state = drawReducer(
+    initDraw(opponentTies, 'opponents', { subjectTeamId: celtic.teamId }),
+    { type: 'REVEAL_REST' },
+  );
+  const rows = landedSides(state);
+  expect(rows.map(r => r.venue)).toEqual(['H', 'A', 'H']); // celtic: home, away, home
+  expect(rows.map(r => r.opponent)).toEqual([rangers, aberdeen, hibs]);
+  expect(rows.map(r => r.kickoff)).toEqual(opponentTies.map(t => t.kickoff));
+});
+
+test('subject club never appears in remainingClubs or landedSides, landed or not', () => {
+  let state = initDraw(opponentTies, 'opponents', { subjectTeamId: celtic.teamId });
+  expect(remainingClubs(state)).toEqual([rangers, aberdeen, hibs]);
+  expect(remainingClubs(state).some(c => c.teamId === celtic.teamId)).toBe(false);
+  expect(landedSides(state).some(r => r.opponent.teamId === celtic.teamId)).toBe(false);
+
+  state = drawReducer(state, { type: 'TAP' });
+  state = drawReducer(state, { type: 'TICK' });
+  state = drawReducer(state, { type: 'TICK' });
+  expect(remainingClubs(state)).toEqual([aberdeen, hibs]);
+  expect(remainingClubs(state).some(c => c.teamId === celtic.teamId)).toBe(false);
+  expect(landedSides(state).some(r => r.opponent.teamId === celtic.teamId)).toBe(false);
+});
+
+test('REVEAL_REST lands every opponent at once in opponents mode', () => {
+  const state = drawReducer(
+    initDraw(opponentTies, 'opponents', { subjectTeamId: celtic.teamId }),
+    { type: 'REVEAL_REST' },
+  );
+  expect(state.phase).toBe('complete');
+  expect(isComplete(state)).toBe(true);
+  expect(remainingClubs(state)).toHaveLength(0);
+  expect(landedSides(state).every(r => r.landed)).toBe(true);
+});
+
+test('RESET restores the initial idle state for opponents mode, preserving subjectTeamId', () => {
+  let state = initDraw(opponentTies, 'opponents', { subjectTeamId: celtic.teamId });
+  state = drawReducer(state, { type: 'TAP' });
+  state = drawReducer(state, { type: 'TICK' });
+  state = drawReducer(state, { type: 'TICK' });
+  state = drawReducer(state, { type: 'RESET' });
+  expect(state).toEqual(initDraw(opponentTies, 'opponents', { subjectTeamId: celtic.teamId }));
+  expect(state.phase).toBe('idle');
+  expect(remainingClubs(state)).toHaveLength(3);
+});
+
 // --- REVEAL_REST / RESET ---
 
 test('REVEAL_REST completes the draw from idle, landing every side at once', () => {
