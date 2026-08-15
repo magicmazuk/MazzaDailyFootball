@@ -7,6 +7,7 @@ import CompetitionScreen from './features/competition/CompetitionScreen.jsx';
 import TeamScreen from './features/team/TeamScreen.jsx';
 import MatchScreen from './features/match/MatchScreen.jsx';
 import ClubsScreen from './features/clubs/ClubsScreen.jsx';
+import DrawScreen from './features/draw/DrawScreen.jsx';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="clubs" element={<ClubsScreen />} />
         <Route path="team/:compId/:teamId" element={<TeamScreen />} />
         <Route path="match/:compId/:eventId" element={<MatchScreen />} />
+        <Route path="draw/:compId/:round" element={<DrawScreen />} />
       </Route>
     </Routes>
   );
