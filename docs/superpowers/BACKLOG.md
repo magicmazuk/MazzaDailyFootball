@@ -62,3 +62,9 @@ None block usage; candidates for a future 1.2 pass.
 
 - Fixture rows now nest three interactive controls inside the row link (row/crest/context) — valid behaviour, invalid HTML content model; the sibling-Link restructure would clear it if a11y tooling complains.
 - Sibling fixtures in the match room don't receive followedIds, so ★ never shows there.
+
+## From the 2.4 review (2026-08-15) — accepted
+
+- A late-published extra tie in an already-revealed round never gets its own ceremony (idempotence outranks completeness) and removes the round's replay link.
+- DrawScreen conflates a dead feed with a nonexistent round in its honest line.
+- Legacy-migration edge: a comp erroring at the exact moment the OLD global latch fired would show one false card post-upgrade (no real installs carry this; self-heals on view).
