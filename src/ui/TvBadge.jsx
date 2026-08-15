@@ -8,8 +8,8 @@ export default function TvBadge({ tv }) {
     <span className="inline-flex gap-1">
       {tv.map(ch => (
         <span key={ch}
-          className="font-sans text-[8.5px] uppercase tracking-[.12em] text-muted
-                     border border-rule rounded-[3px] px-1 py-px leading-none">
+          className="font-sans text-[7.5px] uppercase tracking-[.1em] text-muted
+                     border border-rule rounded-[3px] px-[3px] py-px leading-none">
           {tvShortLabel(ch)}
         </span>
       ))}
