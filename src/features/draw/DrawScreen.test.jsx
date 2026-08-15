@@ -234,3 +234,99 @@ test('rollcall mode is chosen for a round with more than 16 distinct clubs, and 
   expect(within(rollcallList).getByText('Home 0')).toHaveClass('line-through');
   expect(within(rollcallList).getByText('Away 0')).toHaveClass('line-through');
 });
+
+// --- display shuffle (hotfix: the bowl no longer telegraphs the draw) ---
+
+// The pool's crest order, as rendered — the DOM order of the "Still in
+// the hat" items, read via each Crest's accessible name (bowlEvents'
+// clubs are crestless, so Crest renders the monogram span with
+// aria-label={side.name}).
+const poolOrder = () => [...document.querySelectorAll('.draw-pool-item [aria-label]')]
+  .map(el => el.getAttribute('aria-label'));
+
+test("the bowl pool's display order does not start with the first tie's two clubs, for the real seed used", async () => {
+  stubScoreboard(bowlEvents);
+  renderAt('/draw/sco.tennents/fourth-round');
+  await screen.findByText('Tap to draw the first ball');
+
+  // Identity (tie) order would be Celtic, Rangers, Aberdeen, Hibernian,
+  // Hearts, Dundee — the exact bug report: "the leftmost badges are
+  // always the next pairing". The seeded shuffle for this ceremony's real
+  // seed (sco.tennents:fourth-round) must not reproduce that order.
+  const order = poolOrder();
+  expect(order).toHaveLength(6);
+  expect(order).not.toEqual(['Celtic', 'Rangers', 'Aberdeen', 'Hibernian', 'Hearts', 'Dundee']);
+  expect(order.slice(0, 2)).not.toEqual(['Celtic', 'Rangers']);
+});
+
+test('the bowl pool order stays stable as clubs leave — the remainder is always a filtered slice of the same permutation', async () => {
+  stubScoreboard(bowlEvents);
+  renderAt('/draw/sco.tennents/fourth-round');
+  await screen.findByText('Tap to draw the first ball');
+
+  const before = poolOrder();
+  expect(before).toHaveLength(6);
+
+  vi.useFakeTimers();
+  fireEvent.click(drawButton()); // lands Celtic (tie0-home) — the first ball drawn regardless of display order
+  await act(async () => { await vi.advanceTimersByTimeAsync(TIMINGS.tumble); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(TIMINGS.holdOpen); });
+
+  expect(screen.getByText('5')).toBeInTheDocument();
+  const afterOne = poolOrder();
+  expect(afterOne).toEqual(before.filter(name => name !== 'Celtic'));
+
+  fireEvent.click(drawButton()); // lands Rangers (tie0-away)
+  await act(async () => { await vi.advanceTimersByTimeAsync(TIMINGS.tumble); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(TIMINGS.holdOpen); });
+
+  expect(screen.getByText('4')).toBeInTheDocument();
+  const afterTwo = poolOrder();
+  expect(afterTwo).toEqual(afterOne.filter(name => name !== 'Rangers'));
+});
+
+test("the bowl pool's shuffled order is identical across two fresh visits to the same round (deterministic replay)", async () => {
+  stubScoreboard(bowlEvents);
+  const first = renderAt('/draw/sco.tennents/fourth-round');
+  await screen.findByText('Tap to draw the first ball');
+  const firstOrder = poolOrder();
+  first.unmount();
+
+  stubScoreboard(bowlEvents);
+  renderAt('/draw/sco.tennents/fourth-round');
+  await screen.findByText('Tap to draw the first ball');
+  expect(poolOrder()).toEqual(firstOrder);
+});
+
+test('the roll-call list also renders its ties in a shuffled display order, not tie order', async () => {
+  stubScoreboard(rollcallEvents);
+  renderAt('/draw/sco.tennents/first-round');
+  await screen.findByText('Tap to draw the first tie');
+
+  const rollcallList = document.querySelector('.columns-2');
+  const names = within(rollcallList).getAllByText(/^(Home|Away) \d$/).map(el => el.textContent);
+  // Identity order pairs up as Home 0, Away 0, Home 1, Away 1, Home 2, Away 2, ...
+  // — the seeded shuffle for this round must not reproduce that sequence.
+  expect(names).not.toEqual(
+    Array.from({ length: 9 }, (_, i) => [`Home ${i}`, `Away ${i}`]).flat(),
+  );
+});
+
+test('the roll-call "currently drawing" highlight tracks the right tie through the shuffle, not its shuffled position', async () => {
+  stubScoreboard(rollcallEvents);
+  renderAt('/draw/sco.tennents/first-round');
+  await screen.findByText('Tap to draw the first tie');
+
+  vi.useFakeTimers();
+  fireEvent.click(drawButton()); // draws tie 0
+  await act(async () => { await vi.advanceTimersByTimeAsync(TIMINGS.rollcallGap * 2); });
+  expect(screen.getByText('16')).toBeInTheDocument(); // tie 0 landed
+
+  fireEvent.click(drawButton()); // now drawing tie 1 — landed hasn't advanced yet
+  const rollcallList = document.querySelector('.columns-2');
+  expect(within(rollcallList).getByText('Home 0')).toHaveClass('line-through');
+  expect(within(rollcallList).getByText('Away 0')).toHaveClass('line-through');
+  expect(within(rollcallList).getByText('Home 1')).toHaveClass('text-accent');
+  expect(within(rollcallList).getByText('Away 1')).toHaveClass('text-accent');
+  expect(within(rollcallList).getByText('Home 1')).not.toHaveClass('line-through');
+});

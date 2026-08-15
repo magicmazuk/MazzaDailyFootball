@@ -3,7 +3,7 @@
 // timeouts; this file only proves the state machine itself is correct.
 import { expect, test } from 'vitest';
 import {
-  TIMINGS, drawMode, drawReducer, initDraw, isComplete, landedSides, remainingClubs,
+  TIMINGS, drawMode, drawReducer, initDraw, isComplete, landedSides, remainingClubs, seededShuffle,
 } from './drawEngine.js';
 
 const side = (teamId, name) => ({ teamId, name, crestUrl: null, monogram: name.slice(0, 2).toUpperCase() });
@@ -196,4 +196,35 @@ test('RESET from complete also restores idle', () => {
 
 test('TIMINGS exports the four validated pacing constants', () => {
   expect(TIMINGS).toEqual({ tumble: 1200, holdOpen: 1500, land: 450, rollcallGap: 1100 });
+});
+
+// --- seededShuffle: deterministic display shuffle (hotfix — the bowl no
+// longer telegraphs the draw order by rendering clubs in tie order) ---
+
+const sixteen = Array.from({ length: 16 }, (_, i) => side(`s${i}`, `Side ${i}`));
+
+test('seededShuffle is deterministic — the same items and seed always produce the same order', () => {
+  const a = seededShuffle(sixteen, 'sco.tennents:fourth-round');
+  const b = seededShuffle(sixteen, 'sco.tennents:fourth-round');
+  expect(a).toEqual(b);
+});
+
+test('seededShuffle produces a different order for a different seed', () => {
+  const a = seededShuffle(sixteen, 'sco.tennents:fourth-round');
+  const b = seededShuffle(sixteen, 'sco.tennents:fifth-round');
+  expect(a).not.toEqual(b);
+});
+
+test('seededShuffle returns a permutation of the input — same elements, not the original identity order', () => {
+  const shuffled = seededShuffle(sixteen, 'sco.tennents:fourth-round');
+  expect(shuffled).toHaveLength(sixteen.length);
+  expect([...shuffled].sort((a, b) => a.teamId.localeCompare(b.teamId)))
+    .toEqual([...sixteen].sort((a, b) => a.teamId.localeCompare(b.teamId)));
+  expect(shuffled).not.toEqual(sixteen);
+});
+
+test('seededShuffle never mutates the input array', () => {
+  const original = sixteen.slice();
+  seededShuffle(sixteen, 'sco.tennents:fourth-round');
+  expect(sixteen).toEqual(original);
 });

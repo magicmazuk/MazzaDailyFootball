@@ -99,3 +99,45 @@ export function remainingClubs(state) {
 export function isComplete(state) {
   return state.phase === 'complete';
 }
+
+// djb2 string hash → an unsigned 32-bit seed for mulberry32 below. Not
+// cryptographic — just a cheap, deterministic way to turn an arbitrary
+// seed string (e.g. `${compId}:${round}`) into a PRNG seed.
+function djb2(str) {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i += 1) {
+    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0; // hash*33 + c
+  }
+  return hash >>> 0;
+}
+
+// mulberry32: small, fast, deterministic PRNG seeded from a 32-bit
+// integer — same seed always produces the same sequence. Not
+// cryptographic; good enough for a cosmetic display shuffle.
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function next() {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Deterministic Fisher-Yates shuffle, driven by mulberry32 seeded from a
+// djb2 hash of `seedString` — the same (items, seedString) pair always
+// produces the same order, and a different seed reorders it. Repo rule:
+// no Math.random anywhere (determinism; a draw replay must look identical
+// across visits/viewers). Pure: returns a new array, never mutates
+// `items`. Presentation-only tool — callers decide what it's shuffling
+// (e.g. the bowl pool's display order); it has no opinion on reveal order,
+// which stays governed by the reducer's `landed` counter.
+export function seededShuffle(items, seedString) {
+  const result = items.slice();
+  const rand = mulberry32(djb2(String(seedString)));
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rand() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
