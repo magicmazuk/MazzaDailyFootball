@@ -1,6 +1,7 @@
+import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { byId } from '../../domain/competitions.js';
-import { useMatchDetail, useSeasonFixtures } from '../../data/queries.js';
+import { todayWindowQuery, useMatchDetail, useSeasonFixtures } from '../../data/queries.js';
 import MatchRoom from './MatchRoom.jsx';
 import { siblingFixtures } from './siblings.js';
 import { useMatchVideos } from './video.js';
@@ -22,7 +23,14 @@ export default function MatchScreen() {
   const { compId, eventId } = useParams();
   const comp = byId(compId);
   const season = useSeasonFixtures(comp ?? { id: 'none', source: 'espn' });
-  const fixture = season.data?.fixtures.find(f => f.id === eventId);
+  // The season copy (staleTime 1h) can still show a fixture as 'scheduled'
+  // well after kickoff. The today-window copy polls every 30s while
+  // matches are live, so it's preferred here; the season lookup remains
+  // the fallback for fixtures outside the yesterday-today window (e.g.
+  // older results).
+  const windowQ = useQuery({ ...todayWindowQuery(comp ?? { id: 'none', source: 'espn' }), enabled: !!comp });
+  const seasonFixture = season.data?.fixtures.find(f => f.id === eventId);
+  const fixture = windowQ.data?.fixtures.find(f => f.id === eventId) ?? seasonFixture;
   const roomComp = matchRoomComp(comp, eventId);
   const detail = useMatchDetail(roomComp ?? { id: 'none', hasMatchDetail: false }, eventId,
     fixture?.status === 'live');
