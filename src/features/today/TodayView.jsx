@@ -2,6 +2,7 @@ import SectionLabel from '../../ui/SectionLabel.jsx';
 import FixtureRow from '../../ui/FixtureRow.jsx';
 import NextUpRow from './NextUpRow.jsx';
 import MiniTable from './MiniTable.jsx';
+import DrawInvitation from './DrawInvitation.jsx';
 
 const longDate = d => d.toLocaleDateString('en-GB',
   { weekday: 'long', day: 'numeric', month: 'long' });
@@ -27,7 +28,7 @@ function Section({ label, muted, fixtures, followedIds }) {
   );
 }
 
-export default function TodayView({ partition, followedIds, date, asOf = null, nextUp = [], onTv = [], quickTables = [] }) {
+export default function TodayView({ partition, followedIds, date, asOf = null, nextUp = [], onTv = [], quickTables = [], draws = [] }) {
   const { yours, live, later, earlier, yesterday } = partition;
   const quiet = !yours.length && !live.length && !later.length && !earlier.length;
   return (
@@ -41,6 +42,7 @@ export default function TodayView({ partition, followedIds, date, asOf = null, n
           as of {new Date(asOf).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
         </p>
       )}
+      {draws.map(d => <DrawInvitation key={`${d.comp.id}:${d.round}`} draw={d} />)}
       {(yours.length > 0 || nextUp.length > 0) && (
         <section className="mt-8 first:mt-0">
           <SectionLabel>★ Your clubs</SectionLabel>

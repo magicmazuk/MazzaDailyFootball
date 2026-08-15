@@ -119,6 +119,40 @@ test('the Next up row omits the competition text for an unknown competition id, 
   expect(screen.getByRole('button', { name: 'Celtic calendar' })).toBeInTheDocument();
 });
 
+// --- draw invitations (spec §8.2, §13.14) ---
+
+const draw = (id, round) => ({
+  comp: { id, name: id === 'sco.tennents' ? 'Scottish Cup' : 'FA Cup' },
+  round, roundLabel: 'Fourth round', ties: [{ id: 't1' }, { id: 't2' }],
+});
+
+test('renders one draw invitation card per draw, above the Your clubs section', () => {
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-22T15:00:00Z')} followedIds={new Set()}
+        partition={{ yours: [fx('1', 'Celtic', 'St Johnstone')], live: [], later: [], earlier: [], yesterday: [] }}
+        draws={[draw('sco.tennents', 'fourth-round'), draw('eng.fa', 'third-round')]} />
+    </MemoryRouter>,
+  );
+  expect(screen.getAllByText('THE DRAW IS IN')).toHaveLength(2);
+  const [firstCard] = screen.getAllByText('THE DRAW IS IN');
+  const yourClubsHeading = screen.getByText('★ Your clubs');
+  // eslint-disable-next-line no-bitwise
+  expect(firstCard.compareDocumentPosition(yourClubsHeading) & Node.DOCUMENT_POSITION_FOLLOWING)
+    .toBeTruthy();
+});
+
+test('a quiet day with an unrevealed draw still says "No matches today" (a card and the quiet line coexist)', () => {
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-06-15T12:00:00Z')} followedIds={new Set()}
+        partition={emptyPartition} draws={[draw('sco.tennents', 'fourth-round')]} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText('THE DRAW IS IN')).toBeInTheDocument();
+  expect(screen.getByText('No matches today.')).toBeInTheDocument();
+});
+
 test('renders On TV section with televised fixture', () => {
   const onTvFixture = {
     id: 'f1',
