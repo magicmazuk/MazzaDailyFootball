@@ -18,10 +18,17 @@ export const usePrefs = create(persist(
     followed: { [CELTIC.id]: CELTIC },
     hiddenComps: [],
     // tieId ('${compId}:${fixtureId}') -> true, for every draw ceremony
-    // already shown (spec §8.1). seenSeeded guards first-run seeding
-    // (below) so an installation that starts with genuinely zero published
-    // cup ties doesn't keep re-seeding and swallow the first real draw.
+    // already shown (spec §8.1).
     seenTies: {},
+    // compId -> true, once that comp's own first-run baseline has been
+    // seeded (spec §13.14). Per-competition, deliberately — see
+    // seedCompIfNeeded below for why a single global latch doesn't work.
+    seededComps: {},
+    // Vestigial: the OLD global first-run latch, superseded by
+    // seededComps. No code writes this anymore — it is read-only, kept
+    // solely so seedCompIfNeeded can recognise an install that already
+    // seeded under the old scheme (see there). A brand-new install never
+    // has this true.
     seenSeeded: false,
     follow: club => set(s => ({ followed: { ...s.followed, [club.id]: club } })),
     unfollow: id => {
@@ -43,27 +50,43 @@ export const usePrefs = create(persist(
       for (const id of tieIds) seenTies[id] = true;
       return { seenTies };
     }),
-    // First-run seeding (spec §13.14): the first non-empty call writes
-    // every given id and latches seenSeeded so a draw can only ever be
-    // announced from installation forward, never retroactively for ties
-    // already published when the app was installed. Once seenSeeded is
-    // true, every later call is a no-op.
+    // Per-competition first-run seeding (spec §13.14; fix, replacing the
+    // old global seedSeenIfEmpty/seenSeeded latch after two live defects):
+    // a single global latch required EVERY cup query to settle before
+    // seeding ANY comp — a comp that resolved quickly sat unseeded (its
+    // pre-existing round misread as a "new" draw) for as long as any
+    // sibling comp stayed pending, and a comp whose query failed could
+    // never seed at all, even after a later successful retry, once the
+    // global latch had already fired for its siblings. Seeding per comp
+    // fixes both: each comp's own baseline is established the moment ITS
+    // OWN query succeeds, independent of every other comp's state.
     //
-    // Calling contract: call only with settled query data (i.e. once the
-    // fixtures query has resolved). An empty tieIds array is treated as
-    // "not loaded yet", not "zero ties exist" — it is a no-op that does
-    // NOT latch seenSeeded, so a caller invoked before its data is ready
-    // (a load race) can't permanently swallow seeding. The cost is that a
-    // genuinely empty catalogue at first run never latches either, so the
-    // first real ties published get seeded (silently) instead of
-    // announced — deliberately accepted as far milder than the race, and
-    // moot in practice since group stages always exist for a fresh cup.
-    seedSeenIfEmpty: tieIds => set(s => {
-      if (s.seenSeeded === true) return {};
+    // seedCompIfNeeded(compId, tieIds):
+    //  - no-op if this comp is already latched (seededComps[compId]).
+    //  - legacy migration: an install that already ran under the OLD
+    //    global seenSeeded:true latch has every cup tie published at that
+    //    time marked seen in seenTies already — there is nothing left to
+    //    seed, only the per-comp latch needs to catch up. Rather than a
+    //    persist version-bump migration, this is the simpler check: when
+    //    seenSeeded is true, latch the comp WITHOUT touching seenTies (it
+    //    already covers it), so a legacy install never re-seeds and never
+    //    floods a false "new draw" card for ties that predate the update.
+    //    (Trade-off, accepted: a legacy install never does real per-comp
+    //    seeding again, even for a brand-new comp added to the registry
+    //    later — judged acceptable since seenTies already holds its own
+    //    accurate history from the old scheme.)
+    //  - otherwise, same load-race contract as the old function: an empty
+    //    tieIds array means "not loaded yet", not "zero ties exist" — a
+    //    no-op that does NOT latch, so a caller invoked before its query
+    //    resolves can't permanently swallow seeding for that comp.
+    //  - otherwise: seed every given id into seenTies and latch this comp.
+    seedCompIfNeeded: (compId, tieIds) => set(s => {
+      if (s.seededComps[compId]) return {};
+      if (s.seenSeeded) return { seededComps: { ...s.seededComps, [compId]: true } };
       if (tieIds.length === 0) return {};
       const seenTies = { ...s.seenTies };
       for (const id of tieIds) seenTies[id] = true;
-      return { seenTies, seenSeeded: true };
+      return { seenTies, seededComps: { ...s.seededComps, [compId]: true } };
     }),
   }),
   { name: 'mdf-prefs' },

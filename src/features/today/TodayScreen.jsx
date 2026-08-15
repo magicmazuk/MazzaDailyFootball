@@ -12,7 +12,8 @@ export default function TodayScreen() {
   const followed = usePrefs(s => s.followed);
   const hidden = usePrefs(s => s.hiddenComps);
   const seenTies = usePrefs(s => s.seenTies);
-  const seedSeenIfEmpty = usePrefs(s => s.seedSeenIfEmpty);
+  const seededComps = usePrefs(s => s.seededComps);
+  const seedCompIfNeeded = usePrefs(s => s.seedCompIfNeeded);
   const comps = COMPETITIONS.filter(c => !hidden.includes(c.id));
   const results = useTodayWindows(comps);
   const seasons = useAllSeasonFixtures(comps);
@@ -27,28 +28,38 @@ export default function TodayScreen() {
   const cupResults = comps
     .map((comp, i) => ({ comp, ...seasons[i] }))
     .filter(r => r.comp.type === 'cup');
-  // Seeding contract (store/prefs.js seedSeenIfEmpty): only ever call it
-  // once every cup season query has settled (succeeded or errored) — never
-  // while one is still loading. An isError comp is simply absent from
-  // cupFixturesByComp below; additive seeding catches it on a later
-  // successful load, per the brief.
-  const allSettled = cupResults.every(r => r.isSuccess || r.isError);
   const cupFixturesByComp = cupResults
     .filter(r => r.isSuccess)
     .map(r => ({ comp: r.comp, fixtures: r.data?.fixtures ?? [] }));
 
+  // Per-competition seeding (store/prefs.js seedCompIfNeeded, fix per
+  // review): seed EACH comp the moment ITS OWN query succeeds, never
+  // waiting on siblings — an isError comp is simply not seeded yet; it
+  // self-heals on a later successful load, when this effect re-runs and
+  // finds it among the successful ids.
+  const successfulCupIds = cupFixturesByComp.map(({ comp }) => comp.id).join(',');
   useEffect(() => {
-    if (allSettled && cupFixturesByComp.length) seedSeenIfEmpty(allTieIds(cupFixturesByComp));
-    // cupFixturesByComp is rebuilt fresh every render; its length is a
-    // stable-enough dependency proxy for "the settled cup catalogue
-    // arrived" without re-running on every subsequent render once
-    // settled — seedSeenIfEmpty is a no-op past its first successful call
-    // regardless, so this is a minor efficiency choice, not a correctness
-    // one.
+    for (const { comp, fixtures } of cupFixturesByComp) {
+      seedCompIfNeeded(comp.id, allTieIds([{ comp, fixtures }]));
+    }
+    // successfulCupIds (not cupFixturesByComp itself, a fresh array every
+    // render) is the dependency: it changes exactly when the SET of
+    // successful cup comps changes, i.e. when there's genuinely new
+    // settling to react to. seedCompIfNeeded is a no-op past a comp's own
+    // first successful call regardless, so re-running for an unchanged set
+    // would be harmless anyway — this just avoids doing it every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allSettled, cupFixturesByComp.length, seedSeenIfEmpty]);
+  }, [successfulCupIds, seedCompIfNeeded]);
 
-  const draws = unrevealedDraws(cupFixturesByComp, seenTies);
+  // No-flash gating (fix per review): a comp's fixtures only feed
+  // unrevealedDraws() once THAT comp has actually been seeded — not merely
+  // loaded. Otherwise, for the one render between "query succeeded" and
+  // "seeding effect committed", that comp's pre-existing (not genuinely
+  // new) round would misread as an unrevealed draw against an unseeded
+  // seenTies. First paint shows no cards; a card appears only once its own
+  // comp's baseline exists and a round is genuinely unseen against it.
+  const seededCupFixturesByComp = cupFixturesByComp.filter(({ comp }) => seededComps[comp.id]);
+  const draws = unrevealedDraws(seededCupFixturesByComp, seenTies);
   // Today-scoped hiding (spec §13.14): an unrevealed tie's fixture is
   // replaced by its invitation card everywhere a bare FixtureRow could
   // otherwise leak the pairing — the today window (partitionToday/onTv)

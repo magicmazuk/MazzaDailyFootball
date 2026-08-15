@@ -5,7 +5,7 @@ beforeEach(() => {
   localStorage.clear();
   usePrefs.setState({
     followed: { [CELTIC.id]: CELTIC }, hiddenComps: [],
-    seenTies: {}, seenSeeded: false,
+    seenTies: {}, seenSeeded: false, seededComps: {},
   });
 });
 
@@ -54,41 +54,56 @@ test('adding seenTies to the store shape does not break existing persisted keys 
   expect(state.seenTies).toEqual({});
 });
 
-test('seedSeenIfEmpty seeds all given ids the first time', () => {
-  usePrefs.getState().seedSeenIfEmpty(['sco.tennents:1', 'sco.tennents:2']);
+// --- seedCompIfNeeded (per-competition seeding, spec §13.14) ---
+// Replaces the old global seedSeenIfEmpty/seenSeeded latch after two live
+// defects (first-run flash while a sibling comp was still pending; a
+// failed comp could never seed even after later recovering) — see
+// prefs.js's doc comment for the full rationale.
+
+test('seedCompIfNeeded seeds all given ids and latches only that comp', () => {
+  usePrefs.getState().seedCompIfNeeded('sco.tennents', ['sco.tennents:1', 'sco.tennents:2']);
   expect(usePrefs.getState().seenTies).toEqual({
     'sco.tennents:1': true, 'sco.tennents:2': true,
   });
+  expect(usePrefs.getState().seededComps).toEqual({ 'sco.tennents': true });
 });
 
-test('seedSeenIfEmpty is a no-op on a second call, even with different ids', () => {
-  usePrefs.getState().seedSeenIfEmpty(['sco.tennents:1']);
-  usePrefs.getState().seedSeenIfEmpty(['sco.tennents:2']);
+test('seedCompIfNeeded is a no-op for a comp already latched, even with different ids', () => {
+  usePrefs.getState().seedCompIfNeeded('sco.tennents', ['sco.tennents:1']);
+  usePrefs.getState().seedCompIfNeeded('sco.tennents', ['sco.tennents:2']);
   expect(usePrefs.getState().seenTies).toEqual({ 'sco.tennents:1': true });
 });
 
-test('seedSeenIfEmpty does not re-seed once seenSeeded is already true, even with a non-empty catalogue', () => {
-  usePrefs.setState({ seenTies: {}, seenSeeded: true });
-  usePrefs.getState().seedSeenIfEmpty(['sco.tennents:1']);
+test('seedCompIfNeeded([]) is a no-op that does NOT latch that comp — a later non-empty call still seeds it', () => {
+  // Same load-race contract as the old function: a caller invoked before
+  // its fixtures query has resolved must not permanently swallow seeding
+  // for that comp by latching on an empty catalogue.
+  usePrefs.getState().seedCompIfNeeded('sco.tennents', []);
+  expect(usePrefs.getState().seededComps['sco.tennents']).toBeUndefined();
   expect(usePrefs.getState().seenTies).toEqual({});
-});
-
-test('seedSeenIfEmpty([]) is a no-op that does NOT latch — a later non-empty call still seeds', () => {
-  // Guards against a load race: a caller invoked before its fixtures query
-  // has resolved must not permanently swallow seeding by latching on an
-  // empty catalogue. Callers are contractually required to call only once
-  // their query has settled; an empty call is treated as "not loaded yet",
-  // not as "zero ties exist".
-  usePrefs.getState().seedSeenIfEmpty([]);
-  expect(usePrefs.getState().seenSeeded).toBe(false);
-  expect(usePrefs.getState().seenTies).toEqual({});
-  usePrefs.getState().seedSeenIfEmpty(['sco.tennents:1']);
+  usePrefs.getState().seedCompIfNeeded('sco.tennents', ['sco.tennents:1']);
   expect(usePrefs.getState().seenTies).toEqual({ 'sco.tennents:1': true });
-  expect(usePrefs.getState().seenSeeded).toBe(true);
+  expect(usePrefs.getState().seededComps['sco.tennents']).toBe(true);
 });
 
-test('markTiesSeen after seeding adds additively', () => {
-  usePrefs.getState().seedSeenIfEmpty(['sco.tennents:1']);
+test('a second comp seeds independently, unaffected by another comp already being latched', () => {
+  usePrefs.getState().seedCompIfNeeded('sco.tennents', ['sco.tennents:1']);
+  usePrefs.getState().seedCompIfNeeded('eng.fa', ['eng.fa:9']);
+  expect(usePrefs.getState().seenTies).toEqual({ 'sco.tennents:1': true, 'eng.fa:9': true });
+  expect(usePrefs.getState().seededComps).toEqual({ 'sco.tennents': true, 'eng.fa': true });
+});
+
+test('a legacy install (old global seenSeeded latch) latches the comp WITHOUT re-seeding — its old seenTies already covers it', () => {
+  usePrefs.setState({ seenSeeded: true, seenTies: { 'sco.tennents:1': true } });
+  usePrefs.getState().seedCompIfNeeded('sco.tennents', ['sco.tennents:1', 'sco.tennents:2']);
+  // sco.tennents:2 must NOT be silently added — the legacy blob is trusted
+  // as-is; only the per-comp latch catches up.
+  expect(usePrefs.getState().seenTies).toEqual({ 'sco.tennents:1': true });
+  expect(usePrefs.getState().seededComps).toEqual({ 'sco.tennents': true });
+});
+
+test('markTiesSeen after per-comp seeding adds additively', () => {
+  usePrefs.getState().seedCompIfNeeded('sco.tennents', ['sco.tennents:1']);
   usePrefs.getState().markTiesSeen(['sco.tennents:2', 'sco.tennents:3']);
   expect(usePrefs.getState().seenTies).toEqual({
     'sco.tennents:1': true, 'sco.tennents:2': true, 'sco.tennents:3': true,
