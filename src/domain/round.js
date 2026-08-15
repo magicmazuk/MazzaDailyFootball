@@ -9,7 +9,9 @@ const EXCLUDED = new Set(['regular-season', 'league-phase', 'group-stage']);
 // in season.slug instead — e.g. '2026-27-scottish-premiership' (sco.1),
 // '2025-26-english-premier-league' (eng.1). No real round slug starts with
 // a year, so this is rejected outright rather than prettified into noise.
-const YEAR_PREFIXED = /^\d{4}-\d{2}-/;
+// Exported so field.js's fallbackRoundLabel can reject the same slugs
+// prettifyRound does, rather than title-casing a season name into noise.
+export const YEAR_PREFIXED = /^\d{4}-\d{2}-/;
 
 // A handful of round names are single compound words that don't split
 // cleanly on '-' the way 'fourth-round' does.
