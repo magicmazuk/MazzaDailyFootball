@@ -43,16 +43,24 @@ export const usePrefs = create(persist(
       for (const id of tieIds) seenTies[id] = true;
       return { seenTies };
     }),
-    // First-run seeding (spec §13.14): writes every given id ONLY when
-    // seenTies is still empty and seeding hasn't happened before — so a
-    // draw can only ever be announced from installation forward, never
-    // retroactively for ties already published when the app was installed.
-    // seenSeeded flips to true on every call, seeding or not, so a zero-tie
-    // first run doesn't leave the door open to seed again later.
+    // First-run seeding (spec §13.14): the first non-empty call writes
+    // every given id and latches seenSeeded so a draw can only ever be
+    // announced from installation forward, never retroactively for ties
+    // already published when the app was installed. Once seenSeeded is
+    // true, every later call is a no-op.
+    //
+    // Calling contract: call only with settled query data (i.e. once the
+    // fixtures query has resolved). An empty tieIds array is treated as
+    // "not loaded yet", not "zero ties exist" — it is a no-op that does
+    // NOT latch seenSeeded, so a caller invoked before its data is ready
+    // (a load race) can't permanently swallow seeding. The cost is that a
+    // genuinely empty catalogue at first run never latches either, so the
+    // first real ties published get seeded (silently) instead of
+    // announced — deliberately accepted as far milder than the race, and
+    // moot in practice since group stages always exist for a fresh cup.
     seedSeenIfEmpty: tieIds => set(s => {
-      if (Object.keys(s.seenTies).length > 0 || s.seenSeeded === true) {
-        return { seenSeeded: true };
-      }
+      if (s.seenSeeded === true) return {};
+      if (tieIds.length === 0) return {};
       const seenTies = { ...s.seenTies };
       for (const id of tieIds) seenTies[id] = true;
       return { seenTies, seenSeeded: true };

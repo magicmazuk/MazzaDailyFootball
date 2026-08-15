@@ -67,13 +67,24 @@ test('seedSeenIfEmpty is a no-op on a second call, even with different ids', () 
   expect(usePrefs.getState().seenTies).toEqual({ 'sco.tennents:1': true });
 });
 
-test('seedSeenIfEmpty does not re-seed when a prior seeding left seenTies genuinely empty', () => {
-  // Installation had zero published cup ties at first run: seeding wrote
-  // nothing, but seenSeeded is already true, so a later real draw must not
-  // be swallowed by re-seeding.
+test('seedSeenIfEmpty does not re-seed once seenSeeded is already true, even with a non-empty catalogue', () => {
   usePrefs.setState({ seenTies: {}, seenSeeded: true });
   usePrefs.getState().seedSeenIfEmpty(['sco.tennents:1']);
   expect(usePrefs.getState().seenTies).toEqual({});
+});
+
+test('seedSeenIfEmpty([]) is a no-op that does NOT latch — a later non-empty call still seeds', () => {
+  // Guards against a load race: a caller invoked before its fixtures query
+  // has resolved must not permanently swallow seeding by latching on an
+  // empty catalogue. Callers are contractually required to call only once
+  // their query has settled; an empty call is treated as "not loaded yet",
+  // not as "zero ties exist".
+  usePrefs.getState().seedSeenIfEmpty([]);
+  expect(usePrefs.getState().seenSeeded).toBe(false);
+  expect(usePrefs.getState().seenTies).toEqual({});
+  usePrefs.getState().seedSeenIfEmpty(['sco.tennents:1']);
+  expect(usePrefs.getState().seenTies).toEqual({ 'sco.tennents:1': true });
+  expect(usePrefs.getState().seenSeeded).toBe(true);
 });
 
 test('markTiesSeen after seeding adds additively', () => {

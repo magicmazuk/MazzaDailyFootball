@@ -93,6 +93,31 @@ test('multiple comps qualify simultaneously, returned in fixturesByComp order (c
   expect(result.map(r => r.comp.id)).toEqual(['sco.tennents', 'eng.fa']);
 });
 
+test('a group-stage round never qualifies as a draw, even fully scheduled and unseen; a knockout round alongside it still does', () => {
+  const comp = cupComp('sco.cis');
+  const groupFixtures = Array.from({ length: 6 }, (_, i) =>
+    fx(`g${i}`, comp.id, 'group-stage', `2026-08-0${i + 1}T15:00:00Z`));
+  const knockoutFixtures = [
+    fx('k1', comp.id, 'fourth-round', '2026-09-01T15:00:00Z'),
+    fx('k2', comp.id, 'fourth-round', '2026-09-01T12:00:00Z'),
+  ];
+  const result = unrevealedDraws(
+    [{ comp, fixtures: [...groupFixtures, ...knockoutFixtures] }],
+    {},
+  );
+  expect(result).toHaveLength(1);
+  expect(result[0].round).toBe('fourth-round');
+});
+
+test('a league-phase round never qualifies as a draw', () => {
+  const comp = cupComp('sco.challenge');
+  const fixtures = [
+    fx('1', comp.id, 'league-phase', '2026-08-01T15:00:00Z'),
+    fx('2', comp.id, 'league-phase', '2026-08-01T12:00:00Z'),
+  ];
+  expect(unrevealedDraws([{ comp, fixtures }], {})).toEqual([]);
+});
+
 // --------------------------------------------------------------- allTieIds
 
 test('allTieIds returns every cup fixture tieId, ignoring league comps', () => {

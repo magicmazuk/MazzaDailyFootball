@@ -7,6 +7,12 @@ import { fallbackRoundLabel } from './field.js';
 
 export const tieId = (compId, fixtureId) => `${compId}:${fixtureId}`;
 
+// A draw ceremony reveals one round's knockout pairings. Group-stage and
+// league-phase rounds publish their whole phase's fixture list at once —
+// there is no pairing to reveal, so the ceremony is meaningless for them
+// even when every fixture in the phase happens to be scheduled and unseen.
+const PHASE_ROUNDS = new Set(['group-stage', 'league-phase']);
+
 // [{ comp, round, roundLabel, ties }] for every cup round that qualifies as
 // an unrevealed draw. A round qualifies when every one of its fixtures is
 // still 'scheduled' (no ball has been kicked), every fixture's tieId is
@@ -26,6 +32,7 @@ export function unrevealedDraws(fixturesByComp, seenTies) {
     }
 
     for (const [round, roundFixtures] of byRound) {
+      if (PHASE_ROUNDS.has(round)) continue;
       if (roundFixtures.length < 2) continue;
       if (!roundFixtures.every(f => f.status === 'scheduled')) continue;
       if (!roundFixtures.every(f => !seenTies?.[tieId(comp.id, f.id)])) continue;
