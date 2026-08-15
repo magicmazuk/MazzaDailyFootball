@@ -1,7 +1,34 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { byId } from '../domain/competitions.js';
+import { prettifyRound } from '../domain/round.js';
 import Crest from './Crest.jsx';
 import StatusWord from './StatusWord.jsx';
 import TvBadge from './TvBadge.jsx';
+
+// The fixture's competition context (spec §13.12): shortName + round,
+// above the two TeamLines, on by default — team pages, calendar days and
+// the On TV list span many comps and benefit from the reminder. Its own
+// page (CompetitionScreen's Fixtures/Results tabs) turns it off since the
+// context is the page itself. Unknown compId (should never happen, but
+// never a crash) renders nothing rather than a blank/undefined line.
+function ContextLine({ fixture }) {
+  const navigate = useNavigate();
+  const comp = byId(fixture.compId);
+  if (!comp) return null;
+  const round = prettifyRound(fixture.round);
+  const toCompetition = e => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(`/competition/${fixture.compId}`);
+  };
+  return (
+    <button type="button" onClick={toCompetition} aria-label={`${comp.shortName} page`}
+      className="font-sans text-[8.5px] uppercase tracking-[.16em] text-muted mb-0.5
+                 text-left block truncate">
+      {comp.shortName}{round && ` · ${round}`}
+    </button>
+  );
+}
 
 // The club-link rule (spec §13.2): the crest is the team link, the rest
 // of the row is the match link. No nested anchors — the inner control
@@ -30,7 +57,7 @@ function TeamLine({ side, compId, followed, dim, showScore }) {
   );
 }
 
-export default function FixtureRow({ fixture, followedIds = new Set() }) {
+export default function FixtureRow({ fixture, followedIds = new Set(), showContext = true }) {
   const dim = fixture.status === 'postponed' || fixture.status === 'canceled';
   // ESPN reports score:"0" before kickoff — never render a score for a
   // fixture that hasn't started or finished, or every scheduled match
@@ -45,6 +72,7 @@ export default function FixtureRow({ fixture, followedIds = new Set() }) {
           <TvBadge tv={fixture.tv} />
         </div>
         <div className="flex-1 min-w-0 space-y-1.5">
+          {showContext && <ContextLine fixture={fixture} />}
           <TeamLine side={fixture.home} compId={fixture.compId} showScore={showScore}
             followed={followedIds.has(fixture.home.teamId)} dim={dim} />
           <TeamLine side={fixture.away} compId={fixture.compId} showScore={showScore}

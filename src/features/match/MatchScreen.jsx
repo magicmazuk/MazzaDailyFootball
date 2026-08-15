@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom';
 import { byId } from '../../domain/competitions.js';
 import { useMatchDetail, useSeasonFixtures } from '../../data/queries.js';
 import MatchRoom from './MatchRoom.jsx';
+import { siblingFixtures } from './siblings.js';
 import { useMatchVideos } from './video.js';
 
 // BBC-merged cup fixtures (spec §13.7) carry a synthetic `bbc-` id — there
@@ -31,6 +32,7 @@ export default function MatchScreen() {
   if (!fixture) {
     return <p className="text-muted">{season.isLoading ? 'Loading match…' : 'Match not found.'}</p>;
   }
+  const siblings = siblingFixtures(season.data?.fixtures ?? [], fixture);
   return <MatchRoom fixture={fixture} comp={roomComp} detail={detail.data?.detail ?? null}
-    videos={videos.data ?? []} />;
+    videos={videos.data ?? []} siblings={siblings} />;
 }

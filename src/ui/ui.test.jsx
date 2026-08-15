@@ -102,3 +102,45 @@ test('FixtureRow: an ft fixture still shows its scores', () => {
   expect(screen.getByText('3')).toBeInTheDocument();
   expect(screen.getByText('0')).toBeInTheDocument();
 });
+
+// --- context line (spec §13.12) ---
+
+test('FixtureRow: the context line shows comp shortName + round, and tapping it navigates to the competition page', async () => {
+  const user = (await import('@testing-library/user-event')).default.setup();
+  const routes = (await import('react-router-dom'));
+  let where = null;
+  function Probe() { where = routes.useLocation().pathname; return null; }
+  render(
+    <MemoryRouter initialEntries={['/']}>
+      <FixtureRow fixture={fixture('scheduled', { compId: 'sco.cis', round: 'fourth-round' })}
+        followedIds={new Set()} />
+      <routes.Routes>
+        <routes.Route path="*" element={<Probe />} />
+      </routes.Routes>
+    </MemoryRouter>,
+  );
+  expect(screen.getByText('League Cup · Fourth round')).toBeInTheDocument();
+  await user.click(screen.getByLabelText('League Cup page'));
+  expect(where).toBe('/competition/sco.cis');
+});
+
+test('FixtureRow: showContext={false} renders no context line', () => {
+  render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('scheduled', { compId: 'sco.cis', round: 'fourth-round' })}
+        followedIds={new Set()} showContext={false} />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByText(/League Cup/)).not.toBeInTheDocument();
+  expect(screen.getAllByRole('button')).toHaveLength(2); // just the two crest buttons
+});
+
+test('FixtureRow: an unknown compId renders no context line, and no crash', () => {
+  render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('scheduled', { compId: 'not-a-real-comp' })}
+        followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  expect(screen.getAllByRole('button')).toHaveLength(2); // just the two crest buttons
+});

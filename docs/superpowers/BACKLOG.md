@@ -57,3 +57,8 @@ None block usage; candidates for a future 1.2 pass.
 - A postponed fixture stalls rule-2 eliminations for its whole round (singleLeg refinement still fires for decided ties).
 - Structure-strip numerals are registry config, not derived (spec §13.10.1 ambiguity accepted; derived counts live in the tier sub-labels).
 - Champion flourish untested against live data until a cup completes.
+
+## From the 2.2 review (2026-08-15)
+
+- Fixture rows now nest three interactive controls inside the row link (row/crest/context) — valid behaviour, invalid HTML content model; the sibling-Link restructure would clear it if a11y tooling complains.
+- Sibling fixtures in the match room don't receive followedIds, so ★ never shows there.

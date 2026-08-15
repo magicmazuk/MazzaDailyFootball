@@ -60,3 +60,24 @@ test('once loaded with no fixtures, Overview shows the structure strip plus the 
   // Structure strip renders immediately from registry config, independent of fetch.
   expect(screen.getByText('league phase')).toBeInTheDocument();
 });
+
+// --- fixture context suppression (spec §13.12 — the page itself is the context) ---
+
+test('the Fixtures tab renders FixtureRow with showContext={false}, since the page is the context', async () => {
+  const user = (await import('@testing-library/user-event')).default.setup();
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    events: [{
+      id: 'e1', date: '2026-08-22T14:00:00Z', status: { type: { name: 'STATUS_SCHEDULED' } },
+      competitions: [{ competitors: [
+        { homeAway: 'home', team: { id: 'cel', displayName: 'Celtic' } },
+        { homeAway: 'away', team: { id: 'abd', displayName: 'Aberdeen' } },
+      ] }],
+    }],
+  }), { status: 200 })));
+  renderAt('sco.1');
+  await user.click(screen.getByRole('button', { name: 'Fixtures' }));
+  await screen.findByText('Celtic');
+  // 'Premiership' is sco.1's shortName — the context line's text, not the
+  // page's own h1 (which reads the full 'Scottish Premiership' name).
+  expect(screen.queryByText('Premiership')).not.toBeInTheDocument();
+});

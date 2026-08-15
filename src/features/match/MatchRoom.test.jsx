@@ -151,18 +151,35 @@ test('score header sides link to team pages and tv renders', () => {
 
 // --- kicker: round prettifier wiring (spec §13.8) ---
 
+// The kicker's competition name is now a Link (spec §13.13); the round
+// suffix stays plain text outside it, so the two live in separate DOM
+// text nodes. Assert on the kicker <p>'s full textContent (recursive)
+// rather than screen.getByText, whose default node-text matcher only
+// looks at a node's own direct text-node children.
 test('the kicker appends the prettified round for a knockout fixture', () => {
-  render(<MemoryRouter>
+  const { container } = render(<MemoryRouter>
     <MatchRoom fixture={{ ...fixture, round: 'fourth-round' }} comp={byId('sco.1')} detail={detail} />
   </MemoryRouter>);
-  expect(screen.getByText('Scottish Premiership · Fourth round')).toBeInTheDocument();
+  expect(container.querySelector('main > p').textContent).toBe('Scottish Premiership · Fourth round');
 });
 
 test('the kicker has no round suffix for a regular-season fixture', () => {
-  render(<MemoryRouter>
+  const { container } = render(<MemoryRouter>
     <MatchRoom fixture={{ ...fixture, round: 'regular-season' }} comp={byId('sco.1')} detail={detail} />
   </MemoryRouter>);
-  expect(screen.getByText('Scottish Premiership')).toBeInTheDocument();
+  expect(container.querySelector('main > p').textContent).toBe('Scottish Premiership');
+});
+
+// --- kicker: competition link (spec §13.13) ---
+
+test('the kicker competition name is a link to the competition page; the round text stays plain', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, round: 'fourth-round' }} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  const link = screen.getByRole('link', { name: 'Scottish Premiership' });
+  expect(link).toHaveAttribute('href', '/competition/sco.1');
+  // 'Fourth round' is not itself part of any link.
+  expect(screen.getByText(/Fourth round/).closest('a')).toBeNull();
 });
 
 // --- date line ---
@@ -392,4 +409,53 @@ test('the video card still renders in the BBC-degraded branch (no match detail) 
   expect(screen.getByText("Detailed stats aren't published for Scottish League One."))
     .toBeInTheDocument();
   expect(screen.getByText('Celtic 2-1 Rangers highlights')).toBeInTheDocument();
+});
+
+// --- round siblings (spec §13.13) ---
+
+const siblingFixture = (id, home, away, over = {}) => ({
+  id, compId: 'sco.1', kickoff: '2026-08-22T16:00:00Z', status: 'scheduled', minute: null,
+  round: null, venue: null, home: side(home), away: side(away), ...over,
+});
+
+test('siblings render under "In this round" (fixture.round non-null), below the video card', () => {
+  const siblings = [siblingFixture('s1', 'Hibernian', 'Hearts', { round: 'fourth-round' })];
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, round: 'fourth-round', status: 'ft' }} comp={byId('sco.1')}
+      detail={detail} videos={videos} siblings={siblings} />
+  </MemoryRouter>);
+  expect(screen.getByText('In this round')).toBeInTheDocument();
+  expect(screen.getByText('Hibernian')).toBeInTheDocument();
+  expect(screen.getByText('Hearts')).toBeInTheDocument();
+  // Sibling rows carry showContext={false} — sco.1's shortName ('Premiership')
+  // must not appear a second time as a context line.
+  expect(screen.queryByText('Premiership')).not.toBeInTheDocument();
+  const sectionLabels = [...container.querySelectorAll('h2')].map(h => h.textContent);
+  expect(sectionLabels.indexOf('Video')).toBeLessThan(sectionLabels.indexOf('In this round'));
+});
+
+test('siblings render under "That day" when the fixture carries no round', () => {
+  const siblings = [siblingFixture('s1', 'Motherwell', 'Livingston')];
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, round: null }} comp={byId('sco.1')} detail={detail}
+      siblings={siblings} />
+  </MemoryRouter>);
+  expect(screen.getByText('That day')).toBeInTheDocument();
+  expect(screen.getByText('Motherwell')).toBeInTheDocument();
+});
+
+test('the siblings section is absent when there are none', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={detail} siblings={[]} />
+  </MemoryRouter>);
+  expect(screen.queryByText('In this round')).not.toBeInTheDocument();
+  expect(screen.queryByText('That day')).not.toBeInTheDocument();
+});
+
+test('the siblings section is absent when the prop is omitted entirely', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  expect(screen.queryByText('In this round')).not.toBeInTheDocument();
+  expect(screen.queryByText('That day')).not.toBeInTheDocument();
 });

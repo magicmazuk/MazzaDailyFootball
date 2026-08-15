@@ -96,6 +96,29 @@ test('clicking the Next up calendar button navigates to the club calendar', asyn
   expect(where).toBe('/calendar/256');
 });
 
+test('the Next up row shows the competition shortName before the kickoff string (spec §13.12)', () => {
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-22T15:00:00Z')} followedIds={new Set()}
+        partition={emptyPartition} nextUp={[nextUpEntry]} />
+    </MemoryRouter>,
+  );
+  // nextUpFixture.compId is sco.1, shortName 'Premiership'.
+  expect(screen.getByText(/^Premiership · /)).toBeInTheDocument();
+});
+
+test('the Next up row omits the competition text for an unknown competition id, without crashing', () => {
+  const unknownEntry = { club: nextUpEntry.club, fixture: { ...nextUpFixture, compId: 'unknown-comp' } };
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-22T15:00:00Z')} followedIds={new Set()}
+        partition={emptyPartition} nextUp={[unknownEntry]} />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByText(/unknown-comp/)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Celtic calendar' })).toBeInTheDocument();
+});
+
 test('renders On TV section with televised fixture', () => {
   const onTvFixture = {
     id: 'f1',

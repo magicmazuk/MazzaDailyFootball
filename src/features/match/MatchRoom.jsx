@@ -5,6 +5,7 @@
 // detail.
 import { Link } from 'react-router-dom';
 import Crest from '../../ui/Crest.jsx';
+import FixtureRow from '../../ui/FixtureRow.jsx';
 import FormGlyphs from '../../ui/FormGlyphs.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
 import StatusWord from '../../ui/StatusWord.jsx';
@@ -327,7 +328,22 @@ function HeadToHead({ headToHead }) {
   );
 }
 
-export default function MatchRoom({ fixture, comp, detail, videos }) {
+// Round siblings (spec §13.13), at the very bottom of the room, after
+// the video card. Labelled by the same grouping siblingFixtures() itself
+// used — 'In this round' for a knockout/group tie, 'That day' for a
+// league fixture (whose round carries the season name, not a round).
+// Absent entirely rather than an empty shelf when there are none.
+function Siblings({ siblings, fixture }) {
+  if (!siblings?.length) return null;
+  return (
+    <section className="mb-8">
+      <SectionLabel muted>{fixture.round != null ? 'In this round' : 'That day'}</SectionLabel>
+      {siblings.map(f => <FixtureRow key={f.id} fixture={f} showContext={false} />)}
+    </section>
+  );
+}
+
+export default function MatchRoom({ fixture, comp, detail, videos, siblings }) {
   const headerFixture = fixture.status === 'live'
     ? withLiveScore(fixture, detail?.liveScore)
     : fixture;
@@ -335,7 +351,7 @@ export default function MatchRoom({ fixture, comp, detail, videos }) {
   return (
     <main>
       <p className="font-sans text-[10px] uppercase tracking-[.22em] text-muted">
-        {comp.name}{round && ` · ${round}`}
+        <Link to={`/competition/${comp.id}`}>{comp.name}</Link>{round && ` · ${round}`}
       </p>
       <p className="text-[12px] text-muted mb-5">{fullDate(fixture.kickoff)}</p>
       <ScoreHeader fixture={headerFixture} comp={comp} gameInfo={detail?.gameInfo} />
@@ -357,6 +373,7 @@ export default function MatchRoom({ fixture, comp, detail, videos }) {
           comp.hasMatchDetail, so a BBC-degraded fixture that finished can
           still surface highlights even with no match detail to show. */}
       <VideoCard videos={videos} />
+      <Siblings siblings={siblings} fixture={fixture} />
     </main>
   );
 }

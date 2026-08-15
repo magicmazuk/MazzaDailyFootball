@@ -125,3 +125,39 @@ test('a finished fixture with no YouTube key never calls the YouTube API', async
   await screen.findByText('Kilmarnock');
   expect(calls.some(u => u.includes('googleapis.com'))).toBe(false);
 });
+
+// --- round siblings wiring (spec §13.13) ---
+
+const siblingsScoreboard = JSON.stringify({
+  events: [
+    {
+      id: 'e1', date: '2026-08-22T14:00:00Z', status: { type: { name: 'STATUS_SCHEDULED' } },
+      competitions: [{ competitors: [
+        { homeAway: 'home', team: { id: 'cel', displayName: 'Celtic' } },
+        { homeAway: 'away', team: { id: 'abd', displayName: 'Aberdeen' } },
+      ] }],
+    },
+    {
+      // Same day as e1, no round on either (a league scoreboard carries
+      // no season.slug in this stub) — date-mode siblings.
+      id: 'e2', date: '2026-08-22T16:00:00Z', status: { type: { name: 'STATUS_SCHEDULED' } },
+      competitions: [{ competitors: [
+        { homeAway: 'home', team: { id: 'hib', displayName: 'Hibernian' } },
+        { homeAway: 'away', team: { id: 'hea', displayName: 'Hearts' } },
+      ] }],
+    },
+  ],
+});
+
+test('MatchScreen computes siblings from the season cache and MatchRoom renders them', async () => {
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    if (url.includes('/scoreboard')) return new Response(siblingsScoreboard, { status: 200 });
+    return new Response('{}', { status: 200 });
+  }));
+
+  renderAt('/match/sco.1/e1');
+
+  await screen.findByText('Celtic');
+  expect(screen.getByText('That day')).toBeInTheDocument();
+  expect(screen.getByText('Hibernian')).toBeInTheDocument();
+});

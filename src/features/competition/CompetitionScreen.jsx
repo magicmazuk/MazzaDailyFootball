@@ -82,13 +82,13 @@ export default function CompetitionScreen() {
       {active === 'Fixtures' && groupByDate(upcoming).map(([day, list]) => (
         <section key={day} className="mb-6">
           <p className="font-sans text-[9.5px] uppercase tracking-[.18em] text-muted mb-2">{day}</p>
-          {list.map(f => <FixtureRow key={f.id} fixture={f} followedIds={followedIds} />)}
+          {list.map(f => <FixtureRow key={f.id} fixture={f} followedIds={followedIds} showContext={false} />)}
         </section>
       ))}
       {active === 'Results' && groupByDate(results).map(([day, list]) => (
         <section key={day} className="mb-6">
           <p className="font-sans text-[9.5px] uppercase tracking-[.18em] text-muted mb-2">{day}</p>
-          {list.map(f => <FixtureRow key={f.id} fixture={f} followedIds={followedIds} />)}
+          {list.map(f => <FixtureRow key={f.id} fixture={f} followedIds={followedIds} showContext={false} />)}
         </section>
       ))}
     </main>
