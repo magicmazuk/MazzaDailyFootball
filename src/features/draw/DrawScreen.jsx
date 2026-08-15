@@ -28,15 +28,25 @@ const jumbleStyle = i => {
 
 const roundLabelFor = round => prettifyRound(round) ?? fallbackRoundLabel(round) ?? round;
 
-function BowlPool({ pool, revealingIndex }) {
+// Each club's jumble transform and React key are keyed off a STABLE
+// ordinal (its first-appearance order in the original ties list, built
+// once at ceremony mount) rather than its position in the shrinking
+// remainingClubs() array — otherwise every landing shifts everyone after
+// it down one slot, which both reshuffles untouched clubs' transforms and
+// remounts them under a new key (losing the collapse transition, since a
+// remount can't transition).
+function BowlPool({ pool, revealingIndex, clubOrdinals }) {
   return (
     <div className="bg-drawer rounded-2xl p-4 flex flex-wrap justify-center gap-1.5 min-h-[104px]">
-      {pool.map((club, i) => (
-        <span key={`${club.teamId ?? club.name}-${i}`} style={jumbleStyle(i)}
-          className={`draw-pool-item ${i === revealingIndex ? 'draw-pool-item--revealing' : ''}`}>
-          <Crest side={club} size={34} />
-        </span>
-      ))}
+      {pool.map((club, i) => {
+        const ordinal = clubOrdinals.get(club.teamId) ?? i;
+        return (
+          <span key={club.teamId ?? `${club.name}-${i}`} style={jumbleStyle(ordinal)}
+            className={`draw-pool-item ${i === revealingIndex ? 'draw-pool-item--revealing' : ''}`}>
+            <Crest side={club} size={34} />
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -70,7 +80,7 @@ function RollcallList({ rows, currentTieIndex }) {
   );
 }
 
-function Pool({ mode, pool, state, rows }) {
+function Pool({ mode, pool, state, rows, clubOrdinals }) {
   const revealingIndex = mode === 'bowl' && state.phase === 'revealed' ? 0 : -1;
   const currentTieIndex = mode === 'rollcall' && state.phase === 'drawing' ? state.landed : -1;
   return (
@@ -80,9 +90,20 @@ function Pool({ mode, pool, state, rows }) {
         <p className="font-serif text-[13px] tabular-nums">{pool.length}</p>
       </div>
       {mode === 'bowl'
-        ? <BowlPool pool={pool} revealingIndex={revealingIndex} />
+        ? <BowlPool pool={pool} revealingIndex={revealingIndex} clubOrdinals={clubOrdinals} />
         : <RollcallList rows={rows} currentTieIndex={currentTieIndex} />}
     </section>
+  );
+}
+
+// The stage's resting state once the draw is complete — reached either by
+// tapping through every ball/tie or by "Reveal the rest", and (just as
+// often) by simply arriving at an already-seen round, which opens straight
+// into `complete` with no animation at all. Without this the stage would
+// render nothing: a blank hole where the ball/names used to be.
+function CompleteBadge() {
+  return (
+    <p className="font-sans text-[11px] uppercase tracking-[.18em] text-accent">★ Draw complete ★</p>
   );
 }
 
@@ -108,6 +129,7 @@ function Stage({ state, canTap, onTap }) {
       {(phase === 'idle' || phase === 'landed') && (
         <p className="draw-breathe font-sans text-[11px] uppercase tracking-[.14em] text-muted">{hint}</p>
       )}
+      {phase === 'complete' && <CompleteBadge />}
     </button>
   );
 }
@@ -133,6 +155,7 @@ function RollcallStage({ state, canTap, onTap }) {
       {(phase === 'idle' || phase === 'landed') && (
         <p className="draw-breathe font-sans text-[11px] uppercase tracking-[.14em] text-muted">{hint}</p>
       )}
+      {phase === 'complete' && <CompleteBadge />}
     </button>
   );
 }
@@ -185,6 +208,21 @@ function Ceremony({ comp, compId, round, ties, alreadySeen, markTiesSeen, follow
   const complete = isComplete(state);
   const seenMarkedRef = useRef(alreadySeen);
 
+  // Each club's stable pool identity — its first-appearance order in the
+  // original ties list, fixed for the life of this ceremony. Built once
+  // (ties never changes identity within a mounted Ceremony) so the bowl
+  // pool's jumble transform and React key never depend on the shrinking
+  // remainingClubs() array's current indices.
+  const clubOrdinals = useMemo(() => {
+    const map = new Map();
+    for (const t of ties) {
+      for (const side of [t.home, t.away]) {
+        if (side?.teamId != null && !map.has(side.teamId)) map.set(side.teamId, map.size);
+      }
+    }
+    return map;
+  }, [ties]);
+
   // Seen-marking (spec §8.5): fire exactly once, on reaching complete, by
   // taps or by Reveal the rest. An already-seen round on arrival is already
   // marked, so the ref starts true and this never fires again for it.
@@ -228,7 +266,7 @@ function Ceremony({ comp, compId, round, ties, alreadySeen, markTiesSeen, follow
       </p>
       <h1 className="text-[24px] mb-6">The {roundLabel} draw</h1>
 
-      <Pool mode={mode} pool={pool} state={state} rows={rows} />
+      <Pool mode={mode} pool={pool} state={state} rows={rows} clubOrdinals={clubOrdinals} />
 
       {mode === 'bowl'
         ? <Stage state={state} canTap={canTap} onTap={() => canTap && dispatch({ type: 'TAP' })} />

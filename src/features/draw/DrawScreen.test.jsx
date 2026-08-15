@@ -131,6 +131,41 @@ test('a tap mid-animation is ignored — only one ball lands, not two', async ()
   expect(screen.queryByText('4')).not.toBeInTheDocument();
 });
 
+test("the bowl pool jumble is stable — an untouched club's transform is unchanged after another ball lands", async () => {
+  stubScoreboard(bowlEvents);
+  renderAt('/draw/sco.tennents/fourth-round');
+  await screen.findByText('Tap to draw the first ball');
+
+  // Rangers is tie0-away — the second ball drawn, untouched by landing the
+  // first (Celtic, tie0-home).
+  const rangersBefore = screen.getByLabelText('Rangers').closest('.draw-pool-item').getAttribute('style');
+
+  vi.useFakeTimers();
+  fireEvent.click(drawButton());
+  await act(async () => { await vi.advanceTimersByTimeAsync(TIMINGS.tumble); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(TIMINGS.holdOpen); });
+
+  expect(screen.getByText('5')).toBeInTheDocument(); // Celtic landed, pool shrank
+  const rangersAfter = screen.getByLabelText('Rangers').closest('.draw-pool-item').getAttribute('style');
+  expect(rangersAfter).toBe(rangersBefore);
+});
+
+test('the stage shows "Draw complete" once every ball has landed by tapping through', async () => {
+  stubScoreboard(bowlEvents);
+  renderAt('/draw/sco.tennents/fourth-round');
+  await screen.findByText('Tap to draw the first ball');
+
+  vi.useFakeTimers();
+  for (let i = 0; i < bowlEvents.length * 2; i += 1) {
+    fireEvent.click(drawButton());
+    await act(async () => { await vi.advanceTimersByTimeAsync(TIMINGS.tumble); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(TIMINGS.holdOpen); });
+  }
+
+  expect(screen.getByText(/Draw complete/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Start again' })).toBeInTheDocument();
+});
+
 test('Reveal the rest completes the draw and calls markTiesSeen once with every tie id', async () => {
   stubScoreboard(bowlEvents);
   // A fresh vi.fn(), installed via setState (not vi.spyOn on a getState()
@@ -153,6 +188,7 @@ test('Reveal the rest completes the draw and calls markTiesSeen once with every 
   expect(screen.getByText('Rangers')).toBeInTheDocument();
   expect(screen.getByText('Aberdeen')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Start again' })).toBeInTheDocument();
+  expect(screen.getByText(/Draw complete/)).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Done' })).toHaveAttribute('href', '/competition/sco.tennents');
   expect(markTiesSeen).toHaveBeenCalledTimes(1);
   expect(markTiesSeen).toHaveBeenCalledWith(['e1', 'e2', 'e3'].map(id => tieId('sco.tennents', id)));
@@ -171,6 +207,9 @@ test('an already-seen round renders straight into complete, with Start again, no
   expect(await screen.findByText('Celtic')).toBeInTheDocument();
   expect(screen.getByText('Rangers')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Start again' })).toBeInTheDocument();
+  // Opens straight into complete with no animation ever having run — the
+  // stage must show the completion badge, not a blank hole.
+  expect(screen.getByText(/Draw complete/)).toBeInTheDocument();
   expect(markTiesSeen).not.toHaveBeenCalled();
 });
 
