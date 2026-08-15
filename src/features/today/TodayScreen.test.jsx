@@ -108,6 +108,65 @@ test('once its ties are marked seen, the invitation card disappears and the fixt
   vi.useRealTimers();
 });
 
+// --- club-centric phase-draw invitations (spec §13.15) ---
+
+const phaseDrawFixtures = [
+  { id: 'p1', compId: 'sco.tennents', kickoff: '2026-08-20T15:00:00Z', status: 'scheduled',
+    round: 'league-phase', minute: null,
+    home: { teamId: '256', name: 'Celtic', crestUrl: null, monogram: 'CE' },
+    away: { teamId: 'o1', name: 'Opponent One', crestUrl: null, monogram: 'O1' } },
+  { id: 'p2', compId: 'sco.tennents', kickoff: '2026-08-20T17:00:00Z', status: 'scheduled',
+    round: 'league-phase', minute: null,
+    home: { teamId: 'o2', name: 'Opponent Two', crestUrl: null, monogram: 'O2' },
+    away: { teamId: '256', name: 'Celtic', crestUrl: null, monogram: 'CE' } },
+];
+
+function stubSettledPhaseSeasons() {
+  useAllSeasonFixtures.mockImplementation(comps => comps.map(c => ({
+    isLoading: false, isSuccess: true, isError: false,
+    data: { fixtures: c.id === 'sco.tennents' ? phaseDrawFixtures : [], asOf: null },
+  })));
+  useTodayWindows.mockImplementation(comps => comps.map(c => ({
+    isLoading: false,
+    data: { fixtures: c.id === 'sco.tennents' ? phaseDrawFixtures : [], asOf: null },
+  })));
+}
+
+test('a followed club with unrevealed phase fixtures shows its invitation card and hides its fixtures from Today', () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-08-20T12:00:00Z'));
+  usePrefs.setState({
+    followed: { 256: { id: '256', name: 'Celtic' } },
+    seenTies: {}, seededComps: { 'sco.tennents': true },
+  });
+  onlyScoTennentsVisible();
+  stubSettledPhaseSeasons();
+
+  render(<MemoryRouter><TodayScreen /></MemoryRouter>);
+
+  expect(screen.getByText("CELTIC'S DRAW IS IN")).toBeInTheDocument();
+  expect(screen.queryByText('Opponent One')).not.toBeInTheDocument();
+  expect(screen.queryByText('Opponent Two')).not.toBeInTheDocument();
+  vi.useRealTimers();
+});
+
+test('an unfollowed club\'s phase fixtures show no invitation card and stay visible on Today', () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-08-20T12:00:00Z'));
+  usePrefs.setState({
+    followed: {}, seenTies: {}, seededComps: { 'sco.tennents': true },
+  });
+  onlyScoTennentsVisible();
+  stubSettledPhaseSeasons();
+
+  render(<MemoryRouter><TodayScreen /></MemoryRouter>);
+
+  expect(screen.queryByText(/DRAW IS IN/)).not.toBeInTheDocument();
+  expect(screen.getByText('Opponent One')).toBeInTheDocument();
+  expect(screen.getByText('Opponent Two')).toBeInTheDocument();
+  vi.useRealTimers();
+});
+
 // --- per-competition seeding regression tests (fix per review) ---
 
 test('a comp that resolves before a sibling cup query settles is seeded on its own — no false draw card while the sibling is still pending', () => {

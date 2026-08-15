@@ -57,3 +57,67 @@ export function allTieIds(fixturesByComp) {
   }
   return ids;
 }
+
+// [{ comp, round, roundLabel, club, fixtures }] — the club-centric
+// counterpart to unrevealedDraws (spec §13.15): a phase round (group-stage,
+// league-phase) publishes its whole fixture list in one go, so there's no
+// pairing to reveal round-wide the way a knockout draw has. Instead each
+// FOLLOWED club gets its own ceremony over just its own fixtures in that
+// phase. A (comp, round, club) triple qualifies exactly like a tie draw
+// does — every one of the club's fixtures in the round still scheduled,
+// every one unseen, and at least two of them (one published fixture is
+// scheduling, not a "draw is in" moment) — scoped to that club's fixtures
+// rather than the whole round. Note this is the inverse of
+// unrevealedDraws's PHASE_ROUNDS check: that function excludes phase
+// rounds; this one exists only for them, and never returns a knockout
+// round.
+export function unrevealedPhaseDraws(fixturesByComp, seenTies, followedIds) {
+  const followed = new Set(followedIds ?? []);
+  const results = [];
+  for (const { comp, fixtures } of fixturesByComp ?? []) {
+    if (comp?.type !== 'cup') continue;
+
+    const byRound = new Map();
+    for (const f of fixtures ?? []) {
+      if (f?.round == null || !PHASE_ROUNDS.has(f.round)) continue;
+      if (!byRound.has(f.round)) byRound.set(f.round, []);
+      byRound.get(f.round).push(f);
+    }
+
+    const compEntries = [];
+    for (const [round, roundFixtures] of byRound) {
+      const roundLabel = prettifyRound(round) ?? fallbackRoundLabel(round);
+      if (!roundLabel) continue;
+
+      const byClub = new Map(); // teamId -> { club, fixtures: [] }
+      for (const f of roundFixtures) {
+        for (const side of [f.home, f.away]) {
+          if (side?.teamId == null || !followed.has(side.teamId)) continue;
+          if (!byClub.has(side.teamId)) byClub.set(side.teamId, { club: side, fixtures: [] });
+          byClub.get(side.teamId).fixtures.push(f);
+        }
+      }
+
+      for (const { club, fixtures: clubFixtures } of byClub.values()) {
+        if (clubFixtures.length < 2) continue;
+        if (!clubFixtures.every(f => f.status === 'scheduled')) continue;
+        if (!clubFixtures.every(f => !seenTies?.[tieId(comp.id, f.id)])) continue;
+        const sorted = [...clubFixtures].sort(
+          (a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime(),
+        );
+        compEntries.push({ comp, round, roundLabel, club, fixtures: sorted });
+      }
+    }
+    compEntries.sort((a, b) => a.club.name.localeCompare(b.club.name));
+    results.push(...compEntries);
+  }
+  return results;
+}
+
+// A club's phase fixtures' tieIds, for marking that club's phase draw seen
+// on completion — mirrors allTieIds but scoped to one already-collected
+// fixture list (typically an unrevealedPhaseDraws entry's `fixtures`)
+// rather than re-deriving it from the whole comp.
+export function phaseTieIds(comp, fixtures) {
+  return (fixtures ?? []).map(f => tieId(comp.id, f.id));
+}

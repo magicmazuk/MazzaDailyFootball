@@ -68,3 +68,12 @@ None block usage; candidates for a future 1.2 pass.
 - A late-published extra tie in an already-revealed round never gets its own ceremony (idempotence outranks completeness) and removes the round's replay link.
 - DrawScreen conflates a dead feed with a nonexistent round in its honest line.
 - Legacy-migration edge: a comp erroring at the exact moment the OLD global latch fired would show one false card post-upgrade (no real installs carry this; self-heals on view).
+
+## From the 2.5 review (2026-08-16)
+
+- Two followed clubs in one phase group who play EACH OTHER: completing one club's ceremony
+  suppresses the other's invitation (all-unseen gate); recoverable via team-page replay.
+  Follow-up: per-club seen-state or exclude the shared fixture from the gate.
+- /draw/{comp}/{knockout-round}/{teamId} is reachable by hand-typed URL (renders coherently;
+  nothing links to it) — tighten if URL hygiene ever matters.
+- Invitation card copy adds comp name vs spec's terser line (accepted as improvement).

@@ -22,6 +22,7 @@ export default function App() {
         <Route path="team/:compId/:teamId" element={<TeamScreen />} />
         <Route path="match/:compId/:eventId" element={<MatchScreen />} />
         <Route path="draw/:compId/:round" element={<DrawScreen />} />
+        <Route path="draw/:compId/:round/:teamId" element={<DrawScreen />} />
       </Route>
     </Routes>
   );

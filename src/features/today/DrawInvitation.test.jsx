@@ -29,3 +29,34 @@ test('the decorative dots are hidden from assistive tech', () => {
   render(<MemoryRouter><DrawInvitation draw={draw} /></MemoryRouter>);
   expect(screen.getByText('● ● ● ●')).toHaveAttribute('aria-hidden', 'true');
 });
+
+// --- club variant (spec §13.15) ---
+
+const clubDraw = {
+  comp: { id: 'uefa.champions', name: 'UEFA Champions League', shortName: 'Champions League' },
+  round: 'league-phase',
+  roundLabel: 'League Phase',
+  club: { teamId: '256', name: 'Celtic', crestUrl: null, monogram: 'CE' },
+  fixtures: [{ id: 'f1' }, { id: 'f2' }, { id: 'f3' }],
+};
+
+test('the club variant renders the club label, comp/round line, opponent count and a crest', () => {
+  render(<MemoryRouter><DrawInvitation draw={clubDraw} /></MemoryRouter>);
+  expect(screen.getByText("CELTIC'S DRAW IS IN")).toBeInTheDocument();
+  expect(screen.getByText(/UEFA Champions League/)).toBeInTheDocument();
+  expect(screen.getByText(/League Phase/)).toBeInTheDocument();
+  expect(screen.getByText('3 opponents')).toBeInTheDocument();
+  expect(screen.getByLabelText('Celtic')).toBeInTheDocument(); // Crest's monogram fallback
+});
+
+test('the club variant links to the club-centric opponents route, not the round-wide one', () => {
+  render(<MemoryRouter><DrawInvitation draw={clubDraw} /></MemoryRouter>);
+  expect(screen.getAllByRole('link')).toHaveLength(1);
+  expect(screen.getByRole('link')).toHaveAttribute('href', '/draw/uefa.champions/league-phase/256');
+});
+
+test('the tie-draw variant is unaffected — no club key means the original card renders', () => {
+  render(<MemoryRouter><DrawInvitation draw={draw} /></MemoryRouter>);
+  expect(screen.getByText('THE DRAW IS IN')).toBeInTheDocument();
+  expect(screen.getByRole('link')).toHaveAttribute('href', '/draw/sco.tennents/fourth-round');
+});

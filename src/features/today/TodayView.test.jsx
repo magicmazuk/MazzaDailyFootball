@@ -153,6 +153,33 @@ test('a quiet day with an unrevealed draw still says "No matches today" (a card 
   expect(screen.getByText('No matches today.')).toBeInTheDocument();
 });
 
+// --- club-centric phase-draw invitations (spec §13.15) ---
+
+const phaseDraw = (compId, compName, teamId, clubName) => ({
+  comp: { id: compId, name: compName },
+  round: 'league-phase', roundLabel: 'League Phase',
+  club: { teamId, name: clubName, crestUrl: null, monogram: clubName.slice(0, 2).toUpperCase() },
+  fixtures: [{ id: 'f1' }, { id: 'f2' }],
+});
+
+test('renders phase-draw cards after tie-draw cards, above Your clubs', () => {
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-22T15:00:00Z')} followedIds={new Set()}
+        partition={{ yours: [fx('1', 'Celtic', 'St Johnstone')], live: [], later: [], earlier: [], yesterday: [] }}
+        draws={[draw('sco.tennents', 'fourth-round')]}
+        phaseDraws={[phaseDraw('uefa.champions', 'UEFA Champions League', '256', 'Celtic')]} />
+    </MemoryRouter>,
+  );
+  const tieCard = screen.getByText('THE DRAW IS IN');
+  const clubCard = screen.getByText("CELTIC'S DRAW IS IN");
+  const yourClubsHeading = screen.getByText('★ Your clubs');
+  // eslint-disable-next-line no-bitwise
+  expect(tieCard.compareDocumentPosition(clubCard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // eslint-disable-next-line no-bitwise
+  expect(clubCard.compareDocumentPosition(yourClubsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
 test('renders On TV section with televised fixture', () => {
   const onTvFixture = {
     id: 'f1',

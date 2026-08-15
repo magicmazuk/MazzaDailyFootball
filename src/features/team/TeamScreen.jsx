@@ -1,15 +1,18 @@
 import { Link, useParams } from 'react-router-dom';
 import { COMPETITIONS, byId } from '../../domain/competitions.js';
 import { formGuide } from '../../domain/form.js';
+import { prettifyRound } from '../../domain/round.js';
+import { fallbackRoundLabel } from '../../domain/field.js';
 import { useAllSeasonFixtures, useSquad, useTeams } from '../../data/queries.js';
 import { usePrefs } from '../../store/prefs.js';
 import Crest from '../../ui/Crest.jsx';
 import FixtureRow from '../../ui/FixtureRow.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
 import CalendarGlyph from '../../ui/CalendarGlyph.jsx';
-import { teamFixtures } from './teamFixtures.js';
+import { teamFixtures, phaseReplayGroups } from './teamFixtures.js';
 
 const WATERMARK_OPACITY = 0.10; // the dial — user may want it stronger/weaker
+const roundLabelFor = round => prettifyRound(round) ?? fallbackRoundLabel(round) ?? round;
 
 function FollowButton({ team }) {
   const { follow, unfollow } = usePrefs();
@@ -34,6 +37,10 @@ export default function TeamScreen() {
 
   const allFixtures = seasons.flatMap(r => r.data?.fixtures ?? []);
   const { all, next, last } = teamFixtures(allFixtures, teamId);
+  // Replay-the-draw links (spec §13.15): browsable for ANY club with 2+
+  // phase-round fixtures in a comp, any seen-state — followed-ness is
+  // irrelevant here, unlike the Today invitation.
+  const phaseReplayLinks = phaseReplayGroups(all);
   const followedIds = new Set(Object.keys(usePrefs(s => s.followed)));
   // Team identity: teams endpoint when the source has one, else from any fixture.
   const fromFixture = all[0]
@@ -100,7 +107,21 @@ export default function TeamScreen() {
         </section>
 
         <section>
-          <SectionLabel muted>Season</SectionLabel>
+          {phaseReplayLinks.length > 0 ? (
+            <div className="flex items-baseline justify-between gap-3 flex-wrap mb-4">
+              <SectionLabel muted>Season</SectionLabel>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mb-1">
+                {phaseReplayLinks.map(g => (
+                  <Link key={`${g.compId}:${g.round}`} to={`/draw/${g.compId}/${g.round}/${teamId}`}
+                    className="font-sans text-[9.5px] uppercase tracking-[.12em] text-muted">
+                    Replay the {roundLabelFor(g.round)} draw
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <SectionLabel muted>Season</SectionLabel>
+          )}
           {all.map(f => <FixtureRow key={`${f.compId}-${f.id}`} fixture={f}
             followedIds={followedIds} />)}
         </section>

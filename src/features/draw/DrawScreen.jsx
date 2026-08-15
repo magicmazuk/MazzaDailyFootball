@@ -7,7 +7,7 @@ import { Link, useParams } from 'react-router-dom';
 import { byId } from '../../domain/competitions.js';
 import { prettifyRound } from '../../domain/round.js';
 import { fallbackRoundLabel } from '../../domain/field.js';
-import { tieId } from '../../domain/draws.js';
+import { phaseTieIds, tieId } from '../../domain/draws.js';
 import { useSeasonFixtures } from '../../data/queries.js';
 import { usePrefs } from '../../store/prefs.js';
 import Crest from '../../ui/Crest.jsx';
@@ -52,16 +52,37 @@ function filterToRemaining(shuffledAll, remaining) {
   });
 }
 
-// The club whose ball is currently on the Stage (bowl, phase 'revealed'
-// only) — mirrors Stage's own derivation below — so the pool can find its
-// position in the shuffled display order and pulse/collapse the right
-// item, which is no longer necessarily at index 0 now that display order
-// isn't reveal order.
+// The club whose ball is currently on the Stage (bowl/opponents, phase
+// 'revealed' only) — mirrors Stage's own derivation below — so the pool
+// can find its position in the shuffled display order and pulse/collapse
+// the right item, which is no longer necessarily at index 0 now that
+// display order isn't reveal order. Opponents mode (spec §13.15) reveals
+// one fixture's non-subject side per unit, same landed-indexed shape as
+// bowl otherwise.
 function revealingClub(state) {
-  if (state.mode !== 'bowl' || state.phase !== 'revealed') return null;
-  const tieIndex = Math.floor(state.landed / 2);
-  const side = state.landed % 2 === 0 ? 'home' : 'away';
-  return state.ties[tieIndex]?.[side] ?? null;
+  if (state.phase !== 'revealed') return null;
+  if (state.mode === 'bowl') {
+    const tieIndex = Math.floor(state.landed / 2);
+    const side = state.landed % 2 === 0 ? 'home' : 'away';
+    return state.ties[tieIndex]?.[side] ?? null;
+  }
+  if (state.mode === 'opponents') {
+    const tie = state.ties[state.landed];
+    if (!tie) return null;
+    return tie.home?.teamId === state.subjectTeamId ? tie.away : tie.home;
+  }
+  return null;
+}
+
+// The venue marker ('H'/'A') for whichever fixture is currently revealed
+// on the Stage, opponents mode only — the subject played at home when the
+// fixture's home side is the subject, away otherwise (mirrors
+// drawEngine.js's landedSides venue derivation).
+function revealingVenue(state) {
+  if (state.mode !== 'opponents' || state.phase !== 'revealed') return null;
+  const tie = state.ties[state.landed];
+  if (!tie) return null;
+  return tie.home?.teamId === state.subjectTeamId ? 'H' : 'A';
 }
 
 // The tie currently being drawn (rollcall, phase 'drawing' only) — so the
@@ -135,9 +156,16 @@ function Pool({ mode, pool, state, rows, shuffledTies, clubOrdinals }) {
 
   // rows is landedSides(state) in original tie order; re-key by tie id so
   // the roll-call list can render each tie's landed status in the shuffled
-  // display order instead.
-  const byTieId = new Map(rows.map(r => [r.tie.id, r]));
-  const displayRows = shuffledTies.map(t => byTieId.get(t.id));
+  // display order instead. Rollcall-only — opponents rows carry no `tie`
+  // (landedSides' opponents shape is `{ opponent, venue, ... }`, club-
+  // centric rather than tie-centric), and bowl never renders RollcallList,
+  // so this is skipped rather than crashing on `r.tie.id` for either.
+  const displayRows = mode === 'rollcall'
+    ? (() => {
+      const byTieId = new Map(rows.map(r => [r.tie.id, r]));
+      return shuffledTies.map(t => byTieId.get(t.id));
+    })()
+    : [];
 
   return (
     <section className="mb-6">
@@ -145,7 +173,7 @@ function Pool({ mode, pool, state, rows, shuffledTies, clubOrdinals }) {
         <p className="font-sans text-[10px] uppercase tracking-[.2em] text-muted">Still in the hat</p>
         <p className="font-serif text-[13px] tabular-nums">{pool.length}</p>
       </div>
-      {mode === 'bowl'
+      {mode === 'bowl' || mode === 'opponents'
         ? <BowlPool pool={pool} revealingIndex={revealingIndex} clubOrdinals={clubOrdinals} />
         : <RollcallList rows={displayRows} currentTieIndex={currentTieIndex} />}
     </section>
@@ -164,11 +192,11 @@ function CompleteBadge() {
 }
 
 function Stage({ state, canTap, onTap }) {
-  const { phase, ties, landed } = state;
-  const tieIndex = Math.floor(landed / 2);
-  const side = landed % 2 === 0 ? 'home' : 'away';
-  const club = ties[tieIndex]?.[side] ?? null;
-  const hint = landed === 0 ? 'Tap to draw the first ball' : 'Tap for the next ball';
+  const { phase, mode, landed } = state;
+  const club = revealingClub(state);
+  const venue = revealingVenue(state);
+  const unit = mode === 'opponents' ? 'opponent' : 'ball';
+  const hint = landed === 0 ? `Tap to draw the first ${unit}` : `Tap for the next ${unit}`;
 
   return (
     <button type="button" onClick={onTap} disabled={!canTap} aria-label="Draw"
@@ -179,7 +207,10 @@ function Stage({ state, canTap, onTap }) {
       {phase === 'revealed' && club && (
         <span className="draw-ball-open flex flex-col items-center gap-1.5">
           <Crest side={club} size={40} />
-          <span className="font-serif text-[15px]">{club.name}</span>
+          <span className="font-serif text-[15px]">
+            {club.name}
+            {venue && <span className="font-sans text-[10px] text-muted ml-1.5 align-middle">({venue})</span>}
+          </span>
         </span>
       )}
       {(phase === 'idle' || phase === 'landed') && (
@@ -241,6 +272,25 @@ function TieRow({ tie, home, away, compId, followedIds, complete }) {
   return <Link to={`/match/${compId}/${tie.id}`} className="block">{content}</Link>;
 }
 
+// The opponents-mode landed row (spec §13.15): "v {Opponent} (H|A)" — the
+// subject's own side is never a slot (it never reveals), so this is
+// club-centric where TieRow is tie-centric. Reuses Slot (TieRow's own
+// crest+name+followed-star building block) for the opponent, rather than
+// NextUpRow, which is a different list (Today's "next up") with unrelated
+// styling and behaviour.
+function OpponentRow({ row, fixtureId, compId, followedIds, complete }) {
+  const { opponent, venue, landed } = row;
+  const content = (
+    <div className="flex items-center gap-3 py-3 border-b border-rule/70">
+      <span className="font-sans text-[10px] text-muted">v</span>
+      <Slot side={opponent} landed={landed} followed={opponent && followedIds.has(opponent.teamId)} />
+      {landed && <span className="font-sans text-[10px] text-muted shrink-0">({venue})</span>}
+    </div>
+  );
+  if (!complete) return content;
+  return <Link to={`/match/${compId}/${fixtureId}`} className="block">{content}</Link>;
+}
+
 function Controls({ complete, onRevealRest, onReset, compId }) {
   return (
     <div className="flex items-center gap-5 font-sans text-[10.5px] uppercase tracking-[.14em] mt-2">
@@ -255,10 +305,14 @@ function Controls({ complete, onRevealRest, onReset, compId }) {
   );
 }
 
-function Ceremony({ comp, compId, round, ties, alreadySeen, markTiesSeen, followedIds }) {
-  const mode = useMemo(() => drawMode(ties), [ties]);
+function Ceremony({ comp, compId, round, ties, alreadySeen, markTiesSeen, followedIds, subjectClub }) {
+  // A subject club (opponents mode, spec §13.15) forces 'opponents' rather
+  // than the bowl/rollcall size threshold — there is no vessel-size
+  // question here, only "this club's own campaign".
+  const subjectTeamId = subjectClub?.teamId;
+  const mode = useMemo(() => (subjectTeamId ? 'opponents' : drawMode(ties)), [ties, subjectTeamId]);
   const [state, dispatch] = useReducer(drawReducer, undefined, () => {
-    const init = initDraw(ties, mode);
+    const init = initDraw(ties, mode, { subjectTeamId });
     return alreadySeen ? drawReducer(init, { type: 'REVEAL_REST' }) : init;
   });
   const complete = isComplete(state);
@@ -291,29 +345,39 @@ function Ceremony({ comp, compId, round, ties, alreadySeen, markTiesSeen, follow
   // itself (`landed`, strictly tie-sequential), stable ordinals for the
   // jumble, keys and the engine state are all untouched — this only
   // reorders what's drawn on screen.
+  // Opponents mode seeds its pool shuffle per (comp, round, subject club)
+  // — task-2 brief — so two different followed clubs replaying the same
+  // phase round each get their own stable-but-distinct shuffle, rather
+  // than sharing the round-wide bowl/rollcall seed.
+  const shuffleSeed = subjectTeamId ? `${compId}:${round}:${subjectTeamId}` : `${compId}:${round}`;
   const shuffledClubs = useMemo(
-    () => seededShuffle(remainingClubs(initDraw(ties, mode)), `${compId}:${round}`),
-    [ties, mode, compId, round],
+    () => seededShuffle(remainingClubs(initDraw(ties, mode, { subjectTeamId })), shuffleSeed),
+    [ties, mode, subjectTeamId, shuffleSeed],
   );
   const shuffledTies = useMemo(
     () => seededShuffle(ties, `${compId}:${round}`),
     [ties, compId, round],
   );
 
-  // Seen-marking (spec §8.5): fire exactly once, on reaching complete, by
-  // taps or by Reveal the rest. An already-seen round on arrival is already
-  // marked, so the ref starts true and this never fires again for it.
+  // Seen-marking (spec §8.5, §13.15): fire exactly once, on reaching
+  // complete, by taps or by Reveal the rest. An already-seen round on
+  // arrival is already marked, so the ref starts true and this never fires
+  // again for it. Opponents mode reuses phaseTieIds (draws.js) — the same
+  // ids unrevealedPhaseDraws/TodayScreen key off — rather than re-deriving
+  // them ad hoc.
   useEffect(() => {
     if (complete && !seenMarkedRef.current) {
       seenMarkedRef.current = true;
-      markTiesSeen(ties.map(t => tieId(compId, t.id)));
+      markTiesSeen(mode === 'opponents' ? phaseTieIds(comp, ties) : ties.map(t => tieId(compId, t.id)));
     }
-  }, [complete, ties, compId, markTiesSeen]);
+  }, [complete, ties, compId, comp, mode, markTiesSeen]);
 
   // Drive TICK from real animation timeouts, at the validated pacing. The
   // reducer never reads a clock — this is the only place time lives.
+  // Opponents mode shares bowl's tumble/reveal/land timing (spec §13.15:
+  // "pool shuffle, tap pacing, seen-marking semantics all inherited").
   useEffect(() => {
-    if (mode === 'bowl') {
+    if (mode === 'bowl' || mode === 'opponents') {
       if (state.phase === 'tumbling') {
         const id = setTimeout(() => dispatch({ type: 'TICK' }), TIMINGS.tumble);
         return () => clearTimeout(id);
@@ -341,19 +405,29 @@ function Ceremony({ comp, compId, round, ties, alreadySeen, markTiesSeen, follow
       <p className="font-sans text-[10px] uppercase tracking-[.22em] text-muted">
         <Link to={`/competition/${compId}`}>{comp.name}</Link>
       </p>
-      <h1 className="text-[24px] mb-6">The {roundLabel} draw</h1>
+      <h1 className="text-[24px] mb-6 flex items-center gap-3">
+        {subjectClub && <Crest side={subjectClub} size={28} />}
+        <span>
+          {subjectClub ? `${subjectClub.shortName ?? subjectClub.name}'s ${roundLabel} draw` : `The ${roundLabel} draw`}
+        </span>
+      </h1>
 
       <Pool mode={mode} pool={pool} state={state} rows={rows} shuffledTies={shuffledTies} clubOrdinals={clubOrdinals} />
 
-      {mode === 'bowl'
-        ? <Stage state={state} canTap={canTap} onTap={() => canTap && dispatch({ type: 'TAP' })} />
-        : <RollcallStage state={state} canTap={canTap} onTap={() => canTap && dispatch({ type: 'TAP' })} />}
+      {mode === 'rollcall'
+        ? <RollcallStage state={state} canTap={canTap} onTap={() => canTap && dispatch({ type: 'TAP' })} />
+        : <Stage state={state} canTap={canTap} onTap={() => canTap && dispatch({ type: 'TAP' })} />}
 
       <section className="mt-2 mb-6">
-        {rows.map(({ tie, home, away }) => (
-          <TieRow key={tie.id} tie={tie} home={home} away={away}
-            compId={compId} followedIds={followedIds} complete={complete} />
-        ))}
+        {mode === 'opponents'
+          ? rows.map((row, i) => (
+            <OpponentRow key={ties[i]?.id ?? i} row={row} fixtureId={ties[i]?.id}
+              compId={compId} followedIds={followedIds} complete={complete} />
+          ))
+          : rows.map(({ tie, home, away }) => (
+            <TieRow key={tie.id} tie={tie} home={home} away={away}
+              compId={compId} followedIds={followedIds} complete={complete} />
+          ))}
       </section>
 
       <Controls complete={complete} compId={compId}
@@ -364,19 +438,44 @@ function Ceremony({ comp, compId, round, ties, alreadySeen, markTiesSeen, follow
 }
 
 export default function DrawScreen() {
-  const { compId, round } = useParams();
+  // teamId (spec §13.15) is only present on the opponents route
+  // (draw/:compId/:round/:teamId) — its absence is the bowl/rollcall path,
+  // unchanged.
+  const { compId, round, teamId } = useParams();
   const comp = byId(compId);
   const season = useSeasonFixtures(comp ?? { id: 'none', source: 'espn' });
   const seenTies = usePrefs(s => s.seenTies);
   const markTiesSeen = usePrefs(s => s.markTiesSeen);
   const followedIds = new Set(Object.keys(usePrefs(s => s.followed)));
 
-  const ties = useMemo(() => {
+  const roundFixtures = useMemo(() => {
     const fixtures = season.data?.fixtures ?? [];
-    return fixtures.filter(f => f.round === round)
-      .slice()
-      .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
+    return fixtures.filter(f => f.round === round);
   }, [season.data, round]);
+
+  // Opponents mode scopes ties to just the subject club's own fixtures in
+  // the round (its campaign), not the whole round — unlike the bowl/
+  // rollcall path, which draws every tie in the round.
+  const ties = useMemo(() => {
+    const scoped = teamId
+      ? roundFixtures.filter(f => f.home?.teamId === teamId || f.away?.teamId === teamId)
+      : roundFixtures;
+    return scoped.slice().sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
+  }, [roundFixtures, teamId]);
+
+  // Subject club resolution (task-2 brief): from any of the round
+  // fixtures' sides by teamId. An unknown teamId (or a round with no
+  // fixtures at all) finds nothing here, but also leaves `ties` empty —
+  // it falls through to the same honest "isn't available" line below,
+  // with no separate guard needed.
+  const subjectClub = useMemo(() => {
+    if (!teamId) return null;
+    for (const f of roundFixtures) {
+      if (f.home?.teamId === teamId) return f.home;
+      if (f.away?.teamId === teamId) return f.away;
+    }
+    return null;
+  }, [roundFixtures, teamId]);
 
   if (!comp) {
     return (
@@ -403,7 +502,8 @@ export default function DrawScreen() {
   const alreadySeen = ties.every(t => seenTies[tieId(compId, t.id)]);
 
   return (
-    <Ceremony key={`${compId}:${round}`} comp={comp} compId={compId} round={round}
-      ties={ties} alreadySeen={alreadySeen} markTiesSeen={markTiesSeen} followedIds={followedIds} />
+    <Ceremony key={`${compId}:${round}:${teamId ?? ''}`} comp={comp} compId={compId} round={round}
+      ties={ties} alreadySeen={alreadySeen} markTiesSeen={markTiesSeen} followedIds={followedIds}
+      subjectClub={subjectClub} />
   );
 }
