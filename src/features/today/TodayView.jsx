@@ -28,7 +28,7 @@ function Section({ label, muted, fixtures, followedIds }) {
   );
 }
 
-export default function TodayView({ partition, followedIds, date, asOf = null, nextUp = [], onTv = [], quickTables = [], draws = [] }) {
+export default function TodayView({ partition, followedIds, date, asOf = null, nextUp = [], onTv = [], quickTables = [], draws = [], phaseDraws = [] }) {
   const { yours, live, later, earlier, yesterday } = partition;
   const quiet = !yours.length && !live.length && !later.length && !earlier.length;
   return (
@@ -43,6 +43,9 @@ export default function TodayView({ partition, followedIds, date, asOf = null, n
         </p>
       )}
       {draws.map(d => <DrawInvitation key={`${d.comp.id}:${d.round}`} draw={d} />)}
+      {phaseDraws.map(d => (
+        <DrawInvitation key={`${d.comp.id}:${d.round}:${d.club.teamId}`} draw={d} />
+      ))}
       {(yours.length > 0 || nextUp.length > 0) && (
         <section className="mt-8 first:mt-0">
           <SectionLabel>★ Your clubs</SectionLabel>

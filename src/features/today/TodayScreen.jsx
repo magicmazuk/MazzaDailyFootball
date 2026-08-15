@@ -5,7 +5,7 @@ import { usePrefs } from '../../store/prefs.js';
 import { partitionToday } from './partition.js';
 import { nextUpForFollowed } from './nextUp.js';
 import { upcomingTv } from './onTv.js';
-import { allTieIds, tieId, unrevealedDraws } from '../../domain/draws.js';
+import { allTieIds, tieId, unrevealedDraws, unrevealedPhaseDraws } from '../../domain/draws.js';
 import TodayView from './TodayView.jsx';
 
 export default function TodayScreen() {
@@ -60,12 +60,19 @@ export default function TodayScreen() {
   // comp's baseline exists and a round is genuinely unseen against it.
   const seededCupFixturesByComp = cupFixturesByComp.filter(({ comp }) => seededComps[comp.id]);
   const draws = unrevealedDraws(seededCupFixturesByComp, seenTies);
-  // Today-scoped hiding (spec §13.14): an unrevealed tie's fixture is
-  // replaced by its invitation card everywhere a bare FixtureRow could
-  // otherwise leak the pairing — the today window (partitionToday/onTv)
-  // and the season cache nextUp reads from.
-  const unrevealedIds = new Set(
-    draws.flatMap(d => d.ties.map(t => tieId(d.comp.id, t.id))));
+  // Club-centric league-phase draws (spec §13.15) — same seeded gating as
+  // tie draws (seededCupFixturesByComp, not the unseeded cupFixturesByComp)
+  // so a phase round's pre-existing fixtures never misread as "new" before
+  // that comp's own baseline is established.
+  const phaseDraws = unrevealedPhaseDraws(seededCupFixturesByComp, seenTies, followedIds);
+  // Today-scoped hiding (spec §13.14, §13.15): an unrevealed tie's or
+  // phase fixture is replaced by its invitation card everywhere a bare
+  // FixtureRow could otherwise leak the pairing — the today window
+  // (partitionToday/onTv) and the season cache nextUp reads from.
+  const unrevealedIds = new Set([
+    ...draws.flatMap(d => d.ties.map(t => tieId(d.comp.id, t.id))),
+    ...phaseDraws.flatMap(d => d.fixtures.map(f => tieId(d.comp.id, f.id))),
+  ]);
   const hideUnrevealed = f => !unrevealedIds.has(tieId(f.compId, f.id));
 
   const fixtures = results.flatMap(r => r.data?.fixtures ?? []).filter(hideUnrevealed);
@@ -87,6 +94,7 @@ export default function TodayScreen() {
       nextUp={nextUp}
       onTv={onTv}
       draws={draws}
+      phaseDraws={phaseDraws}
       quickTables={[
         { comp: byId('sco.1'), rows: spl.data?.rows ?? [] },
         { comp: byId('eng.1'), rows: epl.data?.rows ?? [] },

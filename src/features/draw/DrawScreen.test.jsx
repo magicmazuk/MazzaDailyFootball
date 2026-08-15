@@ -62,6 +62,7 @@ function renderAt(path) {
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="draw/:compId/:round" element={<DrawScreen />} />
+          <Route path="draw/:compId/:round/:teamId" element={<DrawScreen />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -329,4 +330,76 @@ test('the roll-call "currently drawing" highlight tracks the right tie through t
   expect(within(rollcallList).getByText('Home 1')).toHaveClass('text-accent');
   expect(within(rollcallList).getByText('Away 1')).toHaveClass('text-accent');
   expect(within(rollcallList).getByText('Home 1')).not.toHaveClass('line-through');
+});
+
+// --- opponents mode (spec §13.15, task-2 brief) ---
+
+// Celtic's own league-phase campaign: three fixtures, mixed venues (away
+// first, so the first ball drawn exercises the '(A)' marker).
+const phaseEvents = [
+  teamEvent('p1', '2026-11-01T15:00:00Z', 'r1', 'Rangers', 'h1', 'Celtic', 'league-phase'),
+  teamEvent('p2', '2026-11-02T15:00:00Z', 'h1', 'Celtic', 'a2', 'Aberdeen', 'league-phase'),
+  teamEvent('p3', '2026-11-03T15:00:00Z', 'h1', 'Celtic', 'a3', 'Hibernian', 'league-phase'),
+];
+
+test('opponents mode renders the subject club in the h1 and never in the pool', async () => {
+  stubScoreboard(phaseEvents);
+  renderAt('/draw/sco.tennents/league-phase/h1');
+
+  const heading = await screen.findByRole('heading', { level: 1 });
+  expect(within(heading).getByText("Celtic's League Phase draw")).toBeInTheDocument();
+
+  // Pool crests (Crest's monogram fallback exposes each club's name as an
+  // aria-label) must list every opponent and never the subject club.
+  const poolLabels = [...document.querySelectorAll('.draw-pool-item [aria-label]')]
+    .map(el => el.getAttribute('aria-label'));
+  expect(poolLabels.sort()).toEqual(['Aberdeen', 'Hibernian', 'Rangers']);
+  expect(poolLabels).not.toContain('Celtic');
+});
+
+test('a tap lands the opponent with its venue marker in the landed list', async () => {
+  stubScoreboard(phaseEvents);
+  renderAt('/draw/sco.tennents/league-phase/h1');
+  await screen.findByRole('heading', { level: 1 });
+
+  vi.useFakeTimers();
+  fireEvent.click(drawButton());
+  await act(async () => { await vi.advanceTimersByTimeAsync(TIMINGS.tumble); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(TIMINGS.holdOpen); });
+
+  // Celtic played away in the first (earliest-kickoff) fixture, so the
+  // landed row reads "v Rangers (A)".
+  const row = screen.getByText('Rangers').closest('div');
+  expect(within(row).getByText('v')).toBeInTheDocument();
+  expect(within(row).getByText('(A)')).toBeInTheDocument();
+});
+
+test('completion calls markTiesSeen with phaseTieIds exactly once', async () => {
+  stubScoreboard(phaseEvents);
+  const markTiesSeen = vi.fn();
+  usePrefs.setState({ markTiesSeen });
+  renderAt('/draw/sco.tennents/league-phase/h1');
+  await screen.findByRole('heading', { level: 1 });
+
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Reveal the rest' }));
+
+  expect(markTiesSeen).toHaveBeenCalledTimes(1);
+  expect(markTiesSeen).toHaveBeenCalledWith(
+    ['p1', 'p2', 'p3'].map(id => tieId('sco.tennents', id)),
+  );
+});
+
+test('an already-seen phase round opens straight into complete, with no re-marking', async () => {
+  stubScoreboard(phaseEvents);
+  usePrefs.setState({
+    seenTies: Object.fromEntries(['p1', 'p2', 'p3'].map(id => [tieId('sco.tennents', id), true])),
+  });
+  const markTiesSeen = vi.fn();
+  usePrefs.setState({ markTiesSeen });
+
+  renderAt('/draw/sco.tennents/league-phase/h1');
+
+  expect(await screen.findByText(/Draw complete/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Start again' })).toBeInTheDocument();
+  expect(markTiesSeen).not.toHaveBeenCalled();
 });
