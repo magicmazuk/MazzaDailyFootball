@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { byId } from '../../domain/competitions.js';
 import { formGuide } from '../../domain/form.js';
+import { roundOrder, fallbackRoundLabel } from '../../domain/field.js';
+import { prettifyRound } from '../../domain/round.js';
+import { PHASE_ROUNDS, tieId } from '../../domain/draws.js';
 import { useSeasonFixtures, useTable } from '../../data/queries.js';
 import { usePrefs } from '../../store/prefs.js';
 import FixtureRow from '../../ui/FixtureRow.jsx';
@@ -51,6 +54,33 @@ function GroupedFixtures({ fixtures, reverse, followedIds }) {
     ))));
 }
 
+// The replay link (spec §8.2, §13.14) — the mirror image of draws.js's
+// unrevealedDraws() qualifying shape (2+ ties, not a whole-phase publish,
+// a displayable label) but with every tie now SEEN rather than none: a
+// round whose ceremony has already been played at least once. roundOrder
+// is ascending by each round's earliest kickoff; the LATEST qualifying
+// round is the last match found scanning from the end.
+function latestReplayableRound(fixtures, seenTies, compId) {
+  const byRound = new Map();
+  for (const f of fixtures ?? []) {
+    if (f?.round == null) continue;
+    if (!byRound.has(f.round)) byRound.set(f.round, []);
+    byRound.get(f.round).push(f);
+  }
+  const order = roundOrder(fixtures);
+  for (let i = order.length - 1; i >= 0; i -= 1) {
+    const round = order[i];
+    if (PHASE_ROUNDS.has(round)) continue;
+    const roundFixtures = byRound.get(round) ?? [];
+    if (roundFixtures.length < 2) continue;
+    if (!roundFixtures.every(f => seenTies?.[tieId(compId, f.id)])) continue;
+    const label = prettifyRound(round) ?? fallbackRoundLabel(round);
+    if (!label) continue;
+    return { round, label };
+  }
+  return null;
+}
+
 export default function CompetitionScreen() {
   const { compId } = useParams();
   const comp = byId(compId);
@@ -68,6 +98,7 @@ export default function CompetitionScreen() {
   // isn't valid for it, without needing a remount/key trick.
   const active = tabs.includes(tab) ? tab : tabs[0];
   const followedIds = new Set(Object.keys(usePrefs(s => s.followed)));
+  const seenTies = usePrefs(s => s.seenTies);
   const table = useTable(comp ?? { id: 'none', hasTable: false, source: 'espn' });
   const season = useSeasonFixtures(comp ?? { id: 'none', source: 'espn' });
 
@@ -84,6 +115,7 @@ export default function CompetitionScreen() {
     .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
   const results = fixtures.filter(f => f.status === 'ft')
     .sort((a, b) => new Date(b.kickoff) - new Date(a.kickoff));
+  const replayRound = comp.type === 'cup' ? latestReplayableRound(fixtures, seenTies, comp.id) : null;
 
   return (
     <main>
@@ -104,6 +136,12 @@ export default function CompetitionScreen() {
           {season.isLoading
             ? <p className="text-muted">Loading the field…</p>
             : <FieldBoard fixtures={fixtures} comp={comp} followedIds={followedIds} />}
+          {replayRound && (
+            <Link to={`/draw/${comp.id}/${replayRound.round}`}
+              className="block font-sans text-[10px] uppercase tracking-[.14em] text-muted mt-4">
+              Replay the {replayRound.label} draw
+            </Link>
+          )}
         </>
       )}
       {active === 'Table' && (table.data

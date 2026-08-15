@@ -6,11 +6,13 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, expect, test, vi } from 'vitest';
+import { usePrefs } from '../../store/prefs.js';
 import CompetitionScreen from './CompetitionScreen.jsx';
 
 beforeEach(() => {
   vi.unstubAllGlobals();
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ events: [] }), { status: 200 })));
+  usePrefs.setState({ seenTies: {} });
 });
 
 function renderAt(compId) {
@@ -120,6 +122,55 @@ test('the same cup reverses round order on the Results tab', async () => {
   await screen.findByText('Celtic');
   const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
   expect(headings).toEqual(['Quarter-finals', 'Fourth round']);
+});
+
+// --- replay link (spec §8.2, §13.14) ---
+
+test('the Overview tab shows a quiet replay link for the latest round whose ties are all seen', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    events: [
+      teamEvent('e1', '2026-02-01T15:00:00Z', 'STATUS_SCHEDULED', 'fourth-round', 'Celtic', 'Aberdeen'),
+      teamEvent('e2', '2026-02-01T12:00:00Z', 'STATUS_SCHEDULED', 'fourth-round', 'Rangers', 'Hibernian'),
+    ],
+  }), { status: 200 })));
+  usePrefs.setState({ seenTies: { 'sco.tennents:e1': true, 'sco.tennents:e2': true } });
+  renderAt('sco.tennents');
+  const link = await screen.findByRole('link', { name: 'Replay the Fourth round draw' });
+  expect(link).toHaveAttribute('href', '/draw/sco.tennents/fourth-round');
+});
+
+test('no replay link when no round has every tie seen', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    events: [
+      teamEvent('e1', '2026-02-01T15:00:00Z', 'STATUS_SCHEDULED', 'fourth-round', 'Celtic', 'Aberdeen'),
+      teamEvent('e2', '2026-02-01T12:00:00Z', 'STATUS_SCHEDULED', 'fourth-round', 'Rangers', 'Hibernian'),
+    ],
+  }), { status: 200 })));
+  // Only one of the round's two ties seen — not a fully-revealed round.
+  usePrefs.setState({ seenTies: { 'sco.tennents:e1': true } });
+  renderAt('sco.tennents');
+  await screen.findByText('Celtic');
+  expect(screen.queryByRole('link', { name: /Replay the/ })).not.toBeInTheDocument();
+});
+
+test('the replay link picks the LATEST fully-seen round when more than one qualifies', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    events: [
+      teamEvent('e1', '2026-02-01T15:00:00Z', 'STATUS_SCHEDULED', 'fourth-round', 'Celtic', 'Aberdeen'),
+      teamEvent('e2', '2026-02-01T12:00:00Z', 'STATUS_SCHEDULED', 'fourth-round', 'Rangers', 'Hibernian'),
+      teamEvent('e3', '2026-04-01T15:00:00Z', 'STATUS_SCHEDULED', 'quarterfinals', 'Celtic', 'Rangers'),
+      teamEvent('e4', '2026-04-01T12:00:00Z', 'STATUS_SCHEDULED', 'quarterfinals', 'Aberdeen', 'Hibernian'),
+    ],
+  }), { status: 200 })));
+  usePrefs.setState({
+    seenTies: {
+      'sco.tennents:e1': true, 'sco.tennents:e2': true,
+      'sco.tennents:e3': true, 'sco.tennents:e4': true,
+    },
+  });
+  renderAt('sco.tennents');
+  const link = await screen.findByRole('link', { name: 'Replay the Quarter-finals draw' });
+  expect(link).toHaveAttribute('href', '/draw/sco.tennents/quarterfinals');
 });
 
 test('a league carries no displayable round (ESPN season.slug is a year-prefixed season name) and stays flat, unchanged', async () => {

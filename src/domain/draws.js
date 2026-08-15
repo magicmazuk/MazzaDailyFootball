@@ -11,7 +11,7 @@ export const tieId = (compId, fixtureId) => `${compId}:${fixtureId}`;
 // league-phase rounds publish their whole phase's fixture list at once —
 // there is no pairing to reveal, so the ceremony is meaningless for them
 // even when every fixture in the phase happens to be scheduled and unseen.
-const PHASE_ROUNDS = new Set(['group-stage', 'league-phase']);
+export const PHASE_ROUNDS = new Set(['group-stage', 'league-phase']);
 
 // [{ comp, round, roundLabel, ties }] for every cup round that qualifies as
 // an unrevealed draw. A round qualifies when every one of its fixtures is
