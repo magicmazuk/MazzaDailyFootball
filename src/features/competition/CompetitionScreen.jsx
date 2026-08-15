@@ -8,17 +8,48 @@ import FixtureRow from '../../ui/FixtureRow.jsx';
 import LeagueTable from './LeagueTable.jsx';
 import StructureStrip from './StructureStrip.jsx';
 import FieldBoard from './FieldBoard.jsx';
+import { groupFixturesByRound } from './roundGroups.js';
 
-const groupByDate = fixtures => {
-  const groups = new Map();
-  for (const f of fixtures) {
-    const day = new Date(f.kickoff).toLocaleDateString('en-GB',
-      { weekday: 'short', day: 'numeric', month: 'short' });
-    if (!groups.has(day)) groups.set(day, []);
-    groups.get(day).push(f);
-  }
-  return [...groups.entries()];
-};
+// One date sub-group's fixtures, unchanged from before round-grouping
+// existed — same day label style, same rows, `showContext={false}` since
+// the page itself is the context (spec §13.12).
+function DateGroup({ day, list, followedIds }) {
+  return (
+    <>
+      <p className="font-sans text-[9.5px] uppercase tracking-[.18em] text-muted mb-2">{day}</p>
+      {list.map(f => <FixtureRow key={f.id} fixture={f} followedIds={followedIds} showContext={false} />)}
+    </>
+  );
+}
+
+// Fixtures/Results tab body (Release 2.3 §C1): once at least one fixture
+// carries a displayable round, groups by round first — a primary heading
+// per round (matching the FieldBoard/day-list primary-heading pattern),
+// each with its date sub-grouping nested inside. A league never has a
+// displayable round (groupFixturesByRound returns a single null-round/
+// null-label group for it), so it renders exactly as it did before: flat
+// `<section>` per date, no round heading, no extra wrapper element.
+function GroupedFixtures({ fixtures, reverse, followedIds }) {
+  return groupFixturesByRound(fixtures, { reverse }).map(group => (group.label
+    ? (
+      <section key={group.label} className="mb-8">
+        <h2 className="font-sans text-[10px] font-semibold uppercase tracking-[.2em] text-accent
+                       pb-2 mb-2 border-b border-ink">
+          {group.label}
+        </h2>
+        {group.days.map(([day, list]) => (
+          <div key={day} className="mb-6 last:mb-0">
+            <DateGroup day={day} list={list} followedIds={followedIds} />
+          </div>
+        ))}
+      </section>
+    )
+    : group.days.map(([day, list]) => (
+      <section key={day} className="mb-6">
+        <DateGroup day={day} list={list} followedIds={followedIds} />
+      </section>
+    ))));
+}
 
 export default function CompetitionScreen() {
   const { compId } = useParams();
@@ -79,18 +110,12 @@ export default function CompetitionScreen() {
         ? <LeagueTable comp={comp} rows={table.data.rows}
             followedIds={followedIds} formByTeam={formByTeam} />
         : <p className="text-muted">{table.isError ? 'Table unavailable.' : 'Loading table…'}</p>)}
-      {active === 'Fixtures' && groupByDate(upcoming).map(([day, list]) => (
-        <section key={day} className="mb-6">
-          <p className="font-sans text-[9.5px] uppercase tracking-[.18em] text-muted mb-2">{day}</p>
-          {list.map(f => <FixtureRow key={f.id} fixture={f} followedIds={followedIds} showContext={false} />)}
-        </section>
-      ))}
-      {active === 'Results' && groupByDate(results).map(([day, list]) => (
-        <section key={day} className="mb-6">
-          <p className="font-sans text-[9.5px] uppercase tracking-[.18em] text-muted mb-2">{day}</p>
-          {list.map(f => <FixtureRow key={f.id} fixture={f} followedIds={followedIds} showContext={false} />)}
-        </section>
-      ))}
+      {active === 'Fixtures' && (
+        <GroupedFixtures fixtures={upcoming} reverse={false} followedIds={followedIds} />
+      )}
+      {active === 'Results' && (
+        <GroupedFixtures fixtures={results} reverse followedIds={followedIds} />
+      )}
     </main>
   );
 }

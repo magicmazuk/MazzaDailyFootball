@@ -64,6 +64,18 @@ test('fallbackRoundLabel title-cases a raw slug', () => {
   expect(fallbackRoundLabel(undefined)).toBe('');
 });
 
+// League fixtures carry the SEASON name in season.slug, not a round
+// ('2026-27-scottish-premiership', '2025-26-english-premier-league') —
+// round.js's prettifyRound rejects these outright rather than prettifying
+// them into noise (no real round slug starts with a year); the fallback
+// must reject them the same way, or a league's Fixtures/Results tabs
+// would wrongly see a "displayable round" and switch into round-grouping
+// (Release 2.3 §C1) off a season-name label nobody wants to see.
+test('fallbackRoundLabel rejects a year-prefixed league season slug, same as prettifyRound', () => {
+  expect(fallbackRoundLabel('2026-27-scottish-premiership')).toBe('');
+  expect(fallbackRoundLabel('2025-26-english-premier-league')).toBe('');
+});
+
 // ------------------------------------------------------------- survivalState
 
 test('empty fixtures yield an empty, champion-less field', () => {

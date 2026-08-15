@@ -4,6 +4,7 @@
 // next published round = eliminated) and two-legged ties without any
 // special-casing — the singleLeg flag only adds an immediate-elimination
 // refinement for competitions where every tie is a single match.
+import { YEAR_PREFIXED } from './round.js';
 
 // Distinct fixture.round values, ordered by each round's earliest
 // kickoff — never alphabetically or by array order. Fixtures with no
@@ -212,9 +213,17 @@ export function survivalState(fixtures, { singleLeg = false } = {}) {
 // Tier/round labels are prettified in the UI via round.js's
 // prettifyRound(). For the slugs it deliberately returns null for
 // (league/group phases, or any slug it doesn't recognise), this renders
-// the raw slug title-cased instead of hiding the label entirely.
+// the raw slug title-cased instead of hiding the label entirely — except
+// a year-prefixed league SEASON slug ('2026-27-scottish-premiership'),
+// which prettifyRound also rejects outright (round.js) rather than
+// prettify into noise: title-casing it here would be the same noise by
+// another name, so this mirrors that rejection instead of papering over
+// it. That matters beyond cosmetics — the competition tabs' round
+// grouping (Release 2.3 §C1) treats a non-empty `prettifyRound(round) ??
+// fallbackRoundLabel(round)` as "this competition has displayable
+// rounds," and a league must never trip that check.
 export function fallbackRoundLabel(round) {
-  if (!round) return '';
+  if (!round || YEAR_PREFIXED.test(round)) return '';
   return round
     .split('-')
     .map(w => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))

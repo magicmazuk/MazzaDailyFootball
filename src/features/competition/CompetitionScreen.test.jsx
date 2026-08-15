@@ -81,3 +81,55 @@ test('the Fixtures tab renders FixtureRow with showContext={false}, since the pa
   // page's own h1 (which reads the full 'Scottish Premiership' name).
   expect(screen.queryByText('Premiership')).not.toBeInTheDocument();
 });
+
+// --- round grouping on Fixtures/Results (Release 2.3 §C1) ---
+
+const teamEvent = (id, date, statusName, roundSlug, homeName, awayName) => ({
+  id, date, status: { type: { name: statusName } }, season: { slug: roundSlug },
+  competitions: [{ competitors: [
+    { homeAway: 'home', team: { id: `${id}h`, displayName: homeName } },
+    { homeAway: 'away', team: { id: `${id}a`, displayName: awayName } },
+  ] }],
+});
+
+test('a cup with round-labelled fixtures groups the Fixtures tab by round, ascending, under a heading per round', async () => {
+  const user = (await import('@testing-library/user-event')).default.setup();
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    events: [
+      teamEvent('qf', '2026-04-01T15:00:00Z', 'STATUS_SCHEDULED', 'quarterfinals', 'Celtic', 'Aberdeen'),
+      teamEvent('fr', '2026-02-01T15:00:00Z', 'STATUS_SCHEDULED', 'fourth-round', 'Rangers', 'Hibernian'),
+    ],
+  }), { status: 200 })));
+  renderAt('sco.tennents');
+  await user.click(screen.getByRole('button', { name: 'Fixtures' }));
+  await screen.findByText('Celtic');
+  const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
+  expect(headings).toEqual(['Fourth round', 'Quarter-finals']);
+});
+
+test('the same cup reverses round order on the Results tab', async () => {
+  const user = (await import('@testing-library/user-event')).default.setup();
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    events: [
+      teamEvent('qf', '2026-04-01T15:00:00Z', 'STATUS_FULL_TIME', 'quarterfinals', 'Celtic', 'Aberdeen'),
+      teamEvent('fr', '2026-02-01T15:00:00Z', 'STATUS_FULL_TIME', 'fourth-round', 'Rangers', 'Hibernian'),
+    ],
+  }), { status: 200 })));
+  renderAt('sco.tennents');
+  await user.click(screen.getByRole('button', { name: 'Results' }));
+  await screen.findByText('Celtic');
+  const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
+  expect(headings).toEqual(['Quarter-finals', 'Fourth round']);
+});
+
+test('a league carries no displayable round (ESPN season.slug is a year-prefixed season name) and stays flat, unchanged', async () => {
+  const user = (await import('@testing-library/user-event')).default.setup();
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    events: [teamEvent('e1', '2026-08-22T14:00:00Z', 'STATUS_SCHEDULED',
+      '2026-27-scottish-premiership', 'Celtic', 'Aberdeen')],
+  }), { status: 200 })));
+  renderAt('sco.1');
+  await user.click(screen.getByRole('button', { name: 'Fixtures' }));
+  await screen.findByText('Celtic');
+  expect(screen.queryAllByRole('heading', { level: 2 })).toHaveLength(0);
+});
