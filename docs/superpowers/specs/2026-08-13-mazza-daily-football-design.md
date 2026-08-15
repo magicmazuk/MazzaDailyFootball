@@ -630,3 +630,20 @@ Three rules, applied app-wide:
 
 Navigating to a different route scrolls to the top; within-page interactions (tabs,
 drawers, calendar day selection) never do. Implemented as a pathname-keyed effect.
+
+### 13.14 The draw, scoped for build (agreed 2026-08-15; implements §8)
+
+- **Seen-tie state** joins the prefs store (`seenTies`, additive, persisted). **First-run
+  seeding:** when the key is absent, every currently-published tie is marked seen — draws
+  only announce from installation forward. Detection: a cup round whose fixtures are all
+  scheduled, all unseen, and round-labelled is an unrevealed draw.
+- **Hiding is Today-scoped.** While a draw is unrevealed, its fixtures are withheld from
+  Today's sections and replaced by the invitation card. They appear normally everywhere
+  else (calendar, fixtures tabs) — the app can't spoiler-proof itself and §7.2's
+  "prioritise, never hide" outranks theatre outside Today.
+- **Ceremony** at `/draw/:compId/:round`: bowl mode (≤16 clubs — crests in the vessel, one
+  ball per tap: tumble → hold → reveal → pulse in bowl → leave → land in the tie list) or
+  roll-call mode (>16 — the column of names, one tie per tap, both names light then
+  strike). "Reveal the rest" completes instantly. Completing (either way) marks the round's
+  ties seen. Replayable afterwards from the cup Overview ("Replay the draw") — replays
+  never re-hide. CSS animations, tap-paced, nothing autoplays (§8.3).
