@@ -161,3 +161,78 @@ test('MatchScreen computes siblings from the season cache and MatchRoom renders 
   expect(screen.getByText('That day')).toBeInTheDocument();
   expect(screen.getByText('Hibernian')).toBeInTheDocument();
 });
+
+// --- live match room prefers the fresh today-window fixture over the
+// stale (staleTime 1h) season cache (hotfix 2026-08-15) ---
+
+// The season copy is cached from before kickoff: still 'scheduled', no
+// score. The today-window copy polls every 30s and has moved on to live
+// with a score and a running clock — the season request is distinguished
+// by its fixed full-season `dates` range (SEASON.espnRange); any other
+// `dates` value on a /scoreboard call is the today-window request.
+const staleScheduledSeason = JSON.stringify({
+  events: [{
+    id: 'e1', date: '2026-08-15T14:00:00Z', status: { type: { name: 'STATUS_SCHEDULED' } },
+    competitions: [{ competitors: [
+      { homeAway: 'home', team: { id: 'kil', displayName: 'Kilmarnock' }, score: '0' },
+      { homeAway: 'away', team: { id: 'cel', displayName: 'Celtic' }, score: '0' },
+    ] }],
+  }],
+});
+
+const freshLiveWindow = JSON.stringify({
+  events: [{
+    id: 'e1', date: '2026-08-15T14:00:00Z',
+    status: { type: { name: 'STATUS_IN_PROGRESS', state: 'in' }, displayClock: "63'" },
+    competitions: [{ competitors: [
+      { homeAway: 'home', team: { id: 'kil', displayName: 'Kilmarnock' }, score: '2' },
+      { homeAway: 'away', team: { id: 'cel', displayName: 'Celtic' }, score: '1' },
+    ] }],
+  }],
+});
+
+test('a live match shows the today-window score and minute, not the stale scheduled season cache', async () => {
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    if (url.includes('/scoreboard')) {
+      return new Response(url.includes('dates=20260701-20270630') ? staleScheduledSeason : freshLiveWindow,
+        { status: 200 });
+    }
+    return new Response('{}', { status: 200 });
+  }));
+
+  renderAt('/match/sco.1/e1');
+
+  await screen.findByText("63'");
+  expect(screen.getByText('2')).toBeInTheDocument();
+  expect(screen.getByText('1')).toBeInTheDocument();
+  expect(screen.queryByText('–')).not.toBeInTheDocument();
+});
+
+const finishedSeason = JSON.stringify({
+  events: [{
+    id: 'e1', date: '2026-08-09T14:00:00Z', status: { type: { name: 'STATUS_FULL_TIME' } },
+    competitions: [{ competitors: [
+      { homeAway: 'home', team: { id: 'kil', displayName: 'Kilmarnock' }, score: '1' },
+      { homeAway: 'away', team: { id: 'cel', displayName: 'Celtic' }, score: '2' },
+    ] }],
+  }],
+});
+
+test('an old result outside the today-window still renders from the season cache (no regression)', async () => {
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    if (url.includes('/scoreboard')) {
+      // The today-window request never carries the fixed season range —
+      // it has nothing for this old fixture, so it returns no events.
+      return new Response(url.includes('dates=20260701-20270630') ? finishedSeason : '{"events":[]}',
+        { status: 200 });
+    }
+    return new Response('{}', { status: 200 });
+  }));
+
+  renderAt('/match/sco.1/e1');
+
+  await screen.findByText('Kilmarnock');
+  expect(screen.getByText('FT')).toBeInTheDocument();
+  expect(screen.getByText('1')).toBeInTheDocument();
+  expect(screen.getByText('2')).toBeInTheDocument();
+});
