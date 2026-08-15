@@ -609,3 +609,24 @@ field shows qualifying clubs tiered by round; Today windows carry European quali
 §13.4's "qualified vs still qualifying" grouping becomes derived data. The structure strip
 also becomes horizontally scrollable (no wrapping — an orphaned separator wrapped badly on
 mobile).
+
+### 13.12 Context everywhere (agreed 2026-08-15)
+
+Three rules, applied app-wide:
+
+1. **Fixture rows name their competition.** A small sans context line (competition short
+   name, plus the prettified round where one exists) sits above the teams in every fixture
+   row on mixed-competition surfaces — Today (all sections), On TV, calendar day lists,
+   Next up. It navigates to the competition page. Competition pages themselves suppress it
+   (the context is the page).
+2. **The match-room kicker links back.** The competition name in the kicker navigates to
+   the competition page.
+3. **Every match shows its siblings.** A muted section at the bottom of the match room —
+   "In this round" for fixtures with a round, "That day" for league fixtures — lists the
+   other fixtures of the same competition in the same round (or on the same local date),
+   as standard fixture rows without the context line. Capped at 8, absent when empty.
+
+### 13.13 Scroll restoration (agreed 2026-08-15)
+
+Navigating to a different route scrolls to the top; within-page interactions (tabs,
+drawers, calendar day selection) never do. Implemented as a pathname-keyed effect.
