@@ -692,3 +692,25 @@ structure strip, which is retired (component deleted). Blurbs are editorial, cur
 like the TV listings. The field board's two section headers ("Still in", "Out") carry their counts
 as right-aligned serif numerals on the same rule (GateRule, local to FieldBoard). User verdict
 2026-08-16: "the sentence one… suits the broadsheet brand."
+
+## 13.18 Gold polish (v1.0.0)
+
+1. **Full-bleed club watermark** — the team-page crest watermark anchors to the VIEWPORT
+   (fixed, top-right, same -140px offsets and opacity), not the padded content column, so it
+   bleeds to the actual screen edge. Content stacks above it; no horizontal overflow.
+2. **Shirts in the match-room lineups** — each lineup row leads with the club-coloured Shirt
+   (22px, shirt number on the chest) instead of the bare numeral column. Colour comes from the
+   fixture side; unknown colour falls back to the drawer tone (Shirt's built-in guard). Full
+   two-team formation graphics were assessed and declined: away/European squads routinely lack
+   position data, so the pitch would degrade more often than it delighted.
+3. **The sheet opens all the way** — the player bottom sheet's grab handle is functional: swipe
+   up (or tap it, or tap "Full profile") expands the sheet in place to the full Splits profile,
+   scrollable, underlying page still behind it; swipe down collapses to the peek, again to
+   dismiss. "Open as page →" inside the expanded view keeps the deep link. The sheet also says
+   what it's doing when data is slow ("Loading player…") or missing ("Player information
+   unavailable."). Reduced motion honoured throughout.
+4. **The gold sweep** — backlog minors closed: quiet-day line ordering, pre-season mini-table
+   guard, empty European squads say "unavailable", useSquad distinguishes outage from empty,
+   single-pairing two-leg invitation gate, calendar month-paging selection reset, On TV starts
+   tomorrow (no duplicate of today's rows), sibling fixtures show ★, live-minute tabular-nums,
+   height in primes, pass-share clamp, memo/tidy items.
