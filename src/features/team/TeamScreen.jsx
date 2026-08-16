@@ -51,11 +51,15 @@ export function matchStarters(lineupPlayers, squadPlayers) {
 // a sco/eng fallback — see useSquad). The full sentence needs wins/played/
 // points together; a null or partial record (irreconcilable wins/draws,
 // see adaptTeamRecord) falls back to naming just the league — draws/losses
-// are never spelled out either way, to keep it one line.
+// are never spelled out either way, to keep it one line. `played > 0` is
+// required too (review fix): a zeroed pre-season record (0-0-0, every
+// field present and reconciled but nothing played yet) would otherwise
+// read as "Won 0 of 0 … · 0 points" — technically true but useless, so it
+// falls back to the plain league line the same as an absent record.
 function scoutLine(squadData) {
   if (!squadData?.discovered) return null;
   const { resolvedLeagueName, record } = squadData;
-  if (record && record.wins != null && record.played != null && record.points != null) {
+  if (record && record.wins != null && record.played > 0 && record.points != null) {
     return `Won ${record.wins} of ${record.played} in the ${resolvedLeagueName} this season · ${record.points} points`;
   }
   return `They play in the ${resolvedLeagueName}.`;

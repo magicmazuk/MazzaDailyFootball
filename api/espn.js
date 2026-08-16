@@ -23,11 +23,24 @@ const LEAGUE =
 // summary/standings, since queries.js only ever fetches the qualifier
 // code's scoreboard and adapts it under the parent comp's id.
 const QUALIFIER = '(uefa\\.champions_qual|uefa\\.europa_qual|uefa\\.europa\\.conf_qual)';
+// The scout (spec §13.20.1, review-round CRITICAL fix): useSquad discovers
+// a foreign opponent's actual domestic league from team.defaultLeague
+// (e.g. 'aut.1') and fetches its roster directly under THAT slug — a code
+// the enumerated LEAGUE alternation can never anticipate, since it's not
+// one of our own leagues/cups. Path shape is the allowlist's real safety
+// job here (no slashes, so no traversal or extra path segments); WHICH
+// league someone requests a public team roster for is not sensitive, so a
+// single-team lookup is safe to widen. Only the ONE route below
+// (teams/{numeric id}, the exact shape useSquad hits) uses this — every
+// other route (scoreboard/standings/summary/plain teams-list) stays on the
+// tight, enumerated LEAGUE list, since queries.js never fetches those for
+// a discovered league.
+const LEAGUE_ANY = '[a-z][a-z0-9._]{1,30}';
 const ALLOWED = [
   new RegExp(`^/apis/site/v2/sports/soccer/${LEAGUE}/scoreboard$`),
   new RegExp(`^/apis/site/v2/sports/soccer/${QUALIFIER}/scoreboard$`),
   new RegExp(`^/apis/site/v2/sports/soccer/${LEAGUE}/teams$`),
-  new RegExp(`^/apis/site/v2/sports/soccer/${LEAGUE}/teams/\\d+$`),
+  new RegExp(`^/apis/site/v2/sports/soccer/${LEAGUE_ANY}/teams/\\d+$`),
   new RegExp(`^/apis/site/v2/sports/soccer/${LEAGUE}/summary$`),
   new RegExp(`^/apis/v2/sports/soccer/${LEAGUE}/standings$`),
 ];
@@ -41,6 +54,10 @@ const ALLOWED_CORE = [
 const lastKnownGood = new Map(); // key: rest+query → { body, at }
 
 export default async function handler(req, res) {
+  // Confirmed (review-round CRITICAL fix): ALLOWED/ALLOWED_CORE only ever
+  // test `rest` (the path) — `query` (e.g. useSquad's ?enable=roster) is
+  // never part of the allowlist match, on any route, and is appended
+  // verbatim to the upstream URL below once the path itself clears.
   const { rest, query } = extractRest(req.url);
   const upstreamHost = ALLOWED_CORE.some(rx => rx.test(rest)) ? UPSTREAM_CORE
     : ALLOWED.some(rx => rx.test(rest)) ? UPSTREAM

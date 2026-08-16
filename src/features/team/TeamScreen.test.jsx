@@ -271,6 +271,32 @@ test('a discovered foreign club with a partial record (wins underivable) falls b
   expect(screen.getByText('They play in the Austrian Bundesliga.')).toBeInTheDocument();
 });
 
+// --- review fix: a zeroed pre-season record (every field present and
+// reconciled, but played: 0) must never read "Won 0 of 0 … · 0 points" —
+// technically true, practically useless. ---
+
+test('a discovered foreign club with a zeroed pre-season record (played: 0) falls back to the plain league line, not "Won 0 of 0"', () => {
+  const opponent = side('4411', 'Sturm Graz');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', opponent, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
+      resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
+      record: { played: 0, wins: 0, draws: 0, losses: 0, points: 0 },
+    },
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  expect(screen.getByText('They play in the Austrian Bundesliga.')).toBeInTheDocument();
+  expect(screen.queryByText(/^Won /)).not.toBeInTheDocument();
+});
+
 test('a domestic squad resolution never renders the scout line, discovered or not set', () => {
   const celtic = side('256', 'Celtic');
   stubSeasons({
