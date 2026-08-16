@@ -44,11 +44,16 @@ const ALLOWED = [
   new RegExp(`^/apis/site/v2/sports/soccer/${LEAGUE}/summary$`),
   new RegExp(`^/apis/v2/sports/soccer/${LEAGUE}/standings$`),
 ];
-// Player bio + per-season statistics (spec §13.16) — the qualifier codes
-// have no player data of their own, so only the 11 base league ids apply.
+// Player bio + per-season statistics (spec §13.16). These take LEAGUE_ANY
+// for the same reason the single-team route does (spec §13.20.1): a
+// discovered foreign league's players fetch their bio/stats under that
+// league's code (usePlayer via comp.id and bio.defaultLeagueCode), and an
+// enumerated list here would 400 exactly the class of prod-only failure
+// the teams-route widening fixed. Path shape stays fully pinned — numeric
+// ids, fixed segment count, no slashes in the slug.
 const ALLOWED_CORE = [
-  new RegExp(`^/v2/sports/soccer/leagues/${LEAGUE}/seasons/\\d{4}/athletes/\\d+$`),
-  new RegExp(`^/v2/sports/soccer/leagues/${LEAGUE}/seasons/\\d{4}/types/\\d/athletes/\\d+/statistics$`),
+  new RegExp(`^/v2/sports/soccer/leagues/${LEAGUE_ANY}/seasons/\\d{4}/athletes/\\d+$`),
+  new RegExp(`^/v2/sports/soccer/leagues/${LEAGUE_ANY}/seasons/\\d{4}/types/\\d/athletes/\\d+/statistics$`),
 ];
 
 const lastKnownGood = new Map(); // key: rest+query → { body, at }

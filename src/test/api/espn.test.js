@@ -213,3 +213,29 @@ test('other core-API paths off the two player shapes 400 without touching the ne
   expect(res.statusCode).toBe(400);
   expect(fetchSpy).not.toHaveBeenCalled();
 });
+
+// --- the scout, athlete routes (spec §13.20.2, combined-review Medium):
+// a discovered league's PLAYERS fetch bio/stats under that league's core
+// code too — the athlete routes widen to LEAGUE_ANY with the same pinned
+// path shape, or foreign player pages 400 in prod while mocked tests
+// stay green (the exact failure class the teams-route widening fixed). ---
+
+test('the scout: a discovered league slug is allowed through both core athlete routes', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('{"id":"1"}', { status: 200 })));
+  const bio = await call('/api/espn/v2/sports/soccer/leagues/aut.1/seasons/2026/athletes/12345');
+  expect(bio.statusCode).toBe(200);
+  const stats = await call('/api/espn/v2/sports/soccer/leagues/aut.1/seasons/2026/types/1/athletes/12345/statistics');
+  expect(stats.statusCode).toBe(200);
+});
+
+test('the scout: traversal and encoded slashes in the core athlete league slot stay rejected — including via the ?_p= rewrite branch prod actually uses', async () => {
+  const fetchSpy = vi.fn();
+  vi.stubGlobal('fetch', fetchSpy);
+  const dotdot = await call('/api/espn/v2/sports/soccer/leagues/../seasons/2026/athletes/1');
+  expect(dotdot.statusCode).toBe(400);
+  const encoded = await call('/api/espn?_p=/v2/sports/soccer/leagues/aut%2F1/seasons/2026/athletes/1');
+  expect(encoded.statusCode).toBe(400);
+  const encodedDots = await call('/api/espn?_p=/apis/site/v2/sports/soccer/%2e%2e/teams/1');
+  expect(encodedDots.statusCode).toBe(400);
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
