@@ -88,11 +88,15 @@ export default function PlayerScreen() {
   const { compId, playerId } = useParams();
   const location = useLocation();
   const comp = byId(compId);
-  const { bio, stats, isLoading, isError } = usePlayer(comp ?? { id: 'none', source: 'bbc' }, playerId);
+  // Gated on bio alone (hotfix, Aug 2026): a stats-only failure (e.g. the
+  // statistics feed 404ing under a UEFA/cup comp) must never blank the
+  // page — every stat section below already null-renders when stats is
+  // absent, so there is a full page to show as long as bio resolved.
+  const { bio, stats, isLoading } = usePlayer(comp ?? { id: 'none', source: 'bbc' }, playerId);
 
   if (!comp) return <p className="text-muted">Unknown competition.</p>;
   if (isLoading) return <p className="text-muted">Loading player…</p>;
-  if (isError || !bio) return <p className="text-muted">Player unavailable right now.</p>;
+  if (!bio) return <p className="text-muted">Player unavailable right now.</p>;
 
   const club = location.state?.club ?? null;
   const keeper = isKeeper(bio);

@@ -89,10 +89,11 @@ export default function TeamScreen() {
               Squad details aren't published for {comp.name}.
             </p>
           )}
-          {comp?.hasSquads && squad.data && (
+          {comp?.hasSquads && squad.data && squad.data.players.length > 0 && (
             <div>
               {squad.data.players.map(p => (
-                <Link key={p.id} to={`/player/${compId}/${p.id}`} state={{ club: team.name }}
+                <Link key={p.id} to={`/player/${squad.data.resolvedCompId ?? compId}/${p.id}`}
+                  state={{ club: team.name }}
                   className="flex items-baseline gap-3 py-2 border-b border-rule/60">
                   <span className="w-6 font-sans text-[11px] text-muted tabular-nums text-right">
                     {p.shirt ?? '—'}
@@ -102,6 +103,11 @@ export default function TeamScreen() {
                 </Link>
               ))}
             </div>
+          )}
+          {/* Resolved (possibly via the domestic-league fallback, spec hotfix Aug 2026) but
+              still nothing — distinct from the hasSquads:false "not published" line above. */}
+          {comp?.hasSquads && squad.data && squad.data.players.length === 0 && (
+            <p className="font-sans text-[11px] text-muted">Squad details unavailable.</p>
           )}
           {comp?.hasSquads && squad.isLoading && <p className="text-muted">Loading squad…</p>}
           {comp?.hasSquads && squad.isError && <p className="font-sans text-[11px] text-muted">Squad unavailable right now.</p>}
