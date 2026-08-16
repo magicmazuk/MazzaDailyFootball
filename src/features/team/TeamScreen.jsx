@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { COMPETITIONS, byId } from '../../domain/competitions.js';
 import { formGuide } from '../../domain/form.js';
@@ -9,6 +10,7 @@ import Crest from '../../ui/Crest.jsx';
 import FixtureRow from '../../ui/FixtureRow.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
 import CalendarGlyph from '../../ui/CalendarGlyph.jsx';
+import PlayerSheet from '../player/PlayerSheet.jsx';
 import { teamFixtures, phaseReplayGroups } from './teamFixtures.js';
 
 const WATERMARK_OPACITY = 0.10; // the dial — user may want it stronger/weaker
@@ -34,6 +36,13 @@ export default function TeamScreen() {
   const teams = useTeams(comp ?? { id: 'none', source: 'bbc' });
   const seasons = useAllSeasonFixtures(COMPETITIONS);
   const squad = useSquad(comp ?? { id: 'none', hasSquads: false }, teamId);
+  // The peek sheet's open/closed player (sheet-first consistency, Aug 2026):
+  // every squad-row tap opens PlayerSheet, same one-instance-per-screen
+  // pattern as MatchRoom. The sheet needs the resolved comp (home-league
+  // hotfix), not the route comp, so its stats fetch and Full profile link
+  // keep working when the squad resolved under a fallback league.
+  const [sheetPlayerId, setSheetPlayerId] = useState(null);
+  const sheetComp = byId(squad.data?.resolvedCompId) ?? comp;
 
   const allFixtures = seasons.flatMap(r => r.data?.fixtures ?? []);
   const { all, next, last } = teamFixtures(allFixtures, teamId);
@@ -92,15 +101,15 @@ export default function TeamScreen() {
           {comp?.hasSquads && squad.data && squad.data.players.length > 0 && (
             <div>
               {squad.data.players.map(p => (
-                <Link key={p.id} to={`/player/${squad.data.resolvedCompId ?? compId}/${p.id}`}
-                  state={{ club: team.name }}
-                  className="flex items-baseline gap-3 py-2 border-b border-rule/60">
+                <button key={p.id} type="button" onClick={() => setSheetPlayerId(p.id)}
+                  aria-label={`${p.name}`}
+                  className="flex items-baseline gap-3 py-2 border-b border-rule/60 text-left">
                   <span className="w-6 font-sans text-[11px] text-muted tabular-nums text-right">
                     {p.shirt ?? '—'}
                   </span>
                   <span className="flex-1 text-[14.5px] truncate">{p.name}</span>
                   <span className="font-sans text-[10px] uppercase text-muted">{p.position ?? ''}</span>
-                </Link>
+                </button>
               ))}
             </div>
           )}
@@ -133,6 +142,7 @@ export default function TeamScreen() {
             followedIds={followedIds} />)}
         </section>
       </div>
+      <PlayerSheet comp={sheetComp} playerId={sheetPlayerId} onClose={() => setSheetPlayerId(null)} />
     </main>
   );
 }
