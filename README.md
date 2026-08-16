@@ -1,64 +1,74 @@
 # MazzaDailyFootball
 
-A personal, ad-free football app for Scottish and English club football —
-fixtures, results, live scores, tables, squads — in a quality-newspaper
-design language. React learning project.
+A personal, ad-free football paper. All the Scottish leagues, the English Premier League, every
+cup they feed into, and the three European competitions — set like a broadsheet: serif headlines,
+hairline rules, and room to breathe. No ads, no accounts, no tracking, and nothing to pay for.
 
-**Stack:** Vite · React 19 · Tailwind · React Router · TanStack Query ·
-Zustand, deployed on Vercel. Two serverless functions proxy the public
-ESPN and BBC JSON feeds with edge caching. **No API keys, no accounts,
-no cost.**
+Built for one Celtic fan's morning read; shared in case it's yours too.
 
-## Run it
+| The day's paper | The draw, in your hands | The team sheet |
+|---|---|---|
+| ![Today](docs/screenshots/today.png) | ![Draw ceremony](docs/screenshots/draw.png) | ![Team page](docs/screenshots/team.png) |
 
-    npm install
-    npm run dev        # http://localhost:5173 — /api/* works via the dev shim
-    npm run test:run   # full test suite
-    npm run build      # production build
+| The match room | The competition, in a sentence | The player, one tap deep |
+|---|---|---|
+| ![Match room](docs/screenshots/match.png) | ![Competition overview](docs/screenshots/overview.png) | ![Player sheet](docs/screenshots/sheet.png) |
 
-## Deploy
+## What it does
 
-Push to GitHub, import the repo at vercel.com — no environment variables
-needed. `vercel.json` maps `/api/espn/*` to the proxy and everything else
-to the SPA.
+- **Today** — live scores, the day's fixtures and last night's results across every followed
+  competition, your clubs' next matches, what's on TV tonight, and quick league tables.
+- **Draw ceremonies** — when a cup round is drawn, the app doesn't just list it: the clubs go
+  into a bowl and *you* tap the balls out, pairing by pairing. Never autoplayed, never spoiled —
+  the bowl is shuffled so it can't telegraph who's drawn together.
+- **Cup field boards** — who's still in, who's out and when they fell, who enters at which round,
+  each competition's shape written as a line of prose.
+- **Team pages** — last match's XI laid out on a pitch in club-coloured shirts, the rest of the
+  squad hanging on a rail, the club crest watermarking the page.
+- **Match rooms** — lineups in club colours, goals and cards with names, head-to-head history,
+  form, standout players, and contextual YouTube highlights after full time.
+- **Player sheets** — tap any player anywhere and their card slides up in place; swipe up for the
+  full profile, swipe down and you're exactly where you were.
+- **Calendars** — a general fixture calendar plus one per club, and TV badges (Sky, TNT, BBC,
+  Premier Sports…) on every listed broadcast.
 
-## Where things live
+## Running it yourself
 
-- `api/` — the two proxies (allowlist + edge cache + last-known-good)
-- `src/domain/` — competition registry, computed tables, form, monograms
-- `src/data/` — source adapters (ESPN, BBC) and query hooks
-- `src/features/` — one folder per screen
-- `docs/superpowers/specs/` — the design spec this app implements
+You need Node 20+.
 
-Data quirks worth knowing before touching `src/data/`: see spec §3.5
-(the User-Agent trap, "Away at Home", round slugs, error bodies).
+```bash
+git clone https://github.com/magicmazuk/MazzaDailyFootball.git
+cd MazzaDailyFootball
+npm install
+npm run dev        # → http://localhost:5173
+```
 
-## TV listings (curated)
+That's the whole install. The dev server serves the two data proxies locally, so the app is fully
+live-data from the first run.
 
-The "on TV" badges read `src/data/tvListings.json`. When broadcasters
-announce picks, add one object per televised match to `listings`:
+**Optional — YouTube highlights:** create `.env.local` with
+`VITE_YOUTUBE_API_KEY=<your key>` (a free [YouTube Data API v3](https://developers.google.com/youtube/v3/getting-started)
+key). Without it the app simply doesn't show the highlights card. Everything else is keyless.
 
-    { "comp": "sco.1", "date": "2026-08-22", "home": "St Mirren", "tv": ["Sky Sports"] }
+**Deploying:** the repo deploys to [Vercel](https://vercel.com) as-is (`vercel.json` included) —
+import the repo, optionally add `VITE_YOUTUBE_API_KEY` as an environment variable, done. The two
+serverless proxies keep the feeds cached at the edge, so the free tier is plenty.
 
-`comp` is the competition id from `src/domain/competitions.js`; `home` is
-case/punctuation-insensitive; channels are: Sky Sports, TNT Sports, BBC,
-ITV, Amazon Prime, Premier Sports, Premier Player. Commit and push — Vercel redeploys automatically.
+**Making it yours:** Celtic is the permanently followed club (that's the "personal" part —
+change `CELTIC` in `src/store/prefs.js` or just follow your own clubs in the app; favourites are
+prioritised, never exclusive). TV listings are a hand-curated file at
+`src/data/tvListings.json` — broadcast data has no free feed, so it's maintained by hand and the
+app never invents a listing.
 
-## Match video (the one API key)
+```bash
+npm run test:run   # the suite (560+ tests)
+npm run build      # production build
+```
 
-A finished fixture's match room can show a YouTube highlights card — the
-app's only API key, and it's necessarily client-side (browsers can't keep
-a secret from their own network tab). The key is:
+## How it's free
 
-- **Locally:** `VITE_YOUTUBE_API_KEY` in `.env.local` (gitignored — never
-  commit it).
-- **On Vercel:** the same name, `VITE_YOUTUBE_API_KEY`, set as a project
-  environment variable.
-- **Locked down:** in Google Cloud Console, restrict the key's allowed
-  HTTP referrers to `https://mazza-daily-football.vercel.app/*` (plus
-  `http://localhost:5173/*` for local dev if you want the card to work
-  there too) so it's useless if scraped from a page source.
-
-Without a key set, the app behaves exactly as if no highlights exist —
-the video card simply never appears. Nothing else about the app depends
-on this key; every other data source goes through the two proxies above.
+Fixtures, results, tables, squads and player statistics come from publicly accessible ESPN and
+BBC endpoints, fetched through two small serverless proxies with edge caching and a
+last-known-good fallback (the app tells you when it's showing stale data rather than showing
+nothing). This is an unofficial personal project — it isn't affiliated with or endorsed by ESPN,
+the BBC, or any league or club, and the crests belong to their clubs.
