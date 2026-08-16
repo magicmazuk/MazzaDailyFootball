@@ -84,25 +84,16 @@ function MinutesGauge({ minutes, of }) {
   );
 }
 
-export default function PlayerScreen() {
-  const { compId, playerId } = useParams();
-  const location = useLocation();
-  const comp = byId(compId);
-  // Gated on bio alone (hotfix, Aug 2026): a stats-only failure (e.g. the
-  // statistics feed 404ing under a UEFA/cup comp) must never blank the
-  // page — every stat section below already null-renders when stats is
-  // absent, so there is a full page to show as long as bio resolved.
-  const { bio, stats, isLoading } = usePlayer(comp ?? { id: 'none', source: 'bbc' }, playerId);
-
-  if (!comp) return <p className="text-muted">Unknown competition.</p>;
-  if (isLoading) return <p className="text-muted">Loading player…</p>;
-  if (!bio) return <p className="text-muted">Player unavailable right now.</p>;
-
-  const club = location.state?.club ?? null;
+// The full profile body ("The Splits" itself): attacking/keeper stat
+// blocks, discipline, rating and minutes gauges — everything below
+// PlayerScreen's page-level header (kicker/name/bio line, which stays
+// page-only). Extracted (spec §13.18.3) so PlayerSheet can render the
+// exact same content inline when it expands, rather than navigating away
+// from the match/team context. comp is accepted for symmetry with the
+// sheet's usePlayer(comp, playerId) call site; the splits themselves are
+// driven entirely by bio/stats.
+export function Splits({ bio, stats }) {
   const keeper = isKeeper(bio);
-
-  const bioParts = [club, bio.nationality, bio.age, bio.heightDisplay,
-    stats?.appearances != null ? `${stats.appearances} games` : null].filter(Boolean);
 
   const showShots = stats?.totalShots != null;
   const shotsOn = stats?.shotsOnTarget ?? 0;
@@ -131,18 +122,7 @@ export default function PlayerScreen() {
   const showMinutes = stats?.minutes != null && stats?.appearances != null && stats.appearances > 0;
 
   return (
-    <main>
-      <p className="font-sans text-[10px] uppercase tracking-[.22em] text-muted">
-        {comp.name}{bio.position && ` · ${bio.position}`}
-      </p>
-      <div className="flex items-baseline gap-3 mt-3">
-        <h1 className="text-[26px]">{bio.name}</h1>
-        {bio.shirt != null && <span className="font-sans text-[12px] text-muted">№ {bio.shirt}</span>}
-      </div>
-      {bioParts.length > 0 && (
-        <p className="font-sans text-[11px] text-muted mt-1 mb-6">{bioParts.join(' · ')}</p>
-      )}
-
+    <>
       {showAttacking && (
         <section className="mb-8">
           <SectionLabel>Attacking</SectionLabel>
@@ -181,6 +161,43 @@ export default function PlayerScreen() {
 
       {showRating && <RatingGauge rating={stats.rating} />}
       {showMinutes && <MinutesGauge minutes={stats.minutes} of={stats.appearances * 90} />}
+    </>
+  );
+}
+
+export default function PlayerScreen() {
+  const { compId, playerId } = useParams();
+  const location = useLocation();
+  const comp = byId(compId);
+  // Gated on bio alone (hotfix, Aug 2026): a stats-only failure (e.g. the
+  // statistics feed 404ing under a UEFA/cup comp) must never blank the
+  // page — every stat section below already null-renders when stats is
+  // absent, so there is a full page to show as long as bio resolved.
+  const { bio, stats, isLoading } = usePlayer(comp ?? { id: 'none', source: 'bbc' }, playerId);
+
+  if (!comp) return <p className="text-muted">Unknown competition.</p>;
+  if (isLoading) return <p className="text-muted">Loading player…</p>;
+  if (!bio) return <p className="text-muted">Player unavailable right now.</p>;
+
+  const club = location.state?.club ?? null;
+
+  const bioParts = [club, bio.nationality, bio.age, bio.heightDisplay,
+    stats?.appearances != null ? `${stats.appearances} games` : null].filter(Boolean);
+
+  return (
+    <main>
+      <p className="font-sans text-[10px] uppercase tracking-[.22em] text-muted">
+        {comp.name}{bio.position && ` · ${bio.position}`}
+      </p>
+      <div className="flex items-baseline gap-3 mt-3">
+        <h1 className="text-[26px]">{bio.name}</h1>
+        {bio.shirt != null && <span className="font-sans text-[12px] text-muted">№ {bio.shirt}</span>}
+      </div>
+      {bioParts.length > 0 && (
+        <p className="font-sans text-[11px] text-muted mt-1 mb-6">{bioParts.join(' · ')}</p>
+      )}
+
+      <Splits bio={bio} stats={stats} comp={comp} />
     </main>
   );
 }

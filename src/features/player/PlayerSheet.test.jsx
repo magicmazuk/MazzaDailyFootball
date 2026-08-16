@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { expect, test, vi } from 'vitest';
@@ -22,6 +22,13 @@ const outfieldStats = {
 };
 
 const comp = byId('sco.1');
+
+// A sheet container query shared by the touch tests below — the outer
+// fixed div carries the translate-y-* class in both states, and nothing
+// else in the tree does.
+function sheetEl(container) {
+  return container.querySelector('[class*="translate-y"]');
+}
 
 test('a null playerId keeps the sheet closed and off-screen', () => {
   usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: false, isError: false });
@@ -88,13 +95,6 @@ test('the backdrop dismiss button closes on tap', async () => {
   expect(onClose).toHaveBeenCalled();
 });
 
-test('"Full profile →" links to the player route', () => {
-  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
-  render(<MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>);
-  const link = screen.getByRole('link', { name: /Full profile/ });
-  expect(link).toHaveAttribute('href', '/player/sco.1/272624');
-});
-
 test('no portrait/roundel/mark visual anywhere in the sheet', () => {
   usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
   const { container } = render(
@@ -102,4 +102,143 @@ test('no portrait/roundel/mark visual anywhere in the sheet', () => {
   );
   expect(container.querySelectorAll('[class*="mark"], [class*="roundel"], [class*="portrait"], [class*="avatar"]'))
     .toHaveLength(0);
+});
+
+// --- the sheet opens all the way (spec §13.18.3) ---
+
+test('the handle button expands the sheet, revealing the full Splits content', async () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  render(<MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>);
+  expect(screen.queryByText('Attacking')).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
+  expect(screen.getByText('Attacking')).toBeInTheDocument();
+  expect(screen.getByText('13 shots — 5 on target')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Collapse' })).toBeInTheDocument();
+});
+
+test('clicking the handle again collapses back to the peek — Splits gone, headline numbers still there', async () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  render(<MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>);
+  await userEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
+  expect(screen.getByText('Attacking')).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Collapse' }));
+  expect(screen.queryByText('Attacking')).not.toBeInTheDocument();
+  expect(screen.getByText('Goals')).toBeInTheDocument();
+  expect(screen.getByText('3')).toBeInTheDocument();
+});
+
+test('an upward swipe of 40px+ on the sheet expands it from the peek', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
+  const el = sheetEl(container);
+  fireEvent.touchStart(el, { touches: [{ clientX: 10, clientY: 500 }] });
+  fireEvent.touchEnd(el, { changedTouches: [{ clientX: 10, clientY: 380 }] });
+  expect(screen.getByText('Attacking')).toBeInTheDocument();
+});
+
+test('a downward swipe of 40px+ while expanded and scrolled to top collapses back to the peek', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const onClose = vi.fn();
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={onClose} /></MemoryRouter>,
+  );
+  const el = sheetEl(container);
+  fireEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
+  expect(screen.getByText('Attacking')).toBeInTheDocument();
+
+  fireEvent.touchStart(el, { touches: [{ clientX: 10, clientY: 200 }] });
+  fireEvent.touchEnd(el, { changedTouches: [{ clientX: 10, clientY: 340 }] });
+  expect(screen.queryByText('Attacking')).not.toBeInTheDocument();
+  expect(onClose).not.toHaveBeenCalled();
+});
+
+test('the same downward swipe while already collapsed calls onClose instead', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const onClose = vi.fn();
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={onClose} /></MemoryRouter>,
+  );
+  const el = sheetEl(container);
+  fireEvent.touchStart(el, { touches: [{ clientX: 10, clientY: 200 }] });
+  fireEvent.touchEnd(el, { changedTouches: [{ clientX: 10, clientY: 340 }] });
+  expect(onClose).toHaveBeenCalled();
+});
+
+test('a downward swipe while expanded but scrolled away from top is a scroll, not a collapse', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const onClose = vi.fn();
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={onClose} /></MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
+  const scrollArea = container.querySelector('[class*="overflow-y-auto"]');
+  Object.defineProperty(scrollArea, 'scrollTop', { value: 50, configurable: true });
+
+  const el = sheetEl(container);
+  fireEvent.touchStart(el, { touches: [{ clientX: 10, clientY: 200 }] });
+  fireEvent.touchEnd(el, { changedTouches: [{ clientX: 10, clientY: 340 }] });
+  expect(screen.getByText('Attacking')).toBeInTheDocument();
+  expect(onClose).not.toHaveBeenCalled();
+});
+
+test('a horizontal-dominant swipe on the sheet is ignored', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const onClose = vi.fn();
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={onClose} /></MemoryRouter>,
+  );
+  const el = sheetEl(container);
+  fireEvent.touchStart(el, { touches: [{ clientX: 10, clientY: 400 }] });
+  fireEvent.touchEnd(el, { changedTouches: [{ clientX: 200, clientY: 360 }] });
+  expect(screen.queryByText('Attacking')).not.toBeInTheDocument();
+  expect(onClose).not.toHaveBeenCalled();
+});
+
+test('tapping "Full profile →" expands the sheet without navigating', async () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  render(<MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>);
+  expect(screen.queryByRole('link', { name: /Full profile/ })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: /Full profile/ }));
+  expect(screen.getByText('Attacking')).toBeInTheDocument();
+});
+
+test('"Open as page →" renders as a Link with the player route href once expanded, and closes on click', async () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const onClose = vi.fn();
+  render(<MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={onClose} /></MemoryRouter>);
+  expect(screen.queryByRole('link', { name: /Open as page/ })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
+  const link = screen.getByRole('link', { name: /Open as page/ });
+  expect(link).toHaveAttribute('href', '/player/sco.1/272624');
+  await userEvent.click(link);
+  expect(onClose).toHaveBeenCalled();
+});
+
+test('open with no bio while the query is still fetching shows a muted "Loading player…" line', () => {
+  usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: true, isError: false });
+  render(<MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>);
+  expect(screen.getByText('Loading player…')).toBeInTheDocument();
+});
+
+test('usePlayer isError shows "Player information unavailable."', () => {
+  usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: false, isError: true });
+  render(<MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>);
+  expect(screen.getByText('Player information unavailable.')).toBeInTheDocument();
+});
+
+test('changing playerId resets expanded back to the peek', async () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const { rerender } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
+  expect(screen.getByText('Attacking')).toBeInTheDocument();
+
+  const otherBio = { ...outfieldBio, id: '999', name: 'Someone Else' };
+  usePlayer.mockReturnValue({ bio: otherBio, stats: outfieldStats, isLoading: false, isError: false });
+  rerender(<MemoryRouter><PlayerSheet comp={comp} playerId="999" onClose={() => {}} /></MemoryRouter>);
+  expect(screen.queryByText('Attacking')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Expand profile' })).toBeInTheDocument();
 });

@@ -4,7 +4,7 @@ import { expect, test, vi } from 'vitest';
 
 vi.mock('../../data/queries.js', () => ({ usePlayer: vi.fn() }));
 
-import PlayerScreen from './PlayerScreen.jsx';
+import PlayerScreen, { Splits } from './PlayerScreen.jsx';
 import { usePlayer } from '../../data/queries.js';
 
 const outfieldBio = {
@@ -172,4 +172,22 @@ test('a null bio shows the unavailable line even when isError is false — gated
   usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: false, isError: false });
   renderAt('sco.1', '272624');
   expect(screen.getByText('Player unavailable right now.')).toBeInTheDocument();
+});
+
+// --- extracted Splits (spec §13.18.3): PlayerSheet reuses this exact body
+// when it expands, so it has to work standalone, given bio/stats/comp
+// directly rather than via usePlayer + route params. ---
+
+test('the exported Splits component renders the same attacking section standalone, outside PlayerScreen', () => {
+  render(<Splits bio={outfieldBio} stats={outfieldStats} comp={{ id: 'sco.1', name: 'Scottish Premiership' }} />);
+  expect(screen.getByText('Attacking')).toBeInTheDocument();
+  expect(screen.getByText('13 shots — 5 on target')).toBeInTheDocument();
+  expect(screen.getByText('38 attempted — 60.5%')).toBeInTheDocument();
+});
+
+test('the exported Splits component renders the keeper section standalone', () => {
+  render(<Splits bio={keeperBio} stats={keeperStats} comp={{ id: 'sco.1', name: 'Scottish Premiership' }} />);
+  expect(screen.getByText('Saves')).toBeInTheDocument();
+  expect(screen.getByText('Rating')).toBeInTheDocument();
+  expect(screen.getByText('6.8')).toBeInTheDocument();
 });
