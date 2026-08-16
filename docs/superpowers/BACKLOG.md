@@ -77,3 +77,12 @@ None block usage; candidates for a future 1.2 pass.
 - /draw/{comp}/{knockout-round}/{teamId} is reachable by hand-typed URL (renders coherently;
   nothing links to it) — tighten if URL hygiene ever matters.
 - Invitation card copy adds comp name vs spec's terser line (accepted as improvement).
+
+## From the 2.6 review (2026-08-16)
+
+- Table movement and player ratings are built but dormant — ESPN currently zeroes rankChange
+  and avgRatingFromDataFeed everywhere; sign convention (rankChange>0 = up) is an assumption,
+  one-line flip if it ever reads inverted live.
+- SplitBlock doesn't clamp pass-pct (safe on today's 0-1 fractions; would break on a 0-100 feed).
+- Sheet opens as an empty shell on a cold fetch (jumps to content when the query resolves).
+- Height renders ESPN's raw quotes (6' 1") vs the mockup's primes; discipline row left-packed.
