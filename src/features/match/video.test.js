@@ -2,7 +2,9 @@ import { createElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
-import { buildVideoQuery, searchVideos, useMatchVideos, youtubeKey } from './video.js';
+import {
+  buildTeamVideoQuery, buildVideoQuery, searchVideos, useMatchVideos, useTeamVideos, youtubeKey,
+} from './video.js';
 
 // No JSX in this file (it's plain .js, per the brief's file list) — the
 // QueryClientProvider wrapper is built with createElement instead.
@@ -108,4 +110,62 @@ test('useMatchVideos fetches and resolves videos for a finished fixture with a k
   const { result } = renderHook(() => useMatchVideos(ftFixture), { wrapper });
 
   await waitFor(() => expect(result.current.data).toEqual([{ videoId: 'v1', title: 'Highlights' }]));
+});
+
+test('the match-video request never carries order=date — that param is additive-only for the team query', async () => {
+  import.meta.env.VITE_YOUTUBE_API_KEY = 'stub-key-for-test';
+  const fetchSpy = vi.fn(async () => new Response('{"items":[]}', { status: 200 }));
+  vi.stubGlobal('fetch', fetchSpy);
+
+  const { result } = renderHook(() => useMatchVideos(ftFixture), { wrapper });
+
+  await waitFor(() => expect(result.current.data).toEqual([]));
+  expect(fetchSpy.mock.calls[0][0]).not.toContain('order=');
+});
+
+// --- the scout film (spec §13.20.3): useTeamVideos extends the same seam
+// for a discovered foreign opponent's club highlights — LAZY by design, so
+// `enabled` is entirely caller-controlled (the card flips it true only once
+// tapped) rather than derived from fixture status the way useMatchVideos is. ---
+
+test('buildTeamVideoQuery quotes the club name and appends "highlights", no date', () => {
+  expect(buildTeamVideoQuery({ id: '4411', name: 'Sturm Graz' })).toBe('"Sturm Graz" highlights');
+});
+
+const scoutTeam = { id: '4411', name: 'Sturm Graz' };
+
+test('useTeamVideos never fetches while enabled is false, even with a key set', async () => {
+  import.meta.env.VITE_YOUTUBE_API_KEY = 'stub-key-for-test';
+  const fetchSpy = vi.fn(async () => new Response('{}', { status: 200 }));
+  vi.stubGlobal('fetch', fetchSpy);
+
+  const { result } = renderHook(() => useTeamVideos(scoutTeam, false), { wrapper });
+
+  expect(result.current.fetchStatus).toBe('idle');
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
+
+test('useTeamVideos never fetches when enabled is true but no key is set', async () => {
+  delete import.meta.env.VITE_YOUTUBE_API_KEY;
+  const fetchSpy = vi.fn(async () => new Response('{}', { status: 200 }));
+  vi.stubGlobal('fetch', fetchSpy);
+
+  const { result } = renderHook(() => useTeamVideos(scoutTeam, true), { wrapper });
+
+  expect(result.current.fetchStatus).toBe('idle');
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
+
+test('useTeamVideos fetches and resolves videos when enabled and a key is set, ordered by date', async () => {
+  import.meta.env.VITE_YOUTUBE_API_KEY = 'stub-key-for-test';
+  const payload = { items: [{ id: { videoId: 'v1' }, snippet: { title: 'Sturm Graz highlights' } }] };
+  const fetchSpy = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
+  vi.stubGlobal('fetch', fetchSpy);
+
+  const { result } = renderHook(() => useTeamVideos(scoutTeam, true), { wrapper });
+
+  await waitFor(() => expect(result.current.data).toEqual([{ videoId: 'v1', title: 'Sturm Graz highlights' }]));
+  const requestedUrl = fetchSpy.mock.calls[0][0];
+  expect(requestedUrl).toContain(`q=${encodeURIComponent('"Sturm Graz" highlights')}`);
+  expect(requestedUrl).toContain('order=date');
 });

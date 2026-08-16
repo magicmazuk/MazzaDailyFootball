@@ -25,8 +25,17 @@ vi.mock('../../data/queries.js', () => ({
   useMatchDetail: vi.fn(() => ({ isLoading: false, isError: false, data: undefined })),
 }));
 
+// The scout film (spec §13.20.3): video.js's own hook + key accessor, mocked
+// the same way as everything above — no QueryClientProvider needed, and
+// each test controls whether a key is "present" and what the hook returns.
+vi.mock('../match/video.js', () => ({
+  useTeamVideos: vi.fn(() => ({ isLoading: false, isError: false, data: undefined })),
+  youtubeKey: vi.fn(() => null),
+}));
+
 import TeamScreen, { matchStarters } from './TeamScreen.jsx';
 import { useTeams, useAllSeasonFixtures, useSquad, usePlayer, useMatchDetail } from '../../data/queries.js';
+import { useTeamVideos, youtubeKey } from '../match/video.js';
 
 // Every shirt button's accessible name is "<number> · <name>" (task 3
 // review — the number was aria-hidden before, so it never reached the a11y
@@ -46,6 +55,8 @@ beforeEach(() => {
   useAllSeasonFixtures.mockImplementation(() => []);
   usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: false, isError: false });
   useMatchDetail.mockImplementation(() => ({ isLoading: false, isError: false, data: undefined }));
+  useTeamVideos.mockImplementation(() => ({ isLoading: false, isError: false, data: undefined }));
+  youtubeKey.mockReturnValue(null);
 });
 
 // Feeds every one of the 13 registry comps a fixture list (default empty)
@@ -327,6 +338,126 @@ test('a discovered foreign squad shirt opens the sheet with a synthetic comp des
 
   await userEvent.click(screen.getByRole('button', { name: 'Full profile →' }));
   expect(screen.getByRole('link', { name: 'Open as page →' })).toHaveAttribute('href', '/player/aut.1/p1');
+});
+
+// --- the scout film (spec §13.20.3): a LAZY YouTube card, rendered only
+// for a discovered foreign opponent with a key present. Collapsed fetches
+// nothing (useTeamVideos is wired with enabled=false until tapped); tapping
+// flips enabled true and the card settles on fetching/found/not-found. ---
+
+function discoveredSquad(over = {}) {
+  return {
+    players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
+    resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
+    record: { played: 3, wins: 3, draws: 0, losses: 0, points: 9 },
+    ...over,
+  };
+}
+
+function stubDiscoveredSturmGraz(over = {}) {
+  const opponent = side('4411', 'Sturm Graz');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', opponent, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({ isLoading: false, isError: false, data: discoveredSquad(over) }));
+}
+
+test('missing youtubeKey(): the scout film card does not render at all', () => {
+  stubDiscoveredSturmGraz();
+  youtubeKey.mockReturnValue(null);
+
+  renderAt('uefa.champions', '4411');
+
+  expect(screen.queryByText('The scout film')).not.toBeInTheDocument();
+  expect(useTeamVideos).not.toHaveBeenCalled();
+});
+
+test('a domestic (non-discovered) team page never renders the scout film, even with a key present', () => {
+  const celtic = side('256', 'Celtic');
+  stubSeasons({
+    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: { players: [{ id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' }], resolvedCompId: 'sco.1' },
+  }));
+  youtubeKey.mockReturnValue('test-key');
+
+  renderAt('sco.1', '256');
+
+  expect(screen.queryByText('The scout film')).not.toBeInTheDocument();
+});
+
+test('collapsed scout film: a quiet tappable card, and the hook is wired with enabled false — nothing fetched', () => {
+  stubDiscoveredSturmGraz();
+  youtubeKey.mockReturnValue('test-key');
+
+  renderAt('uefa.champions', '4411');
+
+  expect(screen.getByText('The scout film')).toBeInTheDocument();
+  const card = screen.getByRole('button', { name: /Watch Sturm Graz — recent highlights/ });
+  expect(card).toBeInTheDocument();
+  expect(useTeamVideos).toHaveBeenCalledWith({ id: '4411', name: 'Sturm Graz' }, false);
+});
+
+test('tapping the scout film flips the hook to enabled and shows the fetching line while pending', async () => {
+  stubDiscoveredSturmGraz();
+  youtubeKey.mockReturnValue('test-key');
+  useTeamVideos.mockImplementation((team, enabled) => ({
+    isLoading: enabled, isError: false, data: undefined,
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  await userEvent.click(screen.getByRole('button', { name: /Watch Sturm Graz — recent highlights/ }));
+
+  expect(useTeamVideos).toHaveBeenLastCalledWith({ id: '4411', name: 'Sturm Graz' }, true);
+  expect(screen.getByText('Fetching the film…')).toBeInTheDocument();
+});
+
+test('tapping the scout film, on results, renders VideoCard with the fetched videos', async () => {
+  stubDiscoveredSturmGraz();
+  youtubeKey.mockReturnValue('test-key');
+  useTeamVideos.mockImplementation((team, enabled) => ({
+    isLoading: false, isError: false,
+    data: enabled ? [{ videoId: 'v1', title: 'Sturm Graz recent highlights reel' }] : undefined,
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  await userEvent.click(screen.getByRole('button', { name: /Watch Sturm Graz — recent highlights/ }));
+
+  expect(screen.getByText('Sturm Graz recent highlights reel')).toBeInTheDocument();
+});
+
+test('tapping the scout film on a failed search shows "No film found."', async () => {
+  stubDiscoveredSturmGraz();
+  youtubeKey.mockReturnValue('test-key');
+  useTeamVideos.mockImplementation((team, enabled) => ({
+    isLoading: false, isError: enabled, data: undefined,
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  await userEvent.click(screen.getByRole('button', { name: /Watch Sturm Graz — recent highlights/ }));
+
+  expect(screen.getByText('No film found.')).toBeInTheDocument();
+});
+
+test('tapping the scout film on an empty result set shows "No film found."', async () => {
+  stubDiscoveredSturmGraz();
+  youtubeKey.mockReturnValue('test-key');
+  useTeamVideos.mockImplementation((team, enabled) => ({
+    isLoading: false, isError: false, data: enabled ? [] : undefined,
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  await userEvent.click(screen.getByRole('button', { name: /Watch Sturm Graz — recent highlights/ }));
+
+  expect(screen.getByText('No film found.')).toBeInTheDocument();
 });
 
 test('an empty squad (resolved through every fallback, still zero players) shows the distinct unavailable line', () => {

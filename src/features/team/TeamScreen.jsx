@@ -13,6 +13,8 @@ import CalendarGlyph from '../../ui/CalendarGlyph.jsx';
 import PlayerSheet from '../player/PlayerSheet.jsx';
 import SquadBoard from './SquadBoard.jsx';
 import { teamFixtures, phaseReplayGroups } from './teamFixtures.js';
+import VideoCard from '../match/VideoCard.jsx';
+import { useTeamVideos, youtubeKey } from '../match/video.js';
 
 const WATERMARK_OPACITY = 0.10; // the dial — user may want it stronger/weaker
 const roundLabelFor = round => prettifyRound(round) ?? fallbackRoundLabel(round) ?? round;
@@ -57,6 +59,43 @@ function scoutLine(squadData) {
     return `Won ${record.wins} of ${record.played} in the ${resolvedLeagueName} this season · ${record.points} points`;
   }
   return `They play in the ${resolvedLeagueName}.`;
+}
+
+// The scout film (spec §13.20.3): a LAZY YouTube card, rendered only for a
+// discovered foreign opponent with a key available (see the gate at the
+// call site) — zero quota until tapped. Collapsed is a quiet tappable card
+// in the LeagueTable-Drawer furniture style (same row-button treatment as
+// LeagueTable's/FixtureRow's own toggles); tapping flips `tapped`, which is
+// the only thing that turns useTeamVideos's `enabled` true, so nothing is
+// fetched before that. No toggle back to collapsed — once tapped, the card
+// settles on fetching/found/not-found, same one-way shape as a fixture
+// drawer never re-collapsing its own fetch.
+function ScoutFilm({ team }) {
+  const [tapped, setTapped] = useState(false);
+  const { data, isLoading, isError } = useTeamVideos(team, tapped);
+  if (!tapped) {
+    return (
+      <button type="button" onClick={() => setTapped(true)}
+        className="w-full text-left block py-3 mb-8 border-b border-rule/70">
+        <p className="font-sans text-[10px] uppercase tracking-[.14em] text-muted mb-1">
+          The scout film
+        </p>
+        <p className="font-serif text-[14.5px]">
+          Watch {team.name} — recent highlights →
+        </p>
+      </button>
+    );
+  }
+  if (isLoading) {
+    return <p className="font-sans text-[11px] text-muted mb-8">Fetching the film…</p>;
+  }
+  const videos = data ?? [];
+  // Design law: degraded says so, never blank — a failed search and a
+  // genuinely empty result set read the same to the user either way.
+  if (isError || videos.length === 0) {
+    return <p className="font-sans text-[11px] text-muted mb-8">No film found.</p>;
+  }
+  return <VideoCard videos={videos} />;
 }
 
 function FollowButton({ team }) {
@@ -179,6 +218,9 @@ export default function TeamScreen() {
           <p className="font-serif text-[14.5px] max-w-[60ch] text-ink/70 mb-4">
             {scoutLine(squad.data)}
           </p>
+        )}
+        {squad.data?.discovered && youtubeKey() && (
+          <ScoutFilm team={{ id: teamId, name: team.name }} />
         )}
         <section className="mb-8">
           <SectionLabel muted>Squad</SectionLabel>
