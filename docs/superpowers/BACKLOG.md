@@ -86,3 +86,11 @@ None block usage; candidates for a future 1.2 pass.
 - SplitBlock doesn't clamp pass-pct (safe on today's 0-1 fractions; would break on a 0-100 feed).
 - Sheet opens as an empty shell on a cold fetch (jumps to content when the query resolves).
 - Height renders ESPN's raw quotes (6' 1") vs the mockup's primes; discipline row left-packed.
+
+## From the home-league hotfix review (2026-08-16)
+
+- Fast-follow: useSquad's per-leg catch swallows real fetch errors identically to
+  legit-empty rosters — a full outage caches 'Squad details unavailable.' as fresh for 24h
+  (session-scoped). Distinguish clean-200-empty from errors; let the last leg's error throw.
+- Squad fallback list is deliberately Scotland/England only — foreign UEFA opponents still
+  have no squads (pre-existing; needs per-club domestic-league discovery to generalise).
