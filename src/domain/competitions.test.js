@@ -44,24 +44,24 @@ test('the League Cup declares its BBC fallback tournament', () => {
   expect(byId('sco.cis').bbcTournament).toBe('scottish-league-cup');
 });
 
-test('every cup has a non-empty structure strip; leagues have none', () => {
+test('every cup has a non-empty blurb; leagues have none', () => {
   const cups = COMPETITIONS.filter(c => c.type === 'cup');
   const leagues = COMPETITIONS.filter(c => c.type === 'league');
   expect(cups).toHaveLength(8);
   expect(leagues).toHaveLength(5);
   for (const c of cups) {
-    expect(Array.isArray(c.structure)).toBe(true);
-    expect(c.structure.length).toBeGreaterThan(0);
+    expect(typeof c.blurb).toBe('string');
+    expect(c.blurb.length).toBeGreaterThan(0);
   }
   for (const l of leagues) {
-    expect(l.structure).toBeUndefined();
+    expect(l.blurb).toBeUndefined();
   }
 });
 
-test('the three UEFA club competitions share the same structure strip', () => {
-  expect(byId('uefa.champions').structure).toEqual(byId('uefa.europa').structure);
-  expect(byId('uefa.europa').structure).toEqual(byId('uefa.europa.conf').structure);
-  expect(byId('uefa.champions').structure[0]).toEqual({ n: 36, label: 'league phase' });
+test('the three UEFA club competitions share the same blurb', () => {
+  expect(byId('uefa.champions').blurb).toEqual(byId('uefa.europa').blurb);
+  expect(byId('uefa.europa').blurb).toEqual(byId('uefa.europa.conf').blurb);
+  expect(byId('uefa.champions').blurb).toMatch(/^Thirty-six clubs, one league phase\./);
 });
 
 test('the three UEFA club competitions declare their ESPN qualifying-rounds code (spec §13.11)', () => {

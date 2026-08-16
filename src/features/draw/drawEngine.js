@@ -170,3 +170,73 @@ export function seededShuffle(items, seedString) {
   }
   return result;
 }
+
+// A club's identity for pair/adjacency bookkeeping below — teamId when
+// present, else its name. Not exported: purely an implementation detail of
+// scatterShuffle's own adjacency check, distinct from any status-key
+// concern a caller might have.
+const shuffleClubKey = club => club.teamId ?? club.name;
+
+// The unordered pair-identity of every tie's two clubs, as a Set of
+// sorted "a|b" strings — what scatterShuffle checks display order against.
+function tiePairKeys(ties) {
+  const keys = new Set();
+  for (const t of ties ?? []) {
+    if (t?.home && t?.away) {
+      keys.add([shuffleClubKey(t.home), shuffleClubKey(t.away)].sort().join('|'));
+    }
+  }
+  return keys;
+}
+
+// True if any two CONSECUTIVE items in `clubs` are a tie's two clubs — the
+// exact shape of the telegraph bug (a drawn tie's pairing readable from
+// neighbouring rows before it's drawn).
+function hasAdjacentPair(clubs, pairKeys) {
+  for (let i = 0; i < clubs.length - 1; i += 1) {
+    const key = [shuffleClubKey(clubs[i]), shuffleClubKey(clubs[i + 1])].sort().join('|');
+    if (pairKeys.has(key)) return true;
+  }
+  return false;
+}
+
+// Re-salt cap for scatterShuffle below — enough attempts that any
+// realistic round (the bowl/rollcall threshold starts at 17+ clubs) finds
+// a zero-adjacency arrangement quickly, while still bounding the loop for
+// small/pathological inputs where no such arrangement exists at all (e.g.
+// a round with only one tie: its two clubs are the entire list, so they're
+// unavoidably neighbours in ANY order).
+const SCATTER_ATTEMPTS = 20;
+
+// seededShuffle, but re-salted (deterministically) until no tie's two
+// clubs sit CONSECUTIVELY in the result — the roll-call list's anti-
+// telegraph guarantee (fix: a plain seededShuffle still coincidentally
+// seats a tie's pair next to each other often enough, in ~65% of
+// realistic seeds, to read as the same "pairings visible before the draw"
+// bug the shuffle was meant to fix).
+//
+// "Consecutive in the array" is deliberately stricter than what's visually
+// adjacent in the roll call's columns-2 layout — a pair split across the
+// column break (bottom of column 1, top of column 2) reads fine on
+// screen, so treating it as a violation is a harmless false positive, not
+// an under-check.
+//
+// Determinism preserved: each re-salted attempt derives its seed from
+// `seedString` plus the attempt number, so (clubs, ties, seedString)
+// always retries the exact same sequence of candidates in the exact same
+// order. Capped at SCATTER_ATTEMPTS re-salts; if none clears every
+// adjacency (a tiny round may admit no valid arrangement at all — see
+// SCATTER_ATTEMPTS above), falls back to the plain (unsalted) shuffle
+// rather than looping forever hunting for an arrangement that may not
+// exist.
+export function scatterShuffle(clubs, ties, seedString) {
+  const pairKeys = tiePairKeys(ties);
+  const plain = seededShuffle(clubs, seedString);
+  if (!hasAdjacentPair(plain, pairKeys)) return plain;
+
+  for (let attempt = 1; attempt <= SCATTER_ATTEMPTS; attempt += 1) {
+    const candidate = seededShuffle(clubs, `${seedString}#${attempt}`);
+    if (!hasAdjacentPair(candidate, pairKeys)) return candidate;
+  }
+  return plain;
+}

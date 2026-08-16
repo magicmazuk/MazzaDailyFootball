@@ -119,6 +119,20 @@ test('the Next up row omits the competition text for an unknown competition id, 
   expect(screen.getByRole('button', { name: 'Celtic calendar' })).toBeInTheDocument();
 });
 
+test('the Next up row displays opponent name and context line as separate elements', () => {
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-22T15:00:00Z')} followedIds={new Set()}
+        partition={emptyPartition} nextUp={[nextUpEntry]} />
+    </MemoryRouter>,
+  );
+  // Opponent name should be on its own element (does not contain kickoff time)
+  const opponentElement = screen.getByText(/^v Aberdeen/);
+  expect(opponentElement.textContent).not.toMatch(/\d{1,2}:\d{2}/);
+  // Context line should contain the kickoff time
+  expect(screen.getByText(/\d{1,2}:\d{2}/)).toBeInTheDocument();
+});
+
 // --- draw invitations (spec §8.2, §13.14) ---
 
 const draw = (id, round) => ({

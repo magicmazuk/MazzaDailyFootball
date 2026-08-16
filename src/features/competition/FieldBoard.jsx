@@ -4,11 +4,28 @@
 // the round they fell in, most recent first). No fetching here.
 import { Link } from 'react-router-dom';
 import Crest from '../../ui/Crest.jsx';
-import SectionLabel from '../../ui/SectionLabel.jsx';
 import { survivalState, entryTiers, fallbackRoundLabel } from '../../domain/field.js';
 import { prettifyRound } from '../../domain/round.js';
 
 const roundLabel = round => prettifyRound(round) ?? fallbackRoundLabel(round);
+
+// The gate rules (spec §13.17): the two field-board section headers carry
+// their counts as right-aligned serif numerals on the same hairline,
+// rather than folding the count into the heading text itself. Local to
+// FieldBoard — SectionLabel (src/ui/SectionLabel.jsx) stays untouched
+// since eight other screens share it.
+function GateRule({ children, count, muted = false }) {
+  return (
+    <div className={`flex items-baseline justify-between pb-2 mb-4 border-b ${
+      muted ? 'border-rule' : 'border-ink'}`}>
+      <h2 className={`font-sans text-[10px] font-semibold uppercase tracking-[.2em] ${
+        muted ? 'text-muted' : 'text-accent'}`}>
+        {children}
+      </h2>
+      <span className="font-serif text-[15px] tabular-nums leading-none">{count}</span>
+    </div>
+  );
+}
 
 // 2-line name clamp — no Tailwind line-clamp plugin is installed here, so
 // this is the plain CSS box-clamp technique applied inline.
@@ -55,7 +72,7 @@ export default function FieldBoard({ fixtures, comp, followedIds }) {
   // A club whose first appearance happened to be an unrounded fixture but
   // who is still `in` would otherwise never be drawn anywhere — collect
   // any survivor absent from every tier and give it its own untiered grid
-  // so the crest count always matches the "Still in — N" total.
+  // so the crest count always matches the Still in numeral.
   const tieredTeamIds = new Set(inTierGroups.flatMap(t => t.clubs.map(c => c.teamId)));
   const untieredClubs = inClubs.filter(c => !tieredTeamIds.has(c.teamId));
   const outCount = out.reduce((n, g) => n + g.clubs.length, 0);
@@ -76,7 +93,7 @@ export default function FieldBoard({ fixtures, comp, followedIds }) {
 
       {inClubs.length > 0 && (
         <section className="mb-8">
-          <SectionLabel>Still in — {inClubs.length}</SectionLabel>
+          <GateRule count={inClubs.length}>Still in</GateRule>
           {multiTier
             ? (
               <>
@@ -104,7 +121,7 @@ export default function FieldBoard({ fixtures, comp, followedIds }) {
 
       {out.length > 0 && (
         <section>
-          <SectionLabel muted>Out — {outCount}</SectionLabel>
+          <GateRule muted count={outCount}>Out</GateRule>
           {[...out].reverse().map(g => (
             <div key={g.round} className="mb-5 last:mb-0">
               <p className="font-sans text-[9px] uppercase tracking-[.14em] text-muted mb-3">

@@ -9,7 +9,6 @@ import { useSeasonFixtures, useTable } from '../../data/queries.js';
 import { usePrefs } from '../../store/prefs.js';
 import FixtureRow from '../../ui/FixtureRow.jsx';
 import LeagueTable from './LeagueTable.jsx';
-import StructureStrip from './StructureStrip.jsx';
 import FieldBoard from './FieldBoard.jsx';
 import { groupFixturesByRound } from './roundGroups.js';
 
@@ -132,7 +131,11 @@ export default function CompetitionScreen() {
       </div>
       {active === 'Overview' && (
         <>
-          <StructureStrip structure={comp.structure} />
+          {comp.blurb && (
+            <p className="font-serif text-[15.5px] leading-relaxed max-w-[60ch] pb-5 mb-6 border-b border-rule">
+              {comp.blurb}
+            </p>
+          )}
           {season.isLoading
             ? <p className="text-muted">Loading the field…</p>
             : <FieldBoard fixtures={fixtures} comp={comp} followedIds={followedIds} />}
