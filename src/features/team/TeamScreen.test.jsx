@@ -17,10 +17,16 @@ vi.mock('../../data/queries.js', () => ({
   useAllSeasonFixtures: vi.fn(() => []),
   useSquad: vi.fn(() => ({ isLoading: false, isError: false, data: undefined })),
   usePlayer: vi.fn(() => ({ bio: null, stats: null, isLoading: false, isError: false })),
+  // The team sheet's lineup fetch (task 3, squad-visual) — same shape as
+  // MatchRoom's useMatchDetail mock (isLoading/data), defaulting to "no
+  // detail yet" so every existing test (none of which mock it explicitly)
+  // keeps landing on SquadBoard's bands fallback, same as before this hook
+  // existed.
+  useMatchDetail: vi.fn(() => ({ isLoading: false, isError: false, data: undefined })),
 }));
 
 import TeamScreen from './TeamScreen.jsx';
-import { useTeams, useAllSeasonFixtures, useSquad, usePlayer } from '../../data/queries.js';
+import { useTeams, useAllSeasonFixtures, useSquad, usePlayer, useMatchDetail } from '../../data/queries.js';
 
 const side = (teamId, name, over = {}) =>
   ({ teamId, name, crestUrl: null, monogram: name.slice(0, 2).toUpperCase(), colour: null, ...over });
@@ -34,6 +40,7 @@ beforeEach(() => {
   useSquad.mockImplementation(() => ({ isLoading: false, isError: false, data: undefined }));
   useAllSeasonFixtures.mockImplementation(() => []);
   usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: false, isError: false });
+  useMatchDetail.mockImplementation(() => ({ isLoading: false, isError: false, data: undefined }));
 });
 
 // Feeds every one of the 13 registry comps a fixture list (default empty)
@@ -193,11 +200,13 @@ test('an empty squad (resolved through every fallback, still zero players) shows
   expect(screen.queryByText(/aren't published for/)).not.toBeInTheDocument();
 });
 
-// --- the visual squad experiment (squad-visual branch, Aug 2026, v2): rows
-// of club-coloured shirt icons grouped into pitch-order sections (v1's
-// balance strip and 4-column tile grid are gone). Position bucketing keys
-// off a first-letter match so it copes with both ESPN's abbreviations
-// ('G'/'D'/'M'/'F') and full names alike. ---
+// --- the team sheet (squad-visual branch, Aug 2026, task 3): the squad
+// section is now SquadBoard — a pitch when the last match's lineup is
+// known, bands (grouped by position, no player ever dropped) otherwise.
+// Full bucketing/pitch/rail/formation behaviour is unit-tested directly
+// against SquadBoard (SquadBoard.test.jsx); these are wiring checks only:
+// TeamScreen resolves the last fixture's lineup and hands SquadBoard the
+// right props, and every degraded line keeps working underneath it. ---
 
 const mixedSquad = [
   { id: 'g1', name: 'Keeper One', shirt: '1', position: 'Goalkeeper' },
@@ -209,7 +218,7 @@ const mixedSquad = [
   { id: 'x1', name: 'Mystery Player', shirt: '99', position: null },
 ];
 
-test('a mixed-position squad groups into pitch-order sections, unknown positions trailing as a Squad bucket', () => {
+test('no lineup available: the squad renders as bands, every player shown, unknown positions never dropped', () => {
   const celtic = side('256', 'Celtic');
   stubSeasons({
     'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
@@ -218,27 +227,12 @@ test('a mixed-position squad groups into pitch-order sections, unknown positions
 
   renderAt('sco.1', '256');
 
-  const groupLabels = screen.getAllByTestId(/^squad-group-/).map(el => el.textContent);
-  expect(groupLabels).toEqual(['Goalkeepers', 'Defenders', 'Midfielders', 'Forwards', 'Squad']);
+  for (const p of mixedSquad) {
+    expect(screen.getByRole('button', { name: p.name })).toBeInTheDocument();
+  }
 });
 
-test('a squad with no unrecognised positions renders no trailing Squad bucket', () => {
-  const celtic = side('256', 'Celtic');
-  stubSeasons({
-    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
-  });
-  useSquad.mockImplementation(() => ({
-    isLoading: false, isError: false,
-    data: { players: [{ id: 'p1', name: 'Solo Keeper', shirt: '1', position: 'Goalkeeper' }] },
-  }));
-
-  renderAt('sco.1', '256');
-
-  expect(screen.getByTestId('squad-group-gk')).toHaveTextContent('Goalkeepers');
-  expect(screen.queryByTestId('squad-group-squad')).not.toBeInTheDocument();
-});
-
-test('a squad row is a button with a player-name aria-label, a club-coloured shirt icon, the name and its position abbrev', () => {
+test('a squad row is a button with a player-name aria-label and a club-coloured shirt icon', () => {
   const celtic = side('256', 'Celtic', { colour: '009921' });
   stubSeasons({
     'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
@@ -253,8 +247,6 @@ test('a squad row is a button with a player-name aria-label, a club-coloured shi
 
   const row = screen.getByRole('button', { name: 'Kasper Høgh' });
   expect(within(row).getByText('9')).toBeInTheDocument();
-  expect(within(row).getByText('Kasper Høgh')).toBeInTheDocument();
-  expect(within(row).getByText('FWD')).toBeInTheDocument();
   // the shirt fill is the CLUB's colour (team.colour), same for every row.
   expect(row.querySelector('[data-testid="shirt-shape"]')).toHaveAttribute('fill', '#009921');
 
@@ -262,7 +254,7 @@ test('a squad row is a button with a player-name aria-label, a club-coloured shi
   expect(within(blankRow).getByText('—')).toBeInTheDocument();
 });
 
-test('the squad section renders no leftover grid/tile classes or balance strip from the earlier design', () => {
+test('the squad section renders none of the earlier designs’ leftover markup (v1 tile grid, v2 group testids)', () => {
   const celtic = side('256', 'Celtic');
   stubSeasons({
     'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
@@ -272,7 +264,57 @@ test('the squad section renders no leftover grid/tile classes or balance strip f
   const { container } = renderAt('sco.1', '256');
 
   expect(container.querySelector('.grid-cols-4')).not.toBeInTheDocument();
+  expect(container.querySelector('[data-testid^="squad-group-"]')).not.toBeInTheDocument();
   expect(screen.queryByRole('img', { name: /Squad balance/ })).not.toBeInTheDocument();
+});
+
+// --- the last match's lineup drives the pitch (task 3's data step) ---
+
+test('a resolved lineup for our club\'s side wires starters into SquadBoard\'s pitch, the rest onto the bench rail', () => {
+  const celtic = side('256', 'Celtic');
+  const kilmarnock = side('o1', 'Kilmarnock', { shortName: 'Kilmarnock' });
+  stubSeasons({
+    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, kilmarnock, 'ft')],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      players: [
+        { id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' },
+        { id: 'p2', name: 'Bench Player', shirt: '20', position: 'Defender' },
+      ],
+    },
+  }));
+  useMatchDetail.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      detail: {
+        lineups: [
+          { homeAway: 'home', players: [{ id: 'p1', name: 'Kasper Høgh', starter: true }] },
+          { homeAway: 'away', players: [] },
+        ],
+      },
+    },
+  }));
+
+  renderAt('sco.1', '256');
+
+  expect(screen.getByText('Last match · 0-0-1 v Kilmarnock')).toBeInTheDocument();
+  expect(screen.getByText('The bench & the rest')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Bench Player' })).toBeInTheDocument();
+});
+
+test('a BBC comp (hasSquads false): the degraded line still renders, unaffected by the lineup wiring', () => {
+  const celtic = side('256', 'Celtic');
+  stubSeasons({
+    'scottish-league-one': [
+      fx('f1', 'scottish-league-one', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1')),
+    ],
+  });
+
+  renderAt('scottish-league-one', '256');
+
+  expect(screen.getByText("Squad details aren't published for Scottish League One.")).toBeInTheDocument();
 });
 
 test('a club with no phase fixtures at all renders the page normally, no replay link', () => {

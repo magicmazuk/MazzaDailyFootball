@@ -4,57 +4,29 @@ import { COMPETITIONS, byId } from '../../domain/competitions.js';
 import { formGuide } from '../../domain/form.js';
 import { prettifyRound } from '../../domain/round.js';
 import { fallbackRoundLabel } from '../../domain/field.js';
-import { useAllSeasonFixtures, useSquad, useTeams } from '../../data/queries.js';
+import { useAllSeasonFixtures, useMatchDetail, useSquad, useTeams } from '../../data/queries.js';
 import { usePrefs } from '../../store/prefs.js';
 import Crest from '../../ui/Crest.jsx';
 import FixtureRow from '../../ui/FixtureRow.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
 import CalendarGlyph from '../../ui/CalendarGlyph.jsx';
-import Shirt from '../../ui/Shirt.jsx';
 import PlayerSheet from '../player/PlayerSheet.jsx';
+import SquadBoard from './SquadBoard.jsx';
 import { teamFixtures, phaseReplayGroups } from './teamFixtures.js';
 
 const WATERMARK_OPACITY = 0.10; // the dial — user may want it stronger/weaker
 const roundLabelFor = round => prettifyRound(round) ?? fallbackRoundLabel(round) ?? round;
 
-// The visual squad experiment (squad-visual branch, Aug 2026, v2 — replaces
-// v1's balance strip + programme grid with quiet rows of club-coloured
-// shirt icons). p.position is either a full name ("Goalkeeper") or an ESPN
-// abbreviation ("G") — both shapes match on first letter, so one regex per
-// bucket covers both. Anything matching none (null, unrecognised positions)
-// falls into a trailing 'Squad' bucket, appended after Forwards. Each
-// bucket's own `label` (GK/DEF/MID/FWD/SQD) doubles as the per-row position
-// abbrev on the right of every row in that section.
-const POSITION_BUCKETS = [
-  { key: 'gk', label: 'GK', sectionLabel: 'Goalkeepers', match: /^g/i },
-  { key: 'def', label: 'DEF', sectionLabel: 'Defenders', match: /^d/i },
-  { key: 'mid', label: 'MID', sectionLabel: 'Midfielders', match: /^m/i },
-  { key: 'fwd', label: 'FWD', sectionLabel: 'Forwards', match: /^f/i },
-];
-
-function groupSquad(players) {
-  const buckets = POSITION_BUCKETS.map(b => ({ ...b, players: [] }));
-  const leftover = { key: 'squad', label: 'SQD', sectionLabel: 'Squad', players: [] };
-  for (const p of players) {
-    const bucket = buckets.find(b => b.match.test(p.position ?? ''));
-    (bucket ?? leftover).players.push(p);
-  }
-  return [...buckets, leftover];
-}
-
-// A squad row (replacing v1's number tile): shirt icon, name, position
-// abbrev — a button opening the existing PlayerSheet, same wiring as v1.
-function SquadRow({ player, colour, positionAbbrev, onOpen }) {
-  return (
-    <button type="button" onClick={onOpen} aria-label={player.name}
-      className="w-full flex items-center gap-3 py-2 border-b border-rule/60 text-left">
-      <Shirt colour={colour} number={player.shirt} />
-      <span className="font-serif text-[14.5px] truncate flex-1">{player.name}</span>
-      <span className="font-sans text-[10px] uppercase tracking-[.14em] text-muted shrink-0">
-        {positionAbbrev}
-      </span>
-    </button>
-  );
+// The team sheet (squad-visual branch, Aug 2026, task 3): the squad's
+// position-bucket grouping now lives in SquadBoard, which also owns the
+// starters-known pitch vs bands fallback. This screen's job is just the
+// data step — resolving the last fixture's lineup (when the source
+// publishes one) and matching its starters back to squad players by id.
+function ourLineup(detail, fixture, teamId) {
+  if (!fixture) return null;
+  const homeAway = fixture.home.teamId === teamId ? 'home'
+    : fixture.away.teamId === teamId ? 'away' : null;
+  return detail?.lineups?.find(l => l.homeAway === homeAway) ?? null;
 }
 
 function FollowButton({ team }) {
@@ -84,11 +56,30 @@ export default function TeamScreen() {
   // keep working when the squad resolved under a fallback league.
   const [sheetPlayerId, setSheetPlayerId] = useState(null);
   const sheetComp = byId(squad.data?.resolvedCompId) ?? comp;
-  const squadGroups = comp?.hasSquads && squad.data?.players?.length > 0
-    ? groupSquad(squad.data.players) : null;
 
   const allFixtures = seasons.flatMap(r => r.data?.fixtures ?? []);
   const { all, next, last } = teamFixtures(allFixtures, teamId);
+
+  // The team sheet's data step (task 3): the last fixture's own competition
+  // (not necessarily the route comp — teamFixtures spans every comp) drives
+  // the lineup fetch, same summary endpoint the match room already uses.
+  // A BBC-degraded comp (hasMatchDetail: false) disables the query the same
+  // way MatchScreen disables it for a bbc- event — never a wasted fetch.
+  const lastComp = last ? byId(last.compId) : null;
+  const lineupComp = lastComp?.hasMatchDetail ? lastComp : { id: 'none', hasMatchDetail: false };
+  const matchDetail = useMatchDetail(lineupComp, last?.id, false);
+  const lineup = ourLineup(matchDetail.data?.detail, last, teamId);
+  // Starters matched back to the squad list by id (lineup entries carry id
+  // since R2.6) so the pitch shows the squad's own shirt numbers/positions
+  // rather than whatever the summary endpoint's roster entry happens to
+  // carry. null (not []) when there's no lineup yet — SquadBoard treats
+  // that, and only that, as "fall back to the bands".
+  const starterIds = new Set((lineup?.players ?? []).filter(p => p.starter).map(p => p.id));
+  const starters = lineup && squad.data?.players
+    ? squad.data.players.filter(p => starterIds.has(p.id))
+    : null;
+  const opponentSide = last ? (last.home.teamId === teamId ? last.away : last.home) : null;
+
   // Replay-the-draw links (spec §13.15): browsable for ANY club with 2+
   // phase-round fixtures in a comp, any seen-state — followed-ness is
   // irrelevant here, unlike the Today invitation.
@@ -141,23 +132,9 @@ export default function TeamScreen() {
               Squad details aren't published for {comp.name}.
             </p>
           )}
-          {squadGroups && (
-            <div>
-              {squadGroups.filter(g => g.players.length > 0).map(g => (
-                <div key={g.key} className="mb-6 last:mb-0">
-                  <p data-testid={`squad-group-${g.key}`}
-                    className="font-sans text-[9.5px] uppercase tracking-[.18em] text-muted mb-2">
-                    {g.sectionLabel}
-                  </p>
-                  <div>
-                    {g.players.map(p => (
-                      <SquadRow key={p.id} player={p} colour={team.colour} positionAbbrev={g.label}
-                        onOpen={() => setSheetPlayerId(p.id)} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+          {comp?.hasSquads && squad.data?.players?.length > 0 && (
+            <SquadBoard players={squad.data.players} starters={starters} teamColour={team.colour}
+              opponentShortName={opponentSide?.shortName ?? null} onOpenPlayer={setSheetPlayerId} />
           )}
           {/* Resolved (possibly via the domestic-league fallback, spec hotfix Aug 2026) but
               still nothing — distinct from the hasSquads:false "not published" line above. */}
