@@ -9,6 +9,7 @@ import Crest from '../../ui/Crest.jsx';
 import FixtureRow from '../../ui/FixtureRow.jsx';
 import FormGlyphs from '../../ui/FormGlyphs.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
+import Shirt from '../../ui/Shirt.jsx';
 import StatusWord from '../../ui/StatusWord.jsx';
 import TvBadge from '../../ui/TvBadge.jsx';
 import { prettifyRound } from '../../domain/round.js';
@@ -316,6 +317,7 @@ function Standouts({ standouts, fixture, comp, onOpenPlayer }) {
 function Lineups({ lineups, fixture, comp, onOpenPlayer }) {
   if (!lineups?.some(l => l.players.length)) return null;
   const title = ha => (ha === 'home' ? fixture.home.name : fixture.away.name);
+  const sideColour = ha => (ha === 'home' ? fixture.home.colour : fixture.away.colour) ?? null;
   return (
     <section className="mb-8">
       <SectionLabel muted>Lineups</SectionLabel>
@@ -325,10 +327,8 @@ function Lineups({ lineups, fixture, comp, onOpenPlayer }) {
             {title(l.homeAway)}
           </p>
           {l.players.filter(p => p.starter).map(p => (
-            <div key={p.name} className="flex items-baseline gap-3 py-1.5">
-              <span className="w-6 font-sans text-[11px] text-muted tabular-nums text-right">
-                {p.shirt ?? ''}
-              </span>
+            <div key={p.name} className="flex items-center gap-3 py-1.5">
+              <Shirt colour={sideColour(l.homeAway)} number={p.shirt} size={22} />
               <PlayerTap name={p.name} playerId={p.id} comp={comp} onOpen={onOpenPlayer}
                 className="text-[14px]" />
             </div>
