@@ -520,6 +520,111 @@ test('useSquad: the scout — a defaultLeague named under the route comp is disc
   expect(calls.some(u => u.includes('/sco.1/teams/4411'))).toBe(false);
   expect(calls.some(u => u.includes('/sco.2/teams/4411'))).toBe(false);
   expect(calls.some(u => u.includes('/eng.1/teams/4411'))).toBe(false);
+  // Review round 2 (Finding 2): this fixture's resolving response carries
+  // no defaultLeague.season.year (matching today's real ESPN shape, live-
+  // probed — see task-1-report.md) — recordSeasonYear stays null.
+  expect(result.current.data.recordSeasonYear).toBeNull();
+});
+
+// --- the scout (review round 2, HIGH fix): a positive shape guard on
+// discovered slugs — a genuine domestic league is a short country/region
+// code, a dot, then a numeric tier (sco.1, aut.1, cyp.1). Nothing UEFA-
+// qualifier- or Club-Friendly-shaped can ever match, so those are never
+// queued as a candidate and never mark the squad discovered. ---
+
+test('useSquad: the scout — a UEFA-qualifier-shaped defaultLeague slug is never queued or discovered (shape guard)', async () => {
+  const calls = [];
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    calls.push(url);
+    if (url.includes('/uefa.champions/teams/999')) {
+      return new Response(JSON.stringify({
+        team: { athletes: [], defaultLeague: { slug: 'uefa.champions_qual', name: 'UEFA Champions League Qualifying' } },
+      }), { status: 200 });
+    }
+    if (url.includes('/eng.1/teams/999')) return new Response(rosterWithAthletes(5), { status: 200 });
+    return new Response(emptyRoster, { status: 200 }); // sco.1, sco.2 both empty
+  }));
+
+  const comp = { id: 'uefa.champions', hasSquads: true };
+  const { result } = renderHook(() => useSquad(comp, '999'), { wrapper });
+
+  await waitFor(() => expect(result.current.data?.players?.length).toBe(5));
+  // The qualifier-shaped slug is never fetched at all — the shape guard
+  // rejects it before it's ever spliced into candidates.
+  expect(calls.some(u => u.includes('uefa.champions_qual'))).toBe(false);
+  expect(result.current.data.resolvedCompId).toBe('eng.1');
+  expect(result.current.data.discovered).toBeUndefined();
+});
+
+test('useSquad: the scout — a Club-Friendly-shaped defaultLeague slug is never queued or discovered (shape guard)', async () => {
+  const calls = [];
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    calls.push(url);
+    if (url.includes('/uefa.europa/teams/999')) {
+      return new Response(JSON.stringify({
+        team: { athletes: [], defaultLeague: { slug: 'misc.friendly', name: 'Club Friendly' } },
+      }), { status: 200 });
+    }
+    if (url.includes('/eng.1/teams/999')) return new Response(rosterWithAthletes(4), { status: 200 });
+    return new Response(emptyRoster, { status: 200 });
+  }));
+
+  const comp = { id: 'uefa.europa', hasSquads: true };
+  const { result } = renderHook(() => useSquad(comp, '999'), { wrapper });
+
+  await waitFor(() => expect(result.current.data?.players?.length).toBe(4));
+  expect(calls.some(u => u.includes('misc.friendly'))).toBe(false);
+  expect(result.current.data.resolvedCompId).toBe('eng.1');
+  expect(result.current.data.discovered).toBeUndefined();
+});
+
+test('useSquad: the scout — a second real country-tier slug (cyp.1, the Pafos case) still passes the shape guard and is discovered', async () => {
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    if (url.includes('/uefa.europa.conf/teams/22281')) {
+      return new Response(JSON.stringify({
+        team: { athletes: [], defaultLeague: { slug: 'cyp.1', name: 'Cypriot First Division' } },
+      }), { status: 200 });
+    }
+    if (url.includes('/cyp.1/teams/22281')) return new Response(rosterWithAthletes(24), { status: 200 });
+    throw new Error(`unexpected url ${url}`);
+  }));
+
+  const comp = { id: 'uefa.europa.conf', hasSquads: true };
+  const { result } = renderHook(() => useSquad(comp, '22281'), { wrapper });
+
+  await waitFor(() => expect(result.current.data?.players?.length).toBe(24));
+  expect(result.current.data.resolvedCompId).toBe('cyp.1');
+  expect(result.current.data.discovered).toBe(true);
+  expect(result.current.data.resolvedLeagueName).toBe('Cypriot First Division');
+});
+
+test('useSquad: the scout — recordSeasonYear reads defaultLeague.season.year from the resolving response when ESPN provides one', async () => {
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    if (url.includes('/uefa.champions/teams/4411')) {
+      return new Response(JSON.stringify({
+        team: { athletes: [], defaultLeague: { slug: 'aut.1', name: 'Austrian Bundesliga' } },
+      }), { status: 200 });
+    }
+    if (url.includes('/aut.1/teams/4411')) {
+      return new Response(JSON.stringify({
+        team: {
+          athletes: Array.from({ length: 2 }, (_, i) => ({ id: String(i + 1), displayName: `Player ${i + 1}` })),
+          defaultLeague: { slug: 'aut.1', name: 'Austrian Bundesliga', season: { year: 2026 } },
+          record: { items: [{ type: 'total', stats: [
+            { name: 'gamesPlayed', value: 3 }, { name: 'wins', value: 3 }, { name: 'ties', value: 0 },
+            { name: 'losses', value: 0 }, { name: 'points', value: 9 },
+          ] }] },
+        },
+      }), { status: 200 });
+    }
+    throw new Error(`unexpected url ${url}`);
+  }));
+
+  const comp = { id: 'uefa.champions', hasSquads: true };
+  const { result } = renderHook(() => useSquad(comp, '4411'), { wrapper });
+
+  await waitFor(() => expect(result.current.data?.players?.length).toBe(2));
+  expect(result.current.data.recordSeasonYear).toBe(2026);
 });
 
 test('useSquad: a club resolving under a fallback league (sco.1) is never marked discovered — no scout fields', async () => {

@@ -19,9 +19,17 @@ const UPSTREAM_CORE = 'https://sports.core.api.espn.com';
 const LEAGUE =
   '(sco\\.1|sco\\.2|sco\\.tennents|sco\\.cis|sco\\.challenge|eng\\.1|eng\\.fa|eng\\.league_cup|uefa\\.champions|uefa\\.europa|uefa\\.europa\\.conf)';
 // The three UEFA club competitions' qualifying rounds (spec §13.11) live
-// under their own ESPN league code — scoreboard only, never teams/
-// summary/standings, since queries.js only ever fetches the qualifier
-// code's scoreboard and adapts it under the parent comp's id.
+// under their own ESPN league code. queries.js only ever fetches the
+// qualifier code's scoreboard directly (adapted under the parent comp's
+// id), so QUALIFIER itself stays scoreboard-only. (Review round 2, LOW
+// fix: this comment used to claim that made a qualifier code rejected on
+// teams/summary/standings outright — no longer literally true, since a
+// qualifier slug like uefa.champions_qual also fits LEAGUE_ANY's shape
+// below and so is technically ALLOWED on the single-team teams/{id}
+// route. That's harmless — path shape stays fully pinned there regardless
+// of which slug it is — and moot in practice, since useSquad's
+// domestic-league discovery, spec §13.20.1 review round 2, now excludes
+// qualifier-shaped slugs from ever being fetched in the first place.)
 const QUALIFIER = '(uefa\\.champions_qual|uefa\\.europa_qual|uefa\\.europa\\.conf_qual)';
 // The scout (spec §13.20.1, review-round CRITICAL fix): useSquad discovers
 // a foreign opponent's actual domestic league from team.defaultLeague

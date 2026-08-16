@@ -299,15 +299,32 @@ export function useNews(feed) {
 // that rather than treating it as a failed fetch.
 const SQUAD_FALLBACK_LEAGUES = ['sco.1', 'sco.2', 'eng.1'];
 
+// The scout (review round 2, HIGH fix): ESPN's team.defaultLeague is not
+// always a genuine domestic league — live-sampling 50 qualifier clubs
+// caught 22 wrong scout lines from a defaultLeague that was actually a
+// UEFA qualifier grouping ('uefa.champions_qual', "UEFA Conference League
+// Qualifying" for Gornik Zabrze) or a Club Friendly code (Ferencvaros,
+// Dynamo Kyiv + 6 more). A genuine domestic-league slug is shaped like a
+// short country/region code, a dot, then a numeric tier — sco.1, sco.2,
+// eng.1, aut.1, gre.1, cyp.1 — a shape nothing UEFA/qualifier/friendly can
+// ever match (verified: every one of our own fallback ids fits this too).
+// This is a POSITIVE allowlist, not a denylist of known-bad codes, since
+// ESPN's set of non-domestic groupings isn't enumerable from here.
+const DOMESTIC_LEAGUE_SLUG = /^[a-z]{2,4}\.\d+$/;
+
 // The scout (spec §13.20): sco/eng cover our own leagues, but a genuinely
 // foreign opponent (never sco/eng) has no domestic grouping to guess. Every
 // team response — even an empty-roster one — carries team.defaultLeague
 // when ESPN knows the club's real domestic league, so each leg's response
-// is checked for it; a not-yet-queued slug is spliced in NEXT (ahead of the
-// remaining generic sco/eng fallbacks) and its discovering name remembered.
-// candidates only ever grows and is never rewound, so "not already in the
-// list" doubles as the loop guard — a slug already tried (or already
-// queued) is never pushed twice, however many legs report it.
+// is checked for it; a not-yet-queued slug THAT PASSES THE DOMESTIC SHAPE
+// GUARD ABOVE is spliced in NEXT (ahead of the remaining generic sco/eng
+// fallbacks) and its discovering name remembered. A non-domestic-shaped
+// slug is never queued and never marks the squad discovered — the squad
+// resolves (or stays honestly unavailable) exactly as it would have before
+// this feature existed. candidates only ever grows and is never rewound,
+// so "not already in the list" doubles as the loop guard — a slug already
+// tried (or already queued) is never pushed twice, however many legs
+// report it.
 export function useSquad(comp, teamId) {
   return useQuery({
     queryKey: ['squad', teamId],
@@ -328,7 +345,8 @@ export function useSquad(comp, teamId) {
           lastAsOf = asOf ?? lastAsOf;
 
           const defaultLeague = data?.team?.defaultLeague;
-          if (defaultLeague?.slug && !candidates.includes(defaultLeague.slug)) {
+          if (defaultLeague?.slug && DOMESTIC_LEAGUE_SLUG.test(defaultLeague.slug)
+              && !candidates.includes(defaultLeague.slug)) {
             candidates.splice(i + 1, 0, defaultLeague.slug);
             discoveredNames.set(defaultLeague.slug, defaultLeague.name ?? null);
           }
@@ -344,6 +362,16 @@ export function useSquad(comp, teamId) {
                 discovered: true,
                 resolvedLeagueName: discoveredNames.get(leagueId) ?? null,
                 record: adaptTeamRecord(data),
+                // The scout (review round 2, MEDIUM fix): the RESOLVING
+                // leg's own defaultLeague.season.year, when ESPN provides
+                // one — TeamScreen gates the full "Won X of Y" sentence on
+                // this matching the current season, since `record` alone
+                // carries no indication of which season it's FROM (see
+                // task-1-report.md's live probe: today's real feed never
+                // actually sets this, so the gate currently always falls
+                // back to the plain league line — which is correct, not a
+                // bug, until/unless ESPN starts stamping it).
+                recordSeasonYear: data?.team?.defaultLeague?.season?.year ?? null,
               } : {}),
             };
           }

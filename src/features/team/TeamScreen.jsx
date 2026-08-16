@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { COMPETITIONS, byId } from '../../domain/competitions.js';
+import { COMPETITIONS, SEASON, byId } from '../../domain/competitions.js';
 import { formGuide } from '../../domain/form.js';
 import { prettifyRound } from '../../domain/round.js';
 import { fallbackRoundLabel } from '../../domain/field.js';
@@ -56,11 +56,27 @@ export function matchStarters(lineupPlayers, squadPlayers) {
 // field present and reconciled but nothing played yet) would otherwise
 // read as "Won 0 of 0 … · 0 points" — technically true but useless, so it
 // falls back to the plain league line the same as an absent record.
+//
+// Season currency (review round 2, MEDIUM fix): a record with no season
+// stamp isn't necessarily THIS season's — Pafos (cyp.1) rendered "Won 18
+// of 36 … this season · 62 points" from last season's completed table.
+// The full sentence additionally requires recordSeasonYear (useSquad's
+// read of the resolving response's defaultLeague.season.year) to match
+// the app's current season; live-probing LASK/aut.1 (a fresh 3-game
+// record) and Pafos/cyp.1 (a stale 36-game one) directly confirmed that
+// field never actually carries a year in today's ESPN feed — only
+// `{ type: { hasStandings: true } }` — so this gate correctly and
+// honestly falls back to the plain league line for every real club right
+// now, without a fragile "early season" games-played heuristic. If ESPN
+// ever starts stamping it, the full sentence starts working with no
+// further change here. See task-1-report.md for the full probe evidence.
 function scoutLine(squadData) {
   if (!squadData?.discovered) return null;
-  const { resolvedLeagueName, record } = squadData;
-  if (record && record.wins != null && record.played > 0 && record.points != null) {
-    return `Won ${record.wins} of ${record.played} in the ${resolvedLeagueName} this season · ${record.points} points`;
+  const { resolvedLeagueName, record, recordSeasonYear } = squadData;
+  const seasonVerified = recordSeasonYear === SEASON.espnYear;
+  if (seasonVerified && record && record.wins != null && record.played > 0 && record.points != null) {
+    const pointsPhrase = record.points === 1 ? '1 point' : `${record.points} points`;
+    return `Won ${record.wins} of ${record.played} in the ${resolvedLeagueName} this season · ${pointsPhrase}`;
   }
   return `They play in the ${resolvedLeagueName}.`;
 }
@@ -99,7 +115,11 @@ function ScoutFilm({ team }) {
   if (isError || videos.length === 0) {
     return <p className="font-sans text-[11px] text-muted mb-8">No film found.</p>;
   }
-  return <VideoCard videos={videos} />;
+  // Review round 2 (LOW fix): without exhaustedLine, dismissing every
+  // video left this section permanently blank once tapped — the section
+  // itself doesn't unmount, so an empty result and "I dismissed them all"
+  // looked identical (nothing) to the reader.
+  return <VideoCard videos={videos} exhaustedLine="That's the whole reel." />;
 }
 
 function FollowButton({ team }) {

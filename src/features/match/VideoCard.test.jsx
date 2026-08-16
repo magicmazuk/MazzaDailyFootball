@@ -33,12 +33,33 @@ test('dismissing the current video advances to the next one', async () => {
   expect(screen.getByText('Full match replay')).toBeInTheDocument();
 });
 
-test('dismissing past the last video removes the card entirely', async () => {
+test('dismissing past the last video removes the card entirely when no exhaustedLine is given (MatchRoom\'s path, byte-identical to before this prop existed)', async () => {
   const user = userEvent.setup();
   const { container } = render(<VideoCard videos={videos} />);
 
   await user.click(screen.getByLabelText('Dismiss video'));
   await user.click(screen.getByLabelText('Dismiss video'));
 
+  expect(container).toBeEmptyDOMElement();
+});
+
+// --- exhaustedLine (review round 2, LOW fix, spec §13.20.3): an optional
+// muted one-liner for the fully-dismissed state, so the scout film doesn't
+// leave a permanently blank section once every video's gone. Only changes
+// behaviour once every video is dismissed — an empty list from the start
+// still renders nothing regardless of the prop. ---
+
+test('dismissing past the last video renders the exhaustedLine one-liner when the caller opts in', async () => {
+  const user = userEvent.setup();
+  render(<VideoCard videos={videos} exhaustedLine="That's the whole reel." />);
+
+  await user.click(screen.getByLabelText('Dismiss video'));
+  await user.click(screen.getByLabelText('Dismiss video'));
+
+  expect(screen.getByText("That's the whole reel.")).toBeInTheDocument();
+});
+
+test('an empty video list from the start still renders nothing even with exhaustedLine set', () => {
+  const { container } = render(<VideoCard videos={[]} exhaustedLine="That's the whole reel." />);
   expect(container).toBeEmptyDOMElement();
 });
