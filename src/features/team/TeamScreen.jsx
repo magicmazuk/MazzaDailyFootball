@@ -44,6 +44,21 @@ export function matchStarters(lineupPlayers, squadPlayers) {
     .map(p => bySquadId.get(p.id) ?? { id: p.id, name: p.name, shirt: p.shirt, position: null });
 }
 
+// The scout (spec §13.20): one line above the squad section for a squad
+// resolved under a DISCOVERED foreign league (never for the route comp or
+// a sco/eng fallback — see useSquad). The full sentence needs wins/played/
+// points together; a null or partial record (irreconcilable wins/draws,
+// see adaptTeamRecord) falls back to naming just the league — draws/losses
+// are never spelled out either way, to keep it one line.
+function scoutLine(squadData) {
+  if (!squadData?.discovered) return null;
+  const { resolvedLeagueName, record } = squadData;
+  if (record && record.wins != null && record.played != null && record.points != null) {
+    return `Won ${record.wins} of ${record.played} in the ${resolvedLeagueName} this season · ${record.points} points`;
+  }
+  return `They play in the ${resolvedLeagueName}.`;
+}
+
 function FollowButton({ team }) {
   const { follow, unfollow } = usePrefs();
   const followed = usePrefs(s => Boolean(s.followed[team.id]));
@@ -70,7 +85,15 @@ export default function TeamScreen() {
   // hotfix), not the route comp, so its stats fetch and Full profile link
   // keep working when the squad resolved under a fallback league.
   const [sheetPlayerId, setSheetPlayerId] = useState(null);
-  const sheetComp = byId(squad.data?.resolvedCompId) ?? comp;
+  // The scout (spec §13.20): a discovered foreign slug (e.g. aut.1) has no
+  // registry entry — byId would return undefined and silently fall through
+  // to the route comp, breaking the sheet's stats fetch and Full profile
+  // link. A minimal synthetic descriptor carries exactly what PlayerSheet/
+  // usePlayer read off comp: id (fetch path + Full profile link), source
+  // (usePlayer's espn gate) and name (the sheet's system line).
+  const sheetComp = squad.data?.discovered
+    ? { id: squad.data.resolvedCompId, name: squad.data.resolvedLeagueName, source: 'espn' }
+    : byId(squad.data?.resolvedCompId) ?? comp;
 
   const allFixtures = seasons.flatMap(r => r.data?.fixtures ?? []);
   const { all, next, last } = teamFixtures(allFixtures, teamId);
@@ -152,6 +175,11 @@ export default function TeamScreen() {
           <FixtureRow key={last.id} fixture={last} followedIds={followedIds} />
         </section>)}
 
+        {squad.data?.discovered && (
+          <p className="font-serif text-[14.5px] max-w-[60ch] text-ink/70 mb-4">
+            {scoutLine(squad.data)}
+          </p>
+        )}
         <section className="mb-8">
           <SectionLabel muted>Squad</SectionLabel>
           {comp?.hasSquads === false && (

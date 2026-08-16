@@ -476,6 +476,90 @@ test('useSquad: when the route comp is itself a fallback league, it is fetched o
   expect(result.current.data.resolvedCompId).toBe('eng.1');
 });
 
+// --- the scout (spec §13.20): a foreign UEFA-scope response often carries
+// no roster of its own, but names the club's actual domestic league under
+// team.defaultLeague — discovered once, tried NEXT (ahead of the generic
+// sco/eng fallbacks), so a genuinely foreign club (never sco/eng) still
+// resolves a squad, and the resolving response's record comes along too.
+// Live-verified shapes (uefa.champions/teams/4411, aut.1/teams/4411). ---
+
+const foreignRecordRoster = JSON.stringify({
+  team: {
+    athletes: Array.from({ length: 26 }, (_, i) => ({ id: String(i + 1), displayName: `Player ${i + 1}` })),
+    record: { items: [{ type: 'total', summary: '3-0-0', stats: [
+      { name: 'gamesPlayed', value: 3 }, { name: 'losses', value: 0 },
+      { name: 'points', value: 9 }, { name: 'pointsAgainst', value: 1 },
+      { name: 'pointDifferential', value: 8 },
+    ] }] },
+  },
+});
+
+test('useSquad: the scout — a defaultLeague named under the route comp is discovered and tried next, resolving with league name + record', async () => {
+  const calls = [];
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    calls.push(url);
+    if (url.includes('/uefa.champions/teams/4411')) {
+      return new Response(JSON.stringify({
+        team: { athletes: [], defaultLeague: { slug: 'aut.1', name: 'Austrian Bundesliga' } },
+      }), { status: 200 });
+    }
+    if (url.includes('/aut.1/teams/4411')) return new Response(foreignRecordRoster, { status: 200 });
+    throw new Error(`unexpected url ${url}`);
+  }));
+
+  const comp = { id: 'uefa.champions', hasSquads: true };
+  const { result } = renderHook(() => useSquad(comp, '4411'), { wrapper });
+
+  await waitFor(() => expect(result.current.data?.players?.length).toBe(26));
+  expect(result.current.data.resolvedCompId).toBe('aut.1');
+  expect(result.current.data.discovered).toBe(true);
+  expect(result.current.data.resolvedLeagueName).toBe('Austrian Bundesliga');
+  expect(result.current.data.record).toEqual({ played: 3, wins: 3, draws: 0, losses: 0, points: 9 });
+  // Tried NEXT — ahead of the generic sco/eng fallbacks, which are never
+  // reached once the discovered league resolves.
+  expect(calls.some(u => u.includes('/sco.1/teams/4411'))).toBe(false);
+  expect(calls.some(u => u.includes('/sco.2/teams/4411'))).toBe(false);
+  expect(calls.some(u => u.includes('/eng.1/teams/4411'))).toBe(false);
+});
+
+test('useSquad: a club resolving under a fallback league (sco.1) is never marked discovered — no scout fields', async () => {
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    if (url.includes('/uefa.champions/teams/256')) return new Response(emptyRoster, { status: 200 });
+    if (url.includes('/sco.1/teams/256')) return new Response(rosterWithAthletes(27), { status: 200 });
+    throw new Error(`unexpected url ${url}`);
+  }));
+
+  const comp = { id: 'uefa.champions', hasSquads: true };
+  const { result } = renderHook(() => useSquad(comp, '256'), { wrapper });
+
+  await waitFor(() => expect(result.current.data?.players?.length).toBe(27));
+  expect(result.current.data.resolvedCompId).toBe('sco.1');
+  expect(result.current.data.discovered).toBeUndefined();
+  expect(result.current.data.resolvedLeagueName).toBeUndefined();
+  expect(result.current.data.record).toBeUndefined();
+});
+
+test('useSquad: loop guard — a defaultLeague pointing at an already-tried slug (even the route comp itself) is never requeued', async () => {
+  const calls = [];
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    calls.push(url);
+    // Every empty leg reports defaultLeague pointing back at sco.1 — the
+    // route comp, already tried first — so it must never be queued again.
+    if (url.includes('/eng.1/teams/256')) return new Response(rosterWithAthletes(5), { status: 200 });
+    return new Response(JSON.stringify({
+      team: { athletes: [], defaultLeague: { slug: 'sco.1', name: 'Scottish Premiership' } },
+    }), { status: 200 });
+  }));
+
+  const comp = { id: 'sco.1', hasSquads: true };
+  const { result } = renderHook(() => useSquad(comp, '256'), { wrapper });
+
+  await waitFor(() => expect(result.current.data?.players?.length).toBe(5));
+  expect(calls.filter(u => u.includes('/sco.1/teams/256'))).toHaveLength(1);
+  expect(result.current.data.resolvedCompId).toBe('eng.1');
+  expect(result.current.data.discovered).toBeUndefined();
+});
+
 // --- outage vs legit-empty (backlog, gold sweep): every leg THROWING (a
 // real fetch failure) must surface as isError, never cache as a resolved
 // players: [] — that would read as "Squad details unavailable." for the

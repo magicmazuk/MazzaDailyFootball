@@ -4,7 +4,9 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { SEASON } from '../domain/competitions.js';
 import { computeTable } from '../domain/table.js';
-import { adaptScoreboard, adaptStandings, adaptSquad, adaptSummary, adaptTeams } from './espn.js';
+import {
+  adaptScoreboard, adaptStandings, adaptSquad, adaptSummary, adaptTeams, adaptTeamRecord,
+} from './espn.js';
 import { adaptAthlete, adaptPlayerStats } from './player.js';
 import { adaptBbcFixtures } from './bbc.js';
 import { adaptFeed } from './news.js';
@@ -297,6 +299,15 @@ export function useNews(feed) {
 // that rather than treating it as a failed fetch.
 const SQUAD_FALLBACK_LEAGUES = ['sco.1', 'sco.2', 'eng.1'];
 
+// The scout (spec §13.20): sco/eng cover our own leagues, but a genuinely
+// foreign opponent (never sco/eng) has no domestic grouping to guess. Every
+// team response — even an empty-roster one — carries team.defaultLeague
+// when ESPN knows the club's real domestic league, so each leg's response
+// is checked for it; a not-yet-queued slug is spliced in NEXT (ahead of the
+// remaining generic sco/eng fallbacks) and its discovering name remembered.
+// candidates only ever grows and is never rewound, so "not already in the
+// list" doubles as the loop guard — a slug already tried (or already
+// queued) is never pushed twice, however many legs report it.
 export function useSquad(comp, teamId) {
   return useQuery({
     queryKey: ['squad', teamId],
@@ -304,17 +315,38 @@ export function useSquad(comp, teamId) {
     staleTime: 24 * HOUR,
     queryFn: async () => {
       const candidates = [comp.id, ...SQUAD_FALLBACK_LEAGUES.filter(id => id !== comp.id)];
+      const discoveredNames = new Map(); // slug -> defaultLeague.name from the leg that discovered it
       let lastAsOf = null;
       let lastError = null;
       let anyLegSucceeded = false;
-      for (const leagueId of candidates) {
+      for (let i = 0; i < candidates.length; i++) {
+        const leagueId = candidates[i];
         try {
           const { data, asOf } = await getJson(
             espnUrl(`${SOCCER}/${leagueId}/teams/${teamId}`, { enable: 'roster' }));
           anyLegSucceeded = true;
           lastAsOf = asOf ?? lastAsOf;
+
+          const defaultLeague = data?.team?.defaultLeague;
+          if (defaultLeague?.slug && !candidates.includes(defaultLeague.slug)) {
+            candidates.splice(i + 1, 0, defaultLeague.slug);
+            discoveredNames.set(defaultLeague.slug, defaultLeague.name ?? null);
+          }
+
           const players = adaptSquad(data);
-          if (players.length > 0) return { players, asOf, resolvedCompId: leagueId };
+          if (players.length > 0) {
+            // Neither the route comp nor a generic sco/eng fallback — the
+            // ONLY way such a slug entered candidates is via discovery above.
+            const discovered = leagueId !== comp.id && !SQUAD_FALLBACK_LEAGUES.includes(leagueId);
+            return {
+              players, asOf, resolvedCompId: leagueId,
+              ...(discovered ? {
+                discovered: true,
+                resolvedLeagueName: discoveredNames.get(leagueId) ?? null,
+                record: adaptTeamRecord(data),
+              } : {}),
+            };
+          }
         } catch (err) {
           // this league grouping either has no roster for this team, or the
           // fetch itself failed — keep trying the remaining legs either way,

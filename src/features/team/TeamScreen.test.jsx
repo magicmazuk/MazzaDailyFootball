@@ -190,6 +190,145 @@ test('a squad row opens the sheet under the resolved league, not the route comp,
   expect(screen.getByRole('link', { name: 'Open as page →' })).toHaveAttribute('href', '/player/sco.1/p1');
 });
 
+// --- the scout (spec §13.20): when useSquad resolves a foreign club's
+// squad under a DISCOVERED domestic league (discovered: true), a line
+// above the Squad section names it — and the player sheet's synthetic comp
+// descriptor lets it work even though the discovered slug has no registry
+// entry. Never for a domestic resolution (discovered false/undefined). ---
+
+test('a discovered foreign club renders the scout line with the full record above the squad section', () => {
+  const opponent = side('4411', 'Sturm Graz');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', opponent, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
+      resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
+      record: { played: 3, wins: 3, draws: 0, losses: 0, points: 9 },
+    },
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  expect(screen.getByText('Won 3 of 3 in the Austrian Bundesliga this season · 9 points')).toBeInTheDocument();
+});
+
+test('a discovered foreign club with a null record falls back to the plain league line', () => {
+  const opponent = side('4411', 'Sturm Graz');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', opponent, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
+      resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
+      record: null,
+    },
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  expect(screen.getByText('They play in the Austrian Bundesliga.')).toBeInTheDocument();
+  expect(screen.queryByText(/^Won /)).not.toBeInTheDocument();
+});
+
+test('a discovered foreign club with a partial record (wins underivable) falls back to the plain league line', () => {
+  const opponent = side('4411', 'Sturm Graz');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', opponent, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
+      resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
+      record: { played: 3, wins: null, draws: null, losses: 0, points: 10 },
+    },
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  expect(screen.getByText('They play in the Austrian Bundesliga.')).toBeInTheDocument();
+});
+
+test('a domestic squad resolution never renders the scout line, discovered or not set', () => {
+  const celtic = side('256', 'Celtic');
+  stubSeasons({
+    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: { players: [{ id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' }], resolvedCompId: 'sco.1' },
+  }));
+
+  renderAt('sco.1', '256');
+
+  expect(screen.queryByText(/They play in the/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/^Won /)).not.toBeInTheDocument();
+});
+
+test('a club that resolves under a fallback league (sco.1, discovered undefined) via a UEFA route also gets no scout line', () => {
+  const celtic = side('256', 'Celtic');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', celtic, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: { players: [{ id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' }], resolvedCompId: 'sco.1' },
+  }));
+
+  renderAt('uefa.champions', '256');
+
+  expect(screen.queryByText(/They play in the/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/^Won /)).not.toBeInTheDocument();
+});
+
+test('a discovered foreign squad shirt opens the sheet with a synthetic comp descriptor (id/name/source, no registry entry)', async () => {
+  const opponent = side('4411', 'Sturm Graz');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', opponent, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
+      resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
+      record: { played: 3, wins: 3, draws: 0, losses: 0, points: 9 },
+    },
+  }));
+  usePlayer.mockReturnValue({
+    bio: { id: 'p1', name: 'Foreign Player', position: 'Forward', shirt: '9', age: 24, nationality: 'Austria' },
+    stats: { appearances: 3, minutes: 270, goals: 1 },
+    isLoading: false, isError: false,
+  });
+
+  renderAt('uefa.champions', '4411');
+
+  await userEvent.click(screen.getByRole('button', { name: lbl('Foreign Player', '9') }));
+
+  // byId('aut.1') is undefined (no registry entry for a foreign slug) —
+  // the synthetic descriptor is what usePlayer actually gets called with.
+  const lastCallArgs = usePlayer.mock.calls.at(-1);
+  expect(lastCallArgs[0]).toEqual({ id: 'aut.1', name: 'Austrian Bundesliga', source: 'espn' });
+  expect(lastCallArgs[1]).toBe('p1');
+
+  await userEvent.click(screen.getByRole('button', { name: 'Full profile →' }));
+  expect(screen.getByRole('link', { name: 'Open as page →' })).toHaveAttribute('href', '/player/aut.1/p1');
+});
+
 test('an empty squad (resolved through every fallback, still zero players) shows the distinct unavailable line', () => {
   const celtic = side('256', 'Celtic');
   stubSeasons({
