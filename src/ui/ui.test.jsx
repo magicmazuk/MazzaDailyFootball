@@ -211,6 +211,31 @@ test('FixtureRow: a ft espn row toggles a drawer with scorers and attendance, an
   expect(screen.queryByRole('link', { name: 'Full detail →' })).not.toBeInTheDocument();
 });
 
+test('FixtureRow: an own goal credits the side that benefited, not the committing team (review fix)', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { events: [
+      // teamId '267' is St Johnstone (away) — this codebase's own-goal
+      // convention (MatchRoom.test.jsx's Goldson/Rangers fixture) is that
+      // teamId names the COMMITTING side, so Celtic (home) gets the credit.
+      { minute: "30'", type: 'Own Goal', player: 'Committing Player', teamId: '267', scoringPlay: true },
+    ] } },
+  });
+  render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('ft')} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+
+  const link = screen.getByRole('link', { name: 'Full detail →' });
+  const drawer = link.parentElement;
+  expect(drawer.textContent).toContain('Celtic: Committing Player 30');
+  expect(drawer.textContent).toContain('(og)');
+  expect(drawer.textContent).not.toContain('St Johnstone: Committing Player');
+});
+
 test('FixtureRow: a sched espn row\'s drawer shows the last 3 head-to-head meetings, most recent first', async () => {
   const user = userEvent.setup();
   useMatchDetail.mockReturnValue({

@@ -140,11 +140,16 @@ export default function TeamScreen() {
 
         {next && (<section className="mb-8">
           <SectionLabel>Next</SectionLabel>
-          <FixtureRow fixture={next} followedIds={followedIds} />
+          {/* Keyed on the fixture id (review fix, spec §13.19.1): FixtureRow
+              now owns its own `open` drawer state, so without a key React
+              would reuse this instance across a refetch that changes which
+              fixture is next — an open drawer would silently re-point to a
+              different match instead of resetting closed. */}
+          <FixtureRow key={next.id} fixture={next} followedIds={followedIds} />
         </section>)}
         {last && (<section className="mb-8">
           <SectionLabel muted>Last</SectionLabel>
-          <FixtureRow fixture={last} followedIds={followedIds} />
+          <FixtureRow key={last.id} fixture={last} followedIds={followedIds} />
         </section>)}
 
         <section className="mb-8">

@@ -92,22 +92,45 @@ function goalMarker(type = '') {
   return '';
 }
 
-// Scorers grouped by side then by player (spec §13.19.1): every goal one
-// player scored collapses onto a single "Maeda 12′, 61′" line; different
-// scorers on the same side join with ' · '. Events with no player, or
-// whose teamId matches neither side, are skipped rather than crashing.
-function scorersForSide(events, teamId) {
-  const goals = (events ?? []).filter(e => e.scoringPlay && e.player != null && e.teamId === teamId);
-  const order = [];
-  const minutesByPlayer = new Map();
-  for (const g of goals) {
-    if (!minutesByPlayer.has(g.player)) {
-      minutesByPlayer.set(g.player, []);
-      order.push(g.player);
-    }
-    minutesByPlayer.get(g.player).push(`${g.minute}${goalMarker(g.type)}`);
+// Which side a goal event credits (review fix, spec §13.19.1): a normal
+// goal credits e.teamId's own side, but this codebase's own-goal
+// convention — matching MatchRoom's timeline (e.g. the Goldson/Rangers
+// fixture in MatchRoom.test.jsx) — is that an own goal's teamId is the
+// COMMITTING team, not the team that benefits on the scoreline. So an own
+// goal flips to the OPPOSITE side from its teamId. Returns null when the
+// teamId matches neither side.
+function creditedSide(event, fixture) {
+  const isOwnGoal = /own goal/i.test(event.type ?? '');
+  if (event.teamId === fixture.home.teamId) return isOwnGoal ? 'away' : 'home';
+  if (event.teamId === fixture.away.teamId) return isOwnGoal ? 'home' : 'away';
+  return null;
+}
+
+// Scorers grouped by the side credited for each goal, then by player (spec
+// §13.19.1): every goal one player scored collapses onto a single
+// "Maeda 12′, 61′" line; different scorers on the same side join with
+// ' · '. Events with no player, or that credit neither side, are skipped
+// rather than crashing.
+function scorersBySide(events, fixture) {
+  const goalsBySide = { home: [], away: [] };
+  for (const e of events ?? []) {
+    if (!e.scoringPlay || e.player == null) continue;
+    const side = creditedSide(e, fixture);
+    if (side) goalsBySide[side].push(e);
   }
-  return order.map(player => `${player} ${minutesByPlayer.get(player).join(', ')}`).join(' · ');
+  const format = goals => {
+    const order = [];
+    const minutesByPlayer = new Map();
+    for (const g of goals) {
+      if (!minutesByPlayer.has(g.player)) {
+        minutesByPlayer.set(g.player, []);
+        order.push(g.player);
+      }
+      minutesByPlayer.get(g.player).push(`${g.minute}${goalMarker(g.type)}`);
+    }
+    return order.map(player => `${player} ${minutesByPlayer.get(player).join(', ')}`).join(' · ');
+  };
+  return { home: format(goalsBySide.home), away: format(goalsBySide.away) };
 }
 
 function FullDetailLink({ comp, fixture }) {
@@ -125,13 +148,12 @@ function FullDetailLink({ comp, fixture }) {
 // full page. A goalless side (or a goalless match) simply contributes no
 // line — nothing to report is not a degraded state.
 function ResultDrawer({ detail, fixture, comp }) {
-  const homeScorers = scorersForSide(detail.events, fixture.home.teamId);
-  const awayScorers = scorersForSide(detail.events, fixture.away.teamId);
+  const scorers = scorersBySide(detail.events, fixture);
   const attendance = detail.gameInfo?.attendance;
   return (
     <>
-      {homeScorers && <p className="text-[13px] mb-1">{fixture.home.name}: {homeScorers}</p>}
-      {awayScorers && <p className="text-[13px] mb-1">{fixture.away.name}: {awayScorers}</p>}
+      {scorers.home && <p className="text-[13px] mb-1">{fixture.home.name}: {scorers.home}</p>}
+      {scorers.away && <p className="text-[13px] mb-1">{fixture.away.name}: {scorers.away}</p>}
       {attendance != null && (
         <p className="font-sans text-[10px] text-muted tabular-nums mt-2">
           Attendance {Number(attendance).toLocaleString('en-GB')}

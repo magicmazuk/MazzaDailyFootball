@@ -420,3 +420,42 @@ test('a club with no phase fixtures at all renders the page normally, no replay 
   expect(screen.queryByRole('link', { name: /Replay the/ })).not.toBeInTheDocument();
   expect(screen.getByText('Season')).toBeInTheDocument();
 });
+
+// --- Next/Last drawer state keying (review fix, spec §13.19.1): FixtureRow
+// now owns its own `open` drawer state, so the Next/Last rows need a key on
+// the fixture id or React reuses the instance across a refetch that swaps
+// which fixture occupies that slot — silently re-pointing an open drawer
+// at a different match instead of resetting it closed. ---
+
+test('changing which fixture is "next" (e.g. after a refetch) closes any open drawer rather than re-pointing it', async () => {
+  const user = userEvent.setup();
+  const celtic = side('256', 'Celtic');
+  // Far-future kickoffs so both unambiguously qualify as "next" regardless
+  // of the real system clock when this test runs.
+  const fixtureA = fx('f1', 'sco.1', null, '2027-01-01T15:00:00Z', celtic, side('o1', 'Opponent 1'));
+  const fixtureB = fx('f2', 'sco.1', null, '2027-01-08T15:00:00Z', celtic, side('o2', 'Opponent 2'));
+  stubSeasons({ 'sco.1': [fixtureA] });
+
+  const { rerender } = renderAt('sco.1', '256');
+  const nextSection = () => screen.getByText('Next').closest('section');
+
+  // sco.1 is an espn hasMatchDetail comp, so the Next row is a drawer
+  // toggle — open it.
+  await user.click(within(nextSection()).getByRole('button', { expanded: false }));
+  expect(within(nextSection()).getByRole('button', { expanded: true })).toBeInTheDocument();
+
+  // A refetch settles on a different fixture for the same "next" slot.
+  stubSeasons({ 'sco.1': [fixtureB] });
+  rerender(
+    <MemoryRouter initialEntries={['/team/sco.1/256']}>
+      <Routes>
+        <Route path="team/:compId/:teamId" element={<TeamScreen />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  // Keyed on fixture.id, the row remounts fresh rather than reusing the
+  // old instance's open state pointed at the wrong match now.
+  expect(within(nextSection()).getByRole('button', { expanded: false })).toBeInTheDocument();
+  expect(within(nextSection()).queryByRole('button', { expanded: true })).not.toBeInTheDocument();
+});
