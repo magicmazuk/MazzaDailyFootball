@@ -112,3 +112,56 @@ test('rejects a qualifying-rounds code outside scoreboard (no teams/summary/stan
   expect(res.statusCode).toBe(400);
   expect(fetchSpy).not.toHaveBeenCalled();
 });
+
+// spec §13.16 — player bio + statistics live on a different ESPN host
+// (sports.core.api.espn.com, no /apis prefix) with their own allowlist.
+test('routes the athlete-bio shape to the core-API host with the 24h/7d TTL', async () => {
+  const fetchSpy = vi.fn(async () => new Response('{"id":"272624"}', { status: 200 }));
+  vi.stubGlobal('fetch', fetchSpy);
+  const res = await call('/api/espn/v2/sports/soccer/leagues/sco.1/seasons/2026/athletes/272624');
+  expect(res.statusCode).toBe(200);
+  expect(res.headers['cache-control']).toBe('public, s-maxage=86400, stale-while-revalidate=604800');
+  expect(fetchSpy).toHaveBeenCalledWith(
+    'https://sports.core.api.espn.com/v2/sports/soccer/leagues/sco.1/seasons/2026/athletes/272624',
+    expect.objectContaining({ headers: { accept: 'application/json' } }),
+  );
+});
+
+test('routes the athlete-statistics shape to the core-API host with the 10min/24h TTL', async () => {
+  const fetchSpy = vi.fn(async () => new Response('{"splits":{"categories":[]}}', { status: 200 }));
+  vi.stubGlobal('fetch', fetchSpy);
+  const res = await call(
+    '/api/espn/v2/sports/soccer/leagues/sco.1/seasons/2026/types/1/athletes/272624/statistics');
+  expect(res.statusCode).toBe(200);
+  expect(res.headers['cache-control']).toBe('public, s-maxage=600, stale-while-revalidate=86400');
+  expect(fetchSpy).toHaveBeenCalledWith(
+    'https://sports.core.api.espn.com/v2/sports/soccer/leagues/sco.1/seasons/2026/types/1/athletes/272624/statistics',
+    expect.anything(),
+  );
+});
+
+test('a non-numeric athlete id 400s without touching the network', async () => {
+  const fetchSpy = vi.fn();
+  vi.stubGlobal('fetch', fetchSpy);
+  const res = await call('/api/espn/v2/sports/soccer/leagues/sco.1/seasons/2026/athletes/abc123');
+  expect(res.statusCode).toBe(400);
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
+
+test('a non-numeric athlete id 400s on the statistics shape too, without touching the network', async () => {
+  const fetchSpy = vi.fn();
+  vi.stubGlobal('fetch', fetchSpy);
+  const res = await call(
+    '/api/espn/v2/sports/soccer/leagues/sco.1/seasons/2026/types/1/athletes/notanid/statistics');
+  expect(res.statusCode).toBe(400);
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
+
+test('other core-API paths off the two player shapes 400 without touching the network', async () => {
+  const fetchSpy = vi.fn();
+  vi.stubGlobal('fetch', fetchSpy);
+  // e.g. the position lookup a $ref points at — never proxied directly.
+  const res = await call('/api/espn/v2/sports/soccer/leagues/sco.1/positions/19');
+  expect(res.statusCode).toBe(400);
+  expect(fetchSpy).not.toHaveBeenCalled();
+});

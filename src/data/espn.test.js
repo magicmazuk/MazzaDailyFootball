@@ -124,6 +124,7 @@ const standings = {
             { name: 'pointsFor', value: 67 }, { name: 'pointsAgainst', value: 34 },
             { name: 'pointDifferential', value: 33 }, { name: 'points', value: 80 },
             { name: 'deductions', value: 0 }, { name: 'rank', value: 2 },
+            { name: 'rankChange', value: -1 },
           ] },
         { team: { id: '256', displayName: 'Celtic', logos: [{ href: 'celtic.png' }] },
           stats: [
@@ -132,6 +133,7 @@ const standings = {
             { name: 'pointsFor', value: 73 }, { name: 'pointsAgainst', value: 41 },
             { name: 'pointDifferential', value: 32 }, { name: 'points', value: 82 },
             { name: 'deductions', value: -5 }, { name: 'rank', value: 1 },
+            { name: 'rankChange', value: 2 },
           ] },
       ],
     },
@@ -144,8 +146,20 @@ test('standings: rows sorted by rank, renumbered, deductions preserved', () => {
   expect(rows[0].position).toBe(1);
   expect(rows[0].points).toBe(82);
   expect(rows[0].deduction).toBe(-5);
+  expect(rows[0].rankChange).toBe(2);
   expect(rows[1].goalDifference).toBe(33);
   expect(rows[1].crestUrl).toBe('hearts.png');
+  expect(rows[1].rankChange).toBe(-1);
+});
+
+test('standings: rankChange defaults to 0 when the stat is absent', () => {
+  const noRankChange = {
+    standings: { entries: [
+      { team: { id: '1', displayName: 'No Movement FC' },
+        stats: [{ name: 'rank', value: 1 }] },
+    ] },
+  };
+  expect(adaptStandings(noRankChange)[0].rankChange).toBe(0);
 });
 
 const teams = {
@@ -208,7 +222,7 @@ const summary = {
   ] },
   rosters: [
     { homeAway: 'home', roster: [
-      { athlete: { displayName: 'Kasper Schmeichel' }, jersey: '1', starter: true,
+      { athlete: { id: '227283', displayName: 'Kasper Schmeichel' }, jersey: '1', starter: true,
         position: { abbreviation: 'G' } },
     ] },
   ],
@@ -217,10 +231,10 @@ const summary = {
 test('summary: events null-safe, team stats keyed by name, lineups mapped', () => {
   const d = adaptSummary(summary);
   expect(d.events[0]).toEqual({ minute: "11'", type: 'Goal', player: 'Daizen Maeda',
-    playerOff: null, teamId: '256', scoringPlay: false });
+    playerId: null, playerOff: null, playerOffId: null, teamId: '256', scoringPlay: false });
   expect(d.events[1].player).toBeNull();
   expect(d.teamStats[0].stats.possessionPct).toBe('58');
-  expect(d.lineups[0].players[0]).toEqual({ name: 'Kasper Schmeichel', shirt: '1',
+  expect(d.lineups[0].players[0]).toEqual({ id: '227283', name: 'Kasper Schmeichel', shirt: '1',
     starter: true, position: 'G' });
 });
 
@@ -254,8 +268,8 @@ test('summary: goal event reads player from participants and carries scoringPlay
   };
   const d = adaptSummary(goalViaParticipants);
   expect(d.events[0]).toEqual({
-    minute: "2'", type: 'Goal', player: 'Kasper Høgh', playerOff: null,
-    teamId: '256', scoringPlay: true,
+    minute: "2'", type: 'Goal', player: 'Kasper Høgh', playerId: '272624',
+    playerOff: null, playerOffId: null, teamId: '256', scoringPlay: true,
   });
 });
 
@@ -272,7 +286,9 @@ test('summary: substitution maps player coming on and player going off from the 
   };
   const d = adaptSummary(substitution);
   expect(d.events[0].player).toBe('Colby Donovan');
+  expect(d.events[0].playerId).toBe('387200');
   expect(d.events[0].playerOff).toBe('Alistair Johnston');
+  expect(d.events[0].playerOffId).toBe('293691');
   expect(d.events[0].scoringPlay).toBe(false);
 });
 
@@ -285,7 +301,9 @@ test('summary: legacy payload with only athletesInvolved still yields a player (
   };
   const d = adaptSummary(legacy);
   expect(d.events[0].player).toBe('Daizen Maeda');
+  expect(d.events[0].playerId).toBeNull(); // athletesInvolved carries no id, only participants does
   expect(d.events[0].playerOff).toBeNull();
+  expect(d.events[0].playerOffId).toBeNull();
   expect(d.events[0].scoringPlay).toBe(false);
 });
 
@@ -375,12 +393,14 @@ test('summary: standouts map shots/saves/passes leaders per team, skipping absen
   const withLeaders = {
     leaders: [
       { team: { id: '260', displayName: 'Kilmarnock' }, leaders: [
-        { name: 'totalShots', leaders: [{ displayValue: '3', athlete: { displayName: 'Joe Hugill' } }] },
-        { name: 'accuratePasses', leaders: [{ displayValue: '42', athlete: { displayName: 'Aaron Tshibola' } }] },
+        { name: 'totalShots', leaders: [{ displayValue: '3',
+          athlete: { id: '351372', displayName: 'Joe Hugill' } }] },
+        { name: 'accuratePasses', leaders: [{ displayValue: '42',
+          athlete: { id: '173306', displayName: 'Aaron Tshibola' } }] },
         { name: 'saves', leaders: [] },
       ] },
       { team: { id: '256', displayName: 'Celtic' }, leaders: [
-        { name: 'totalShots', leaders: [{ displayValue: '9', athlete: { displayName: 'Kasper Høgh' } }] },
+        { name: 'totalShots', leaders: [{ displayValue: '9', athlete: { id: '272624', displayName: 'Kasper Høgh' } }] },
       ] },
     ],
   };
@@ -388,11 +408,13 @@ test('summary: standouts map shots/saves/passes leaders per team, skipping absen
   expect(d.standouts[0]).toEqual({
     teamId: '260', teamName: 'Kilmarnock',
     entries: [
-      { label: 'Shots', player: 'Joe Hugill', value: '3' },
-      { label: 'Passes', player: 'Aaron Tshibola', value: '42' },
+      { label: 'Shots', player: 'Joe Hugill', playerId: '351372', value: '3' },
+      { label: 'Passes', player: 'Aaron Tshibola', playerId: '173306', value: '42' },
     ],
   });
-  expect(d.standouts[1].entries).toEqual([{ label: 'Shots', player: 'Kasper Høgh', value: '9' }]);
+  expect(d.standouts[1].entries).toEqual([
+    { label: 'Shots', player: 'Kasper Høgh', playerId: '272624', value: '9' },
+  ]);
 });
 
 test('summary: missing leaders yields null standouts', () => {
