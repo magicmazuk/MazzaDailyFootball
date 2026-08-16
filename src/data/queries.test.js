@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, expect, test, vi } from 'vitest';
-import { seasonFixturesQuery, todayWindowQuery, usePlayer, useSquad } from './queries.js';
+import { seasonFixturesQuery, todayWindowQuery, useNews, usePlayer, useSquad } from './queries.js';
 
 // No JSX in this file — the QueryClientProvider wrapper is built with
 // createElement instead (matches src/features/match/video.test.js).
@@ -505,4 +505,35 @@ test('useSquad: one leg throwing but a later leg cleanly resolving empty is NOT 
   await waitFor(() => expect(result.current.isSuccess).toBe(true));
   expect(result.current.data.players).toEqual([]);
   expect(result.current.isError).toBe(false);
+});
+
+// --- useNews (spec §13.19.2): fetches the proxy's raw XML text and adapts
+// it via adaptFeed — a plain-text fetch, not getJson (the feed is XML). ---
+
+test('useNews fetches /api/news?feed=<feed> and adapts the XML body into items', async () => {
+  const calls = [];
+  const xml = '<rss><channel><item>'
+    + '<title>Celtic win</title><link>https://bbc.co.uk/1</link>'
+    + '<guid>https://bbc.co.uk/1</guid><pubDate>Thu, 13 Aug 2026 09:00:00 GMT</pubDate>'
+    + '</item></channel></rss>';
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    calls.push(url);
+    return new Response(xml, { status: 200 });
+  }));
+
+  const { result } = renderHook(() => useNews('celtic'), { wrapper });
+
+  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  expect(calls).toEqual(['/api/news?feed=celtic']);
+  expect(result.current.data.items).toHaveLength(1);
+  expect(result.current.data.items[0].title).toBe('Celtic win');
+  expect(result.current.data.items[0].link).toBe('https://bbc.co.uk/1');
+});
+
+test('useNews surfaces isError on a failed fetch rather than throwing past the hook', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('err', { status: 500 })));
+
+  const { result } = renderHook(() => useNews('football'), { wrapper });
+
+  await waitFor(() => expect(result.current.isError).toBe(true));
 });

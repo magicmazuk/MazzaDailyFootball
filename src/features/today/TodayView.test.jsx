@@ -1,7 +1,15 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { vi } from 'vitest';
 import TodayView from './TodayView.jsx';
 import { byId } from '../../domain/competitions.js';
+
+// TodayView renders Papers (The papers, spec §13.19.2), which fetches its
+// own news via useNews — stub it so these presentational tests need no
+// QueryClientProvider and stay focused on TodayView's own layout/ordering.
+vi.mock('../../data/queries.js', () => ({
+  useNews: vi.fn(() => ({ isLoading: false, data: { items: [] } })),
+}));
 
 const side = (teamId, name) => ({ teamId, name, crestUrl: null, monogram: 'XX', score: 1 });
 const fx = (id, h, a, status = 'ft') => ({
@@ -250,4 +258,32 @@ test('on a quiet day, "No matches today." renders above On TV and Quick view', (
   expect(quietLine.compareDocumentPosition(onTvHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   // eslint-disable-next-line no-bitwise
   expect(quietLine.compareDocumentPosition(quickViewHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+// --- The papers placement (spec §13.19.2) ---
+
+test('The papers section sits after Earlier today and before On TV', () => {
+  const onTvFixture = {
+    id: 'tv1', compId: 'eng.1', kickoff: '2026-08-21T19:00:00Z', status: 'scheduled',
+    tv: ['Sky Sports'], home: side('1', 'Home'), away: side('2', 'Away'),
+  };
+
+  render(
+    <MemoryRouter>
+      <TodayView
+        date={new Date('2026-08-21T00:00:00Z')}
+        followedIds={new Set()}
+        partition={{ yours: [], live: [], later: [], earlier: [fx('9', 'Falkirk', 'Hearts')], yesterday: [] }}
+        onTv={[onTvFixture]}
+      />
+    </MemoryRouter>,
+  );
+
+  const earlierHeading = screen.getByText('Earlier today');
+  const papersHeading = screen.getByText('The papers');
+  const onTvHeading = screen.getByText('On TV');
+  // eslint-disable-next-line no-bitwise
+  expect(earlierHeading.compareDocumentPosition(papersHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // eslint-disable-next-line no-bitwise
+  expect(papersHeading.compareDocumentPosition(onTvHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });

@@ -15,6 +15,10 @@ vi.mock('../../data/queries.js', () => ({
   useAllSeasonFixtures: vi.fn(comps => comps.map(() =>
     ({ isLoading: true, isSuccess: false, isError: false, data: undefined }))),
   useTable: vi.fn(() => ({ isLoading: true, data: undefined })),
+  // TodayView renders Papers (The papers, spec §13.19.2), which calls this
+  // directly — stubbed so these TodayScreen wiring tests don't need real
+  // news data of their own.
+  useNews: vi.fn(() => ({ isLoading: false, data: { items: [] } })),
 }));
 
 import TodayScreen from './TodayScreen.jsx';
