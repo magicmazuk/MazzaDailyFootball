@@ -7,6 +7,59 @@ import { fallbackRoundLabel } from './field.js';
 
 export const tieId = (compId, fixtureId) => `${compId}:${fixtureId}`;
 
+// Minimal name normalization for dedupePairings' teamId-less fallback below
+// — lowercased, non-alphanumerics stripped. Not the alias-aware cross-feed
+// norm() in data/mergeCup.js (that reconciles ESPN vs BBC spellings of the
+// same club); this only needs two fixtures from the SAME feed, describing
+// the SAME pairing, to compare equal.
+const norm = s => (s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+// A side's identity for pairing purposes: its teamId, or (rare — a side
+// with no id yet) its normalized name.
+const pairSideKey = side => (side?.teamId != null ? String(side.teamId) : `n:${norm(side?.name)}`);
+
+// A fixture's pairing key: the two sides' identities, order-independent
+// (sorted) so a reversed-venue return leg still matches its first leg.
+// Scoped by round too, so two different rounds never collide even in the
+// pathological case of the same two clubs meeting again later.
+const pairKey = f => `${f?.round}::${[pairSideKey(f?.home), pairSideKey(f?.away)].sort().join('|')}`;
+
+// A draw ceremony draws PAIRINGS, not legs — but a two-legged round (or a
+// qualifying round with a return fixture) publishes one FIXTURE per leg.
+// Collapse fixtures sharing an unordered team pair within the same round
+// into ONE representative: the earliest kickoff, i.e. the first leg — its
+// home/away sides are the pairing's true first-leg (original draw) venue.
+// Result is ordered by that representative kickoff, stably (ties at the
+// same kickoff keep their first-encountered relative order).
+//
+// A no-op for single-leg rounds: every fixture is already its own distinct
+// pairing. This includes Scottish Cup replays — a replay shares its pairing
+// with the original tie by design (a replay IS a second decisive meeting
+// for the SAME drawn pairing), so collapsing it down to the first meeting
+// is correct here: the draw ceremony only ever drew the pairing once.
+export function dedupePairings(fixtures) {
+  const reps = new Map(); // pairKey -> earliest-kickoff fixture seen so far
+  for (const f of fixtures ?? []) {
+    const key = pairKey(f);
+    const cur = reps.get(key);
+    if (!cur || new Date(f.kickoff).getTime() < new Date(cur.kickoff).getTime()) reps.set(key, f);
+  }
+  return [...reps.values()].sort(
+    (a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime(),
+  );
+}
+
+// Every one of a round's fixtures' tieIds — BOTH legs of a two-legged round
+// — for marking a ceremony's round fully seen. Unlike dedupePairings (which
+// collapses to one representative per pairing for display/reveal), seen-
+// marking must cover every published fixture so unrevealedDraws' "every
+// fixture unseen" detection and Today's per-fixture hiding never see a
+// partially-seen round (one leg marked, the other not) once a ceremony
+// completes.
+export function roundTieIds(compId, fixtures) {
+  return (fixtures ?? []).map(f => tieId(compId, f.id));
+}
+
 // A draw ceremony reveals one round's knockout pairings. Group-stage and
 // league-phase rounds publish their whole phase's fixture list at once —
 // there is no pairing to reveal, so the ceremony is meaningless for them
@@ -42,7 +95,11 @@ export function unrevealedDraws(fixturesByComp, seenTies) {
       const ties = [...roundFixtures].sort(
         (a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime(),
       );
-      draws.push({ comp, round, roundLabel, ties });
+      // ties stays the FULL fixture list (both legs of a two-legged round)
+      // — hiding (Today) and seen-marking (DrawScreen) depend on every
+      // fixture being present. tieCount is the deduped pairing count, for
+      // display ("N ties unrevealed") without leaking leg-doubled numbers.
+      draws.push({ comp, round, roundLabel, ties, tieCount: dedupePairings(roundFixtures).length });
     }
   }
   return draws;
@@ -99,13 +156,17 @@ export function unrevealedPhaseDraws(fixturesByComp, seenTies, followedIds) {
       }
 
       for (const { club, fixtures: clubFixtures } of byClub.values()) {
-        if (clubFixtures.length < 2) continue;
-        if (!clubFixtures.every(f => f.status === 'scheduled')) continue;
-        if (!clubFixtures.every(f => !seenTies?.[tieId(comp.id, f.id)])) continue;
-        const sorted = [...clubFixtures].sort(
-          (a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime(),
-        );
-        compEntries.push({ comp, round, roundLabel, club, fixtures: sorted });
+        // Safety dedupe (a phase round is club-scoped already — a league-
+        // phase club plays 8 distinct opponents once each, group stages are
+        // single round-robin — so this is a no-op in the real world, but a
+        // duplicated fixture from the feed must never double-count or
+        // double-render the same opponent). dedupePairings also re-sorts by
+        // kickoff, so no separate sort is needed after it.
+        const deduped = dedupePairings(clubFixtures);
+        if (deduped.length < 2) continue;
+        if (!deduped.every(f => f.status === 'scheduled')) continue;
+        if (!deduped.every(f => !seenTies?.[tieId(comp.id, f.id)])) continue;
+        compEntries.push({ comp, round, roundLabel, club, fixtures: deduped });
       }
     }
     compEntries.sort((a, b) => a.club.name.localeCompare(b.club.name));

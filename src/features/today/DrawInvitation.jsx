@@ -39,7 +39,11 @@ export default function DrawInvitation({ draw }) {
     );
   }
 
-  const { ties } = draw;
+  // tieCount is the deduped pairing count (draws.js dedupePairings) — draw
+  // is unrevealedDraws' own shape, whose `ties` stays the FULL both-legs
+  // fixture list (hiding/seen-marking depend on it); tieCount is what the
+  // card shows so a two-legged round never reads as double its real size.
+  const { tieCount } = draw;
   return (
     <Link to={`/draw/${comp.id}/${round}`}
       className="block border border-ink rounded-none bg-paper p-5 mb-4">
@@ -53,7 +57,7 @@ export default function DrawInvitation({ draw }) {
         {comp.name} · {roundLabel}
       </p>
       <p className="font-sans text-[10.5px] text-muted text-center mt-1 mb-3">
-        {ties.length} ties unrevealed
+        {tieCount} ties unrevealed
       </p>
       <p className="font-sans text-[10.5px] uppercase tracking-[.14em] text-accent text-center">
         Reveal them →

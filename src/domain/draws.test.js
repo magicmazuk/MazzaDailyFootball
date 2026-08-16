@@ -1,4 +1,7 @@
-import { tieId, unrevealedDraws, allTieIds, unrevealedPhaseDraws, phaseTieIds } from './draws.js';
+import {
+  tieId, unrevealedDraws, allTieIds, unrevealedPhaseDraws, phaseTieIds,
+  dedupePairings, roundTieIds,
+} from './draws.js';
 
 const cupComp = id => ({ id, type: 'cup', name: id });
 const leagueComp = id => ({ id, type: 'league', name: id });
@@ -36,6 +39,22 @@ test('a qualifying round (all scheduled, all unseen, labelled, 2+ ties) is detec
   expect(result[0].roundLabel).toBe('Fourth round');
   // sorted by kickoff, not array order
   expect(result[0].ties.map(f => f.id)).toEqual(['2', '1']);
+});
+
+test('unrevealedDraws gains tieCount = dedupePairings(fixtures).length, distinct from ties (the full fixture list, both legs)', () => {
+  const comp = cupComp('uefa.champions');
+  const pairs = Array.from({ length: 7 }, (_, i) => ({
+    home: side(`h${i}`, `Home ${i}`),
+    away: side(`a${i}`, `Away ${i}`),
+  }));
+  const fixtures = pairs.flatMap((p, i) => [
+    phaseFx(`leg1-${i}`, comp.id, 'playoff-round', `2026-02-0${i + 1}T15:00:00Z`, p.home, p.away),
+    phaseFx(`leg2-${i}`, comp.id, 'playoff-round', `2026-02-2${i + 1}T15:00:00Z`, p.away, p.home),
+  ]);
+  const result = unrevealedDraws([{ comp, fixtures }], {});
+  expect(result).toHaveLength(1);
+  expect(result[0].ties).toHaveLength(14); // full fixture list — hiding/seen-marking depend on it
+  expect(result[0].tieCount).toBe(7); // deduped pairing count — what the invitation card shows
 });
 
 test('a partially-seen round is not detected (idempotence after reveal)', () => {
@@ -261,6 +280,92 @@ test('entries are ordered by fixturesByComp order (comp registry order) across c
     {}, [celtic.teamId, rangers.teamId],
   );
   expect(result.map(r => r.comp.id)).toEqual(['sco.tennents', 'eng.champions']);
+});
+
+// ----------------------------------------------------------- dedupePairings
+
+test('a two-legged round (14 fixtures, 7 pairings) collapses to 7 representatives, the earliest (first) leg of each', () => {
+  const comp = cupComp('uefa.champions');
+  const pairs = Array.from({ length: 7 }, (_, i) => ({
+    home: side(`h${i}`, `Home ${i}`),
+    away: side(`a${i}`, `Away ${i}`),
+  }));
+  const fixtures = pairs.flatMap((p, i) => [
+    phaseFx(`leg1-${i}`, comp.id, 'playoff-round', `2026-02-0${i + 1}T15:00:00Z`, p.home, p.away),
+    // second leg: reversed venue, later kickoff — same unordered pair
+    phaseFx(`leg2-${i}`, comp.id, 'playoff-round', `2026-02-2${i + 1}T15:00:00Z`, p.away, p.home),
+  ]);
+  const result = dedupePairings(fixtures);
+  expect(result).toHaveLength(7);
+  // every representative is its pair's first leg (earliest kickoff)
+  expect(result.map(f => f.id)).toEqual(pairs.map((_, i) => `leg1-${i}`));
+  // representative order is by kickoff (stable), not input order
+  expect(result.map(f => f.kickoff)).toEqual([...result.map(f => f.kickoff)].sort());
+});
+
+test('dedupePairings is a no-op for single-leg rounds', () => {
+  const comp = cupComp('sco.tennents');
+  const fixtures = [
+    fx('1', comp.id, 'fourth-round', '2026-02-01T15:00:00Z'),
+    fx('2', comp.id, 'fourth-round', '2026-02-01T12:00:00Z'),
+  ];
+  const result = dedupePairings(fixtures);
+  // no-op: same fixtures back out, kickoff-ordered
+  expect(result.map(f => f.id)).toEqual(['2', '1']);
+});
+
+test('dedupePairings collapses a replay to the original tie — a replay is a second decisive meeting for the same drawn pairing, so collapsing it to the first meeting is correct for the draw ceremony, which only ever drew the pairing once', () => {
+  const comp = cupComp('sco.tennents');
+  const celtic = side('c1', 'Celtic');
+  const rangers = side('c2', 'Rangers');
+  const original = phaseFx('orig', comp.id, 'fourth-round', '2026-02-01T15:00:00Z', celtic, rangers);
+  const replay = phaseFx('replay', comp.id, 'fourth-round', '2026-02-08T15:00:00Z', rangers, celtic);
+  expect(dedupePairings([original, replay])).toEqual([original]);
+});
+
+test('dedupePairings falls back to normalized names when a side has no teamId', () => {
+  const comp = cupComp('sco.tennents');
+  const noId = name => ({ teamId: null, name, crestUrl: null, monogram: name.slice(0, 2).toUpperCase() });
+  const leg1 = phaseFx('leg1', comp.id, 'first-round', '2026-08-01T15:00:00Z', noId('Spartans'), noId('Vale'));
+  const leg2 = phaseFx('leg2', comp.id, 'first-round', '2026-08-08T15:00:00Z', noId('Vale'), noId('Spartans'));
+  expect(dedupePairings([leg1, leg2])).toEqual([leg1]);
+});
+
+test('dedupePairings never mutates its input and returns [] for an empty/nullish list', () => {
+  const fixtures = [fx('1', 'sco.tennents', 'fourth-round', '2026-02-01T15:00:00Z')];
+  const original = fixtures.slice();
+  dedupePairings(fixtures);
+  expect(fixtures).toEqual(original);
+  expect(dedupePairings(undefined)).toEqual([]);
+  expect(dedupePairings([])).toEqual([]);
+});
+
+// ------------------------------------------------------------- roundTieIds
+
+test('roundTieIds returns a tieId for every fixture given, both legs of a two-legged round included', () => {
+  const comp = cupComp('uefa.champions');
+  const fixtures = [
+    fx('leg1-0', comp.id, 'playoff-round', '2026-02-01T15:00:00Z'),
+    fx('leg2-0', comp.id, 'playoff-round', '2026-02-21T15:00:00Z'),
+  ];
+  expect(roundTieIds(comp.id, fixtures)).toEqual([
+    tieId(comp.id, 'leg1-0'),
+    tieId(comp.id, 'leg2-0'),
+  ]);
+});
+
+test('unrevealedPhaseDraws safety-dedupes a club\'s phase fixtures too (harmless — a real league/group phase never repeats an opponent, but a duplicated fixture must never double-count or double-render)', () => {
+  const comp = cupComp('eng.champions');
+  const celtic = side('c1', 'Celtic');
+  const rangers = side('c2', 'Rangers');
+  const fixtures = [
+    phaseFx('f1', comp.id, 'league-phase', '2026-09-01T15:00:00Z', celtic, rangers),
+    // duplicate of the same pairing, as if the feed republished it
+    phaseFx('f1-dup', comp.id, 'league-phase', '2026-09-01T15:05:00Z', rangers, celtic),
+  ];
+  // Only 1 distinct opponent for celtic once deduped — below the 2+ threshold,
+  // so this must NOT qualify, same as a genuine single-fixture round wouldn't.
+  expect(unrevealedPhaseDraws([{ comp, fixtures }], {}, [celtic.teamId])).toEqual([]);
 });
 
 // -------------------------------------------------------------- phaseTieIds

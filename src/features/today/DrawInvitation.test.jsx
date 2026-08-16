@@ -8,6 +8,18 @@ const draw = {
   round: 'fourth-round',
   roundLabel: 'Fourth round',
   ties: [{ id: 't1' }, { id: 't2' }, { id: 't3' }],
+  tieCount: 3,
+};
+
+// A two-legged round (spec: hotfix-two-leg-draw) — ties carries all 14
+// fixtures (both legs, per unrevealedDraws' contract), but tieCount is the
+// deduped pairing count the card must show.
+const twoLegDraw = {
+  comp: { id: 'uefa.champions', name: 'UEFA Champions League', shortName: 'Champions League' },
+  round: 'playoff-round',
+  roundLabel: 'Play-off round',
+  ties: Array.from({ length: 14 }, (_, i) => ({ id: `t${i}` })),
+  tieCount: 7,
 };
 
 test('renders the accent label, comp name, round label and unrevealed count', () => {
@@ -28,6 +40,15 @@ test('the whole card is a single link to the draw ceremony route', () => {
 test('the decorative dots are hidden from assistive tech', () => {
   render(<MemoryRouter><DrawInvitation draw={draw} /></MemoryRouter>);
   expect(screen.getByText('● ● ● ●')).toHaveAttribute('aria-hidden', 'true');
+});
+
+// --- two-legged rounds (hotfix-two-leg-draw): the card shows the deduped
+// pairing count (tieCount), never the full both-legs fixture count (ties.length) ---
+
+test('a two-legged round shows the deduped pairing count, not the doubled fixture count', () => {
+  render(<MemoryRouter><DrawInvitation draw={twoLegDraw} /></MemoryRouter>);
+  expect(screen.getByText('7 ties unrevealed')).toBeInTheDocument();
+  expect(screen.queryByText('14 ties unrevealed')).not.toBeInTheDocument();
 });
 
 // --- club variant (spec §13.15) ---

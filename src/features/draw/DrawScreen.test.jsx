@@ -332,6 +332,52 @@ test('the roll-call "currently drawing" highlight tracks the right tie through t
   expect(within(rollcallList).getByText('Home 1')).not.toHaveClass('line-through');
 });
 
+// --- two-legged rounds (hotfix-two-leg-draw): a ceremony draws PAIRINGS,
+// not legs — 7 pairings × 2 legs = 14 fixtures must collapse to 7 tie rows
+// and a 14-unique-club pool, not 14 rows / a duplicate-riddled pool. ---
+
+// 7 pairings, 2 legs each (14 fixtures, 14 distinct clubs): leg 1 is the
+// earlier kickoff at the original venue, leg 2 the later, reversed-venue
+// return leg — same unordered pair both times.
+const twoLegEvents = Array.from({ length: 7 }, (_, i) => [
+  teamEvent(`leg1-${i}`, `2026-11-0${i + 1}T15:00:00Z`, `h${i}`, `Home ${i}`, `a${i}`, `Away ${i}`, 'playoff-round'),
+  teamEvent(`leg2-${i}`, `2026-11-2${i + 1}T15:00:00Z`, `a${i}`, `Away ${i}`, `h${i}`, `Home ${i}`, 'playoff-round'),
+]).flat();
+
+test('a two-legged round (14 fixtures) renders 7 tie rows and a 14-club pool with unique clubs, no duplicates', async () => {
+  stubScoreboard(twoLegEvents);
+  renderAt('/draw/uefa.champions/playoff-round');
+  await screen.findByText('Tap to draw the first ball'); // 14 distinct clubs <= 16 -> bowl mode
+
+  // Pool: 14 unique crests, no club doubled up.
+  const poolLabels = [...document.querySelectorAll('.draw-pool-item [aria-label]')]
+    .map(el => el.getAttribute('aria-label'));
+  expect(poolLabels).toHaveLength(14);
+  expect(new Set(poolLabels).size).toBe(14);
+  expect(screen.getByText('14')).toBeInTheDocument(); // "Still in the hat" count
+
+  // Tie list: one row per pairing (7), not one per fixture (14) — each row
+  // renders a single 'v' separator between its two slots.
+  expect(screen.getAllByText('v')).toHaveLength(7);
+});
+
+test('a two-legged round\'s completion marks ALL 14 fixtures\' tieIds seen (both legs), not just the 7 drawn representatives', async () => {
+  stubScoreboard(twoLegEvents);
+  const markTiesSeen = vi.fn();
+  usePrefs.setState({ markTiesSeen });
+  renderAt('/draw/uefa.champions/playoff-round');
+  await screen.findByText('Tap to draw the first ball');
+
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Reveal the rest' }));
+
+  expect(screen.getByText(/Draw complete/)).toBeInTheDocument();
+  expect(markTiesSeen).toHaveBeenCalledTimes(1);
+  const seenIds = markTiesSeen.mock.calls[0][0];
+  const expectedIds = Array.from({ length: 7 }, (_, i) => [`leg1-${i}`, `leg2-${i}`])
+    .flat().map(id => tieId('uefa.champions', id));
+  expect([...seenIds].sort()).toEqual([...expectedIds].sort());
+});
+
 // --- opponents mode (spec §13.15, task-2 brief) ---
 
 // Celtic's own league-phase campaign: three fixtures, mixed venues (away
