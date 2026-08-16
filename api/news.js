@@ -32,20 +32,22 @@ export default async function handler(req, res) {
       res.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=3600');
       return send(res, 200, text);
     }
-    return serveFallback(res, feed, upstream.status, text);
+    // The upstream's raw failure body is whatever the CDN sent — often an
+    // HTML error page — so it's labelled text/plain, not application/json.
+    return serveFallback(res, feed, upstream.status, text, 'text/plain');
   } catch (err) {
     return serveFallback(res, feed, 502, JSON.stringify({ error: String(err?.message ?? err) }));
   }
 }
 
-function serveFallback(res, feed, status, failureBody) {
+function serveFallback(res, feed, status, failureBody, bodyType = 'application/json') {
   res.setHeader('Cache-Control', 'no-store');
   const lkg = lastKnownGood.get(feed);
   if (lkg) {
     res.setHeader('x-lkg-at', lkg.at);
     return send(res, 200, lkg.body);
   }
-  return send(res, status >= 400 ? status : 502, failureBody, 'application/json');
+  return send(res, status >= 400 ? status : 502, failureBody, bodyType);
 }
 
 // A CDN/WAF outage page still answers with HTTP 200 and a body starting

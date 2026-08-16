@@ -92,17 +92,18 @@ function goalMarker(type = '') {
   return '';
 }
 
-// Which side a goal event credits (review fix, spec §13.19.1): a normal
-// goal credits e.teamId's own side, but this codebase's own-goal
-// convention — matching MatchRoom's timeline (e.g. the Goldson/Rangers
-// fixture in MatchRoom.test.jsx) — is that an own goal's teamId is the
-// COMMITTING team, not the team that benefits on the scoreline. So an own
-// goal flips to the OPPOSITE side from its teamId. Returns null when the
-// teamId matches neither side.
+// Which side a goal event credits (spec §13.19.1): e.teamId's own side,
+// for own goals too — verified against the LIVE feed at the v1.1 final
+// review (8 own goals across eng.1/sco.1: ESPN's keyEvents[].team.id is
+// always the team the goal counts FOR, and the per-teamId tally reproduces
+// every final scoreline exactly; e.g. O'Hora's og in Hibs 1-2 Hearts
+// carries the Hearts id). Do NOT "flip" own goals to the other side — a
+// fix round tried that on the strength of a hand-authored test fixture
+// and it inverted real drawers. The (og) marker still renders; only the
+// grouping stays raw. Returns null when the teamId matches neither side.
 function creditedSide(event, fixture) {
-  const isOwnGoal = /own goal/i.test(event.type ?? '');
-  if (event.teamId === fixture.home.teamId) return isOwnGoal ? 'away' : 'home';
-  if (event.teamId === fixture.away.teamId) return isOwnGoal ? 'home' : 'away';
+  if (event.teamId === fixture.home.teamId) return 'home';
+  if (event.teamId === fixture.away.teamId) return 'away';
   return null;
 }
 

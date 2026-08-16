@@ -211,15 +211,17 @@ test('FixtureRow: a ft espn row toggles a drawer with scorers and attendance, an
   expect(screen.queryByRole('link', { name: 'Full detail →' })).not.toBeInTheDocument();
 });
 
-test('FixtureRow: an own goal credits the side that benefited, not the committing team (review fix)', async () => {
+test('FixtureRow: an own goal stays under its event teamId — ESPN already credits the benefiting side', async () => {
   const user = userEvent.setup();
   useMatchDetail.mockReturnValue({
     isLoading: false, isError: false,
     data: { detail: { events: [
-      // teamId '267' is St Johnstone (away) — this codebase's own-goal
-      // convention (MatchRoom.test.jsx's Goldson/Rangers fixture) is that
-      // teamId names the COMMITTING side, so Celtic (home) gets the credit.
-      { minute: "30'", type: 'Own Goal', player: 'Committing Player', teamId: '267', scoringPlay: true },
+      // Live-feed convention (verified against 8 real own goals at the
+      // v1.1 final review): an own-goal event's teamId is the side the
+      // goal counts FOR. teamId '256' is Celtic (home) — a St Johnstone
+      // defender put it through his own net, the feed stamps Celtic's id,
+      // and the drawer must NOT flip it back.
+      { minute: "30'", type: 'Own Goal', player: 'Unlucky Defender', teamId: '256', scoringPlay: true },
     ] } },
   });
   render(
@@ -231,9 +233,9 @@ test('FixtureRow: an own goal credits the side that benefited, not the committin
 
   const link = screen.getByRole('link', { name: 'Full detail →' });
   const drawer = link.parentElement;
-  expect(drawer.textContent).toContain('Celtic: Committing Player 30');
+  expect(drawer.textContent).toContain('Celtic: Unlucky Defender 30');
   expect(drawer.textContent).toContain('(og)');
-  expect(drawer.textContent).not.toContain('St Johnstone: Committing Player');
+  expect(drawer.textContent).not.toContain('St Johnstone: Unlucky Defender');
 });
 
 test('FixtureRow: a sched espn row\'s drawer shows the last 3 head-to-head meetings, most recent first', async () => {
