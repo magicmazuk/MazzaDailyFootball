@@ -50,7 +50,7 @@ export const COMPETITIONS = [
     blurb: 'Forty clubs open the season in eight groups of five. The eight group winners and three best runners-up go through, and the five clubs bound for Europe join them in the last 16. Straight knockout from there.' },
   { ...cup, id: 'sco.challenge', name: 'Scottish Challenge Cup', shortName: 'Challenge Cup',
     country: 'Scotland', source: 'espn',
-    blurb: 'The cup for the leagues below the Premiership. Regional in the early rounds, then a straight knockout to the final.' },
+    blurb: 'The cup for the game below the Premiership — colt sides and Highland and Lowland clubs included. A league phase of three games each, then a straight knockout to the final.' },
   { ...league, id: 'eng.1', name: 'English Premier League', shortName: 'Premier League',
     country: 'England', source: 'espn',
     zones: { ...range(1, 4, 'ucl'), 5: 'uecl', ...range(18, 20, 'rel') } },

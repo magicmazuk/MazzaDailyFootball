@@ -686,7 +686,7 @@ because a 144-fixture ceremony is meaningless. Instead they get a **club-centric
 
 ## 13.17 The sentence (supersedes the structure strip, §13.10.1)
 
-The competition overview's structure display is two lines of hand-written broadsheet prose
+The competition overview's structure display is a couple of hand-written sentences of broadsheet prose
 (`comp.blurb`) under the tab bar — serif, max 60ch, hairline beneath — replacing the horizontal
 structure strip, which is retired (component deleted). Blurbs are editorial, curated per season
 like the TV listings. The field board's two section headers ("Still in", "Out") carry their counts

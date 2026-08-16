@@ -184,8 +184,11 @@ function RollcallList({ clubs, statuses }) {
 
   return (
     <div className="border border-rule rounded-xl p-3 max-h-[200px] overflow-y-auto columns-2">
+      {/* Key carries the index unconditionally: a phase round repeats each
+          club once per tie, so teamId alone collides there. The list's
+          order is fixed for the ceremony's life, so the index is stable. */}
       {clubs.map((club, i) => (
-        <p key={club.teamId ?? `${club.name}-${i}`} ref={i === firstCurrentIndex ? currentRef : null}
+        <p key={`${club.teamId ?? club.name}-${i}`} ref={i === firstCurrentIndex ? currentRef : null}
           className={nameClass(statuses[i])}>
           {club.name}
         </p>
