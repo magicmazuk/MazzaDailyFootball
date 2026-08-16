@@ -16,6 +16,74 @@ import { teamFixtures, phaseReplayGroups } from './teamFixtures.js';
 const WATERMARK_OPACITY = 0.10; // the dial — user may want it stronger/weaker
 const roundLabelFor = round => prettifyRound(round) ?? fallbackRoundLabel(round) ?? round;
 
+// The visual squad experiment (squad-visual branch, Aug 2026): pitch-order
+// position buckets for the programme grid + balance strip. p.position is
+// either a full name ("Goalkeeper") or an ESPN abbreviation ("G") — both
+// shapes match on first letter, so one regex per bucket covers both.
+// Anything matching none (null, unrecognised positions) falls into a
+// trailing 'Squad' bucket, appended after Forwards.
+const POSITION_BUCKETS = [
+  { key: 'gk', label: 'GK', sectionLabel: 'Goalkeepers', match: /^g/i },
+  { key: 'def', label: 'DEF', sectionLabel: 'Defenders', match: /^d/i },
+  { key: 'mid', label: 'MID', sectionLabel: 'Midfielders', match: /^m/i },
+  { key: 'fwd', label: 'FWD', sectionLabel: 'Forwards', match: /^f/i },
+];
+
+function groupSquad(players) {
+  const buckets = POSITION_BUCKETS.map(b => ({ ...b, players: [] }));
+  const leftover = { key: 'squad', label: 'SQD', sectionLabel: 'Squad', players: [] };
+  for (const p of players) {
+    const bucket = buckets.find(b => b.match.test(p.position ?? ''));
+    (bucket ?? leftover).players.push(p);
+  }
+  return [...buckets, leftover];
+}
+
+// The balance strip (experiment brief §1): a hand-authored pitch schematic
+// — outer rect, halfway line, two penalty boxes, no path data — with
+// GK/DEF/MID/FWD zones shaded in alternating `drawer` opacity and sized
+// proportionally to their counts. role="img" carries the numerals as an
+// accessible text alternative (role="img" prunes descendant content from
+// the accessibility tree, so the visual overlay needs no separate
+// aria-hidden).
+function BalanceStrip({ counts }) {
+  const labels = ['GK', 'DEF', 'MID', 'FWD'];
+  const total = counts.reduce((a, b) => a + b, 0) || 1;
+  let cursor = 0;
+  const zones = counts.map((count, i) => {
+    const width = (count / total) * 400;
+    const zone = { label: labels[i], count, x: cursor, width };
+    cursor += width;
+    return zone;
+  });
+  return (
+    <div className="relative mb-8" role="img" aria-label={`Squad balance ${counts.join(' · ')}`}>
+      <svg viewBox="0 0 400 64" preserveAspectRatio="none" width="100%" height="64">
+        {zones.map((z, i) => (
+          <rect key={z.label} x={z.x} y="0" width={z.width} height="64"
+            fill="currentColor" className="text-drawer" opacity={i % 2 === 0 ? 1 : 0.5} />
+        ))}
+        <rect x="1" y="1" width="398" height="62" fill="none" stroke="currentColor"
+          strokeWidth="1" className="text-ink" />
+        <line x1="200" y1="1" x2="200" y2="63" stroke="currentColor" strokeWidth="1" className="text-ink" />
+        <rect x="1" y="15" width="42" height="34" fill="none" stroke="currentColor"
+          strokeWidth="1" className="text-ink" />
+        <rect x="357" y="15" width="42" height="34" fill="none" stroke="currentColor"
+          strokeWidth="1" className="text-ink" />
+      </svg>
+      <div className="absolute inset-0 flex">
+        {zones.map(z => (
+          <div key={z.label} style={{ flexGrow: Math.max(z.count, 0.4), flexBasis: 0 }}
+            className="flex flex-col items-center justify-center">
+            <span className="font-serif text-[15px] tabular-nums leading-none">{z.count}</span>
+            <span className="font-sans text-[7px] uppercase tracking-[.14em] text-muted mt-0.5">{z.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function FollowButton({ team }) {
   const { follow, unfollow } = usePrefs();
   const followed = usePrefs(s => Boolean(s.followed[team.id]));
@@ -43,6 +111,9 @@ export default function TeamScreen() {
   // keep working when the squad resolved under a fallback league.
   const [sheetPlayerId, setSheetPlayerId] = useState(null);
   const sheetComp = byId(squad.data?.resolvedCompId) ?? comp;
+  const squadGroups = comp?.hasSquads && squad.data?.players?.length > 0
+    ? groupSquad(squad.data.players) : null;
+  const squadCounts = squadGroups ? squadGroups.slice(0, 4).map(g => g.players.length) : null;
 
   const allFixtures = seasons.flatMap(r => r.data?.fixtures ?? []);
   const { all, next, last } = teamFixtures(allFixtures, teamId);
@@ -98,18 +169,28 @@ export default function TeamScreen() {
               Squad details aren't published for {comp.name}.
             </p>
           )}
-          {comp?.hasSquads && squad.data && squad.data.players.length > 0 && (
+          {squadGroups && (
             <div>
-              {squad.data.players.map(p => (
-                <button key={p.id} type="button" onClick={() => setSheetPlayerId(p.id)}
-                  aria-label={`${p.name}`}
-                  className="flex items-baseline gap-3 py-2 border-b border-rule/60 text-left">
-                  <span className="w-6 font-sans text-[11px] text-muted tabular-nums text-right">
-                    {p.shirt ?? '—'}
-                  </span>
-                  <span className="flex-1 text-[14.5px] truncate">{p.name}</span>
-                  <span className="font-sans text-[10px] uppercase text-muted">{p.position ?? ''}</span>
-                </button>
+              <BalanceStrip counts={squadCounts} />
+              {squadGroups.filter(g => g.players.length > 0).map(g => (
+                <div key={g.key} className="mb-6 last:mb-0">
+                  <p data-testid={`squad-group-${g.key}`}
+                    className="font-sans text-[9.5px] uppercase tracking-[.18em] text-muted mb-2">
+                    {g.sectionLabel}
+                  </p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {g.players.map(p => (
+                      <button key={p.id} type="button" onClick={() => setSheetPlayerId(p.id)}
+                        aria-label={`${p.name}`}
+                        className="border border-rule rounded-[2px] p-3.5 text-center bg-paper">
+                        <div className="font-serif text-[30px] tabular-nums leading-none">
+                          {p.shirt ?? '—'}
+                        </div>
+                        <div className="font-sans text-[9.5px] mt-2 line-clamp-2">{p.name}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}
