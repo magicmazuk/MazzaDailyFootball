@@ -23,20 +23,22 @@ export default function NextUpRow({ club, fixture }) {
     navigate(`/calendar/${club.id}`); };
   return (
     <Link to={`/match/${fixture.compId}/${fixture.id}`}
-      className="flex items-center gap-2.5 py-2.5 border-b border-rule/60">
+      className="flex items-start gap-2.5 py-3 border-b border-rule/60">
       <button type="button" onClick={toTeam} aria-label={`${club.name} team page`}
-        className="shrink-0">
+        className="shrink-0 mt-[1px]">
         <Crest side={club} size={20} />
       </button>
-      <span className="font-serif text-[13.5px] truncate">
-        v {opponent.name} <span className="text-muted">({venue})</span>
+      <span className="flex-1 min-w-0">
+        <span className="block font-serif text-[15px] leading-snug">
+          v {opponent.name} <span className="text-muted">({venue})</span>
+        </span>
+        <span className="mt-1 flex items-center gap-2 font-sans text-[10px] text-muted tabular-nums">
+          <span className="truncate">{comp && `${comp.shortName} · `}{when(fixture.kickoff)}</span>
+          <TvBadge tv={fixture.tv} />
+        </span>
       </span>
-      <span className="ml-auto font-sans text-[10px] text-muted tabular-nums whitespace-nowrap">
-        {comp && `${comp.shortName} · `}{when(fixture.kickoff)}
-      </span>
-      <TvBadge tv={fixture.tv} />
       <button type="button" onClick={toCalendar} aria-label={`${club.name} calendar`}
-        className="shrink-0 p-1">
+        className="shrink-0 p-1 -mr-1">
         <CalendarGlyph />
       </button>
     </Link>
