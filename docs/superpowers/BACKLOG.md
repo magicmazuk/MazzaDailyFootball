@@ -106,3 +106,8 @@ None block usage; candidates for a future 1.2 pass.
 - RollcallList recomputes firstCurrentIndex per render unmemoized — negligible at roll-call sizes, tidy if ever hot.
 - Bowl pool 2D adjacency: pairs can sit beside each other in the wrapping crest cloud; decided out of scope (cloud adjacency is fuzzy, ≤16 clubs). Revisit only if a user notices.
 - UEFA overview editorial gap: the blurb describes the league phase while the field board (correctly, per §13.11) shows qualifying tiers in August — sentence and board describe different stages until the league phase draws. Consider a qualifying-aware second sentence next August.
+
+## From v1.1.0 final review (2026-08-16)
+- Nested interactive controls now sit inside a row BUTTON (was an anchor) — React's DOM-nesting validator logs dev-only errors on Today; the sibling-control restructure would clear it (same standing item, kind changed not just scale).
+- TodayView.test.jsx mocks queries.js with only useNews — useMatchDetail is undefined there; will confuse the first TodayView test that taps a fixture row open.
+- FixtureRow H2H drawer rows keyed by array index (static list per render; consistency nit).
