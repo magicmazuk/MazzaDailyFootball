@@ -5,6 +5,7 @@ import { useQueries, useQuery } from '@tanstack/react-query';
 import { SEASON } from '../domain/competitions.js';
 import { computeTable } from '../domain/table.js';
 import { adaptScoreboard, adaptStandings, adaptSquad, adaptSummary, adaptTeams } from './espn.js';
+import { adaptAthlete, adaptPlayerStats } from './player.js';
 import { adaptBbcFixtures } from './bbc.js';
 import { applyTv } from './tv.js';
 import { bbcUrl, espnUrl, getJson } from './client.js';
@@ -293,4 +294,39 @@ export function useMatchDetail(comp, eventId, isLive) {
       return { detail: adaptSummary(data), asOf };
     },
   });
+}
+
+// Player bio + season statistics (spec §13.16) — a different ESPN host
+// (sports.core.api.espn.com) behind the proxy's second allowlist, so the
+// path shape differs from every other query here: no /apis prefix, and
+// season/type live in the path rather than as query params. BBC comps
+// carry no player data at all — enabled is false for them, and callers
+// (T2) must not offer player links on a BBC-source competition.
+export function usePlayer(comp, playerId) {
+  const enabled = comp?.source === 'espn' && !!playerId;
+  const base = `/v2/sports/soccer/leagues/${comp?.id}/seasons/${SEASON.espnYear}`;
+  const athlete = useQuery({
+    queryKey: ['player', comp?.id, playerId],
+    enabled,
+    staleTime: 24 * HOUR,
+    queryFn: async () => {
+      const { data } = await getJson(espnUrl(`${base}/athletes/${playerId}`));
+      return adaptAthlete(data);
+    },
+  });
+  const stats = useQuery({
+    queryKey: ['playerStats', comp?.id, playerId],
+    enabled,
+    staleTime: 10 * MIN,
+    queryFn: async () => {
+      const { data } = await getJson(espnUrl(`${base}/types/1/athletes/${playerId}/statistics`));
+      return adaptPlayerStats(data);
+    },
+  });
+  return {
+    bio: athlete.data ?? null,
+    stats: stats.data ?? null,
+    isLoading: athlete.isLoading || stats.isLoading,
+    isError: athlete.isError || stats.isError,
+  };
 }

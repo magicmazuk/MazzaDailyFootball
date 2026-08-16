@@ -6,6 +6,21 @@ import Crest from '../../ui/Crest.jsx';
 import FormGlyphs from '../../ui/FormGlyphs.jsx';
 import { ZONE_META, zoneFor } from './zones.js';
 
+// Table movement (spec §13.16): a quiet glyph beside a club that changed
+// rank since the last table snapshot, drawn from the feed's rankChange.
+// Absent entirely for 0/null/undefined — never a phantom "no movement" mark.
+function RankChange({ rankChange }) {
+  if (!rankChange) return null;
+  const up = rankChange > 0;
+  return (
+    <span aria-label={`${up ? 'up' : 'down'} ${Math.abs(rankChange)}`}
+      className="font-sans text-[8.5px] tabular-nums ml-1.5"
+      style={{ color: up ? '#3E8E7E' : '#A11B1B' }}>
+      {up ? '▲' : '▼'}{Math.abs(rankChange)}
+    </span>
+  );
+}
+
 function Drawer({ row, form }) {
   const cells = [
     ['P', row.played], ['W', row.won], ['D', row.drawn],
@@ -71,6 +86,7 @@ export default function LeagueTable({ comp, rows, followedIds, formByTeam }) {
               {followedIds.has(row.teamId) && (
                 <span className="text-accent text-[9px] align-middle ml-1.5">★</span>
               )}
+              <RankChange rankChange={row.rankChange} />
             </span>
             <span className="text-[17px] tabular-nums">{row.points}</span>
           </button>

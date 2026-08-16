@@ -6,10 +6,15 @@
 // Rewrite : (vercel.json)  /api/espn/(.*) -> /api/espn?_p=/$1
 // Upstream: GET https://site.api.espn.com/apis/...
 //
+// Player endpoints (spec §13.16) live on a different ESPN host —
+// sports.core.api.espn.com, no /apis prefix — so they get their own
+// allowlist below and route to UPSTREAM_CORE instead.
+//
 // IMPORTANT (spec §3.5): never attach a browser User-Agent — ESPN
 // returns 403 to spoofed browser UAs and serves the default UA fine.
 
 const UPSTREAM = 'https://site.api.espn.com';
+const UPSTREAM_CORE = 'https://sports.core.api.espn.com';
 
 const LEAGUE =
   '(sco\\.1|sco\\.2|sco\\.tennents|sco\\.cis|sco\\.challenge|eng\\.1|eng\\.fa|eng\\.league_cup|uefa\\.champions|uefa\\.europa|uefa\\.europa\\.conf)';
@@ -26,17 +31,26 @@ const ALLOWED = [
   new RegExp(`^/apis/site/v2/sports/soccer/${LEAGUE}/summary$`),
   new RegExp(`^/apis/v2/sports/soccer/${LEAGUE}/standings$`),
 ];
+// Player bio + per-season statistics (spec §13.16) — the qualifier codes
+// have no player data of their own, so only the 11 base league ids apply.
+const ALLOWED_CORE = [
+  new RegExp(`^/v2/sports/soccer/leagues/${LEAGUE}/seasons/\\d{4}/athletes/\\d+$`),
+  new RegExp(`^/v2/sports/soccer/leagues/${LEAGUE}/seasons/\\d{4}/types/\\d/athletes/\\d+/statistics$`),
+];
 
 const lastKnownGood = new Map(); // key: rest+query → { body, at }
 
 export default async function handler(req, res) {
   const { rest, query } = extractRest(req.url);
-  if (!ALLOWED.some(rx => rx.test(rest))) {
+  const upstreamHost = ALLOWED_CORE.some(rx => rx.test(rest)) ? UPSTREAM_CORE
+    : ALLOWED.some(rx => rx.test(rest)) ? UPSTREAM
+    : null;
+  if (!upstreamHost) {
     return send(res, 400, JSON.stringify({ error: `Path not allowed: ${rest}` }));
   }
   const key = rest + query;
   try {
-    const upstream = await fetch(UPSTREAM + rest + query, {
+    const upstream = await fetch(upstreamHost + rest + query, {
       headers: { accept: 'application/json' },
     });
     const text = await upstream.text();
@@ -75,8 +89,12 @@ function looksLikeErrorBody(text) {
 }
 
 // Edge TTLs from spec §4.2. A dates window over 3 days is a season
-// fetch; a narrow window carries live scores and stays tight.
+// fetch; a narrow window carries live scores and stays tight. Player
+// statistics move during a match week (600/86400, spec §13.16) while a
+// player's bio is essentially static (86400/604800, same as teams).
 function ttlFor(rest, query) {
+  if (rest.includes('/statistics')) return { fresh: 600, swr: 86400 };
+  if (/\/athletes\/\d+$/.test(rest)) return { fresh: 86400, swr: 604800 };
   if (rest.includes('/standings')) return { fresh: 600, swr: 86400 };
   if (/\/teams(\/|$)/.test(rest)) return { fresh: 86400, swr: 604800 };
   if (rest.includes('/summary')) return { fresh: 30, swr: 120 };

@@ -77,6 +77,7 @@ export function adaptStandings(json) {
       goalDifference: s.pointDifferential ?? 0,
       points: s.points ?? 0,
       deduction: s.deductions ?? 0,
+      rankChange: s.rankChange ?? 0,
       rank: s.rank ?? 99,
     };
   });
@@ -117,7 +118,9 @@ export function adaptSummary(json) {
       minute: k.clock?.displayValue ?? '',
       type: k.type?.text ?? '',
       player: participants[0]?.athlete?.displayName ?? k.athletesInvolved?.[0]?.displayName ?? null,
+      playerId: participants[0]?.athlete?.id ?? null,
       playerOff: participants[1]?.athlete?.displayName ?? null,
+      playerOffId: participants[1]?.athlete?.id ?? null,
       teamId: k.team?.id ?? null,
       scoringPlay: k.scoringPlay ?? false,
     };
@@ -133,6 +136,7 @@ export function adaptSummary(json) {
   const lineups = (json?.rosters ?? []).map(r => ({
     homeAway: r.homeAway ?? null,
     players: (r.roster ?? []).map(p => ({
+      id: p.athlete?.id ?? null,
       name: p.athlete?.displayName ?? '',
       shirt: p.jersey ?? p.athlete?.jersey ?? null,
       starter: p.starter ?? false,
@@ -222,7 +226,10 @@ function adaptStandouts(json) {
     const categories = t.leaders ?? [];
     const entries = STANDOUT_CATEGORIES.map(({ key, label }) => {
       const top = categories.find(c => c.name === key)?.leaders?.[0];
-      return top ? { label, player: top.athlete?.displayName ?? null, value: top.displayValue ?? null } : null;
+      return top
+        ? { label, player: top.athlete?.displayName ?? null, playerId: top.athlete?.id ?? null,
+            value: top.displayValue ?? null }
+        : null;
     }).filter(Boolean);
     return {
       teamId: t.team?.id ?? null,

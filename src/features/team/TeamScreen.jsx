@@ -92,13 +92,14 @@ export default function TeamScreen() {
           {comp?.hasSquads && squad.data && (
             <div>
               {squad.data.players.map(p => (
-                <div key={p.id} className="flex items-baseline gap-3 py-2 border-b border-rule/60">
+                <Link key={p.id} to={`/player/${compId}/${p.id}`} state={{ club: team.name }}
+                  className="flex items-baseline gap-3 py-2 border-b border-rule/60">
                   <span className="w-6 font-sans text-[11px] text-muted tabular-nums text-right">
                     {p.shirt ?? '—'}
                   </span>
                   <span className="flex-1 text-[14.5px] truncate">{p.name}</span>
                   <span className="font-sans text-[10px] uppercase text-muted">{p.position ?? ''}</span>
-                </div>
+                </Link>
               ))}
             </div>
           )}

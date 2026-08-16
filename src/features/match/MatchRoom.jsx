@@ -3,6 +3,7 @@
 // newest first, then stats, standouts, lineups and head-to-head. Degrades
 // to a clean scoreline plus one honest line where the source publishes no
 // detail.
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Crest from '../../ui/Crest.jsx';
 import FixtureRow from '../../ui/FixtureRow.jsx';
@@ -11,7 +12,26 @@ import SectionLabel from '../../ui/SectionLabel.jsx';
 import StatusWord from '../../ui/StatusWord.jsx';
 import TvBadge from '../../ui/TvBadge.jsx';
 import { prettifyRound } from '../../domain/round.js';
+import PlayerSheet from '../player/PlayerSheet.jsx';
 import VideoCard from './VideoCard.jsx';
+
+// Tappable player names (spec §13.16): standouts, lineups and timeline
+// names open the peek sheet when a playerId is known AND the comp is an
+// ESPN one — BBC comps carry no player ids at all, and a plain name with
+// no id would only open a sheet with nothing to show. Everywhere else
+// (no id, or a BBC comp) stays exactly the plain text it always was.
+const canTapPlayer = (comp, playerId) => comp?.source === 'espn' && playerId != null;
+
+// A player name that becomes a button (opening the peek sheet) when
+// tappable, otherwise the same plain <span> as before — used anywhere the
+// name already lives in its own isolated element (timeline rows, lineup
+// rows), where swapping the wrapping element doesn't change surrounding text.
+function PlayerTap({ name, playerId, comp, onOpen, className }) {
+  if (canTapPlayer(comp, playerId)) {
+    return <button type="button" onClick={() => onOpen(playerId)} className={className}>{name}</button>;
+  }
+  return <span className={className}>{name}</span>;
+}
 
 const STAT_LABELS = {
   possessionPct: 'Possession', totalShots: 'Shots', shotsOnTarget: 'On target',
@@ -135,7 +155,7 @@ function FormBlock({ form, fixture }) {
   );
 }
 
-function TimelineRow({ e, fixture }) {
+function TimelineRow({ e, fixture, comp, onOpenPlayer }) {
   const teamSide = sideForTeam(fixture, e.teamId);
   const type = e.type ?? '';
   const isSub = /substitution/i.test(type);
@@ -152,9 +172,13 @@ function TimelineRow({ e, fixture }) {
       </span>
     );
   } else if (isSub) {
+    // Only the ON player is tappable — the OFF name (playerOffId) stays
+    // plain text, one fewer tap target cluttering a substitution row.
     content = (
       <>
-        <span className="text-[15px]">{e.player} ↑</span>
+        <PlayerTap name={e.player} playerId={e.playerId} comp={comp} onOpen={onOpenPlayer}
+          className="text-[15px]" />
+        <span className="text-[15px]">{' ↑'}</span>
         {e.playerOff && (
           <span className="text-[15px] text-muted ml-3">{e.playerOff} ↓</span>
         )}
@@ -163,11 +187,15 @@ function TimelineRow({ e, fixture }) {
   } else if (isPlainGoal) {
     // A plain 'Goal' needs no redundant type word — the bold-ish serif
     // name alone says everything, with no accent colour and no ⚽.
-    content = <span className="text-[15px] font-semibold">{e.player}</span>;
+    content = (
+      <PlayerTap name={e.player} playerId={e.playerId} comp={comp} onOpen={onOpenPlayer}
+        className="text-[15px] font-semibold" />
+    );
   } else if (isYellow || isRed) {
     content = (
       <>
-        <span className="text-[15px]">{e.player}</span>
+        <PlayerTap name={e.player} playerId={e.playerId} comp={comp} onOpen={onOpenPlayer}
+          className="text-[15px]" />
         <span className="font-sans text-[9.5px] uppercase tracking-[.12em] text-muted ml-2.5">
           {type}
         </span>
@@ -183,7 +211,8 @@ function TimelineRow({ e, fixture }) {
     // named moment (kickoff subs aside, cards aside).
     content = (
       <>
-        <span className="text-[15px]">{e.player}</span>
+        <PlayerTap name={e.player} playerId={e.playerId} comp={comp} onOpen={onOpenPlayer}
+          className="text-[15px]" />
         <span className="font-sans text-[9.5px] uppercase tracking-[.12em] text-muted ml-2.5">
           {type}
         </span>
@@ -204,13 +233,13 @@ function TimelineRow({ e, fixture }) {
   );
 }
 
-function Timeline({ events, fixture }) {
+function Timeline({ events, fixture, comp, onOpenPlayer }) {
   if (!events?.length) return null;
   return (
     <section className="mb-8">
       <SectionLabel>The match</SectionLabel>
       {[...events].reverse().map((e, i) => (
-        <TimelineRow key={i} e={e} fixture={fixture} />
+        <TimelineRow key={i} e={e} fixture={fixture} comp={comp} onOpenPlayer={onOpenPlayer} />
       ))}
     </section>
   );
@@ -258,7 +287,7 @@ function Stats({ teamStats, fixture }) {
 // data presence: ESPN's leaders endpoint publishes season-to-date numbers
 // even for a fixture that hasn't kicked off yet, which would mislead if
 // shown as if they were "this match's" standouts.
-function Standouts({ standouts, fixture }) {
+function Standouts({ standouts, fixture, comp, onOpenPlayer }) {
   if (fixture.status !== 'ft' || !standouts?.length) return null;
   return (
     <section className="mb-8">
@@ -270,7 +299,12 @@ function Standouts({ standouts, fixture }) {
           </p>
           {s.entries.slice(0, 3).map((en, i) => (
             <p key={i} className="text-[13px] text-muted">
-              {en.label}: {en.player} {en.value}
+              {/* Bare-text interpolation when not tappable (no playerId, or a
+                  BBC comp) keeps this exactly the single text node it always
+                  was; only the tappable case introduces a nested <button>. */}
+              {en.label}: {canTapPlayer(comp, en.playerId)
+                ? <button type="button" onClick={() => onOpenPlayer(en.playerId)}>{en.player}</button>
+                : en.player} {en.value}
             </p>
           ))}
         </div>
@@ -279,7 +313,7 @@ function Standouts({ standouts, fixture }) {
   );
 }
 
-function Lineups({ lineups, fixture }) {
+function Lineups({ lineups, fixture, comp, onOpenPlayer }) {
   if (!lineups?.some(l => l.players.length)) return null;
   const title = ha => (ha === 'home' ? fixture.home.name : fixture.away.name);
   return (
@@ -295,7 +329,8 @@ function Lineups({ lineups, fixture }) {
               <span className="w-6 font-sans text-[11px] text-muted tabular-nums text-right">
                 {p.shirt ?? ''}
               </span>
-              <span className="text-[14px]">{p.name}</span>
+              <PlayerTap name={p.name} playerId={p.id} comp={comp} onOpen={onOpenPlayer}
+                className="text-[14px]" />
             </div>
           ))}
         </div>
@@ -344,6 +379,10 @@ function Siblings({ siblings, fixture }) {
 }
 
 export default function MatchRoom({ fixture, comp, detail, videos, siblings }) {
+  // The peek sheet's open/closed player (spec §13.16) — one instance lives
+  // at the room's root rather than per tap-site, so standouts, lineups and
+  // timeline names all share the same sheet instead of each mounting one.
+  const [sheetPlayerId, setSheetPlayerId] = useState(null);
   const headerFixture = fixture.status === 'live'
     ? withLiveScore(fixture, detail?.liveScore)
     : fixture;
@@ -358,10 +397,10 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings }) {
       {comp.hasMatchDetail
         ? (<>
             <FormBlock form={detail?.form} fixture={fixture} />
-            <Timeline events={detail?.events} fixture={fixture} />
+            <Timeline events={detail?.events} fixture={fixture} comp={comp} onOpenPlayer={setSheetPlayerId} />
             <Stats teamStats={detail?.teamStats} fixture={fixture} />
-            <Standouts standouts={detail?.standouts} fixture={fixture} />
-            <Lineups lineups={detail?.lineups} fixture={fixture} />
+            <Standouts standouts={detail?.standouts} fixture={fixture} comp={comp} onOpenPlayer={setSheetPlayerId} />
+            <Lineups lineups={detail?.lineups} fixture={fixture} comp={comp} onOpenPlayer={setSheetPlayerId} />
             <HeadToHead headToHead={detail?.headToHead} />
           </>)
         : (
@@ -374,6 +413,7 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings }) {
           still surface highlights even with no match detail to show. */}
       <VideoCard videos={videos} />
       <Siblings siblings={siblings} fixture={fixture} />
+      <PlayerSheet comp={comp} playerId={sheetPlayerId} onClose={() => setSheetPlayerId(null)} />
     </main>
   );
 }

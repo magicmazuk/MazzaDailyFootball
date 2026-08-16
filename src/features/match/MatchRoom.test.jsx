@@ -1,7 +1,27 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+import { beforeEach, expect, test, vi } from 'vitest';
+
+// PlayerSheet (mounted at MatchRoom's root, spec §13.16) fetches via
+// usePlayer internally — mocked here so these tests don't need a
+// QueryClientProvider. Vitest resolves this to the same physical
+// src/data/queries.js module PlayerSheet itself imports, regardless of
+// each file's own relative path to it, so this single mock covers both.
+vi.mock('../../data/queries.js', () => ({
+  usePlayer: vi.fn(() => ({ bio: null, stats: null, isLoading: false, isError: false })),
+}));
+
 import MatchRoom from './MatchRoom.jsx';
 import { byId } from '../../domain/competitions.js';
+import { usePlayer } from '../../data/queries.js';
+
+// usePlayer is a shared mock across every test in this file — reset to the
+// closed-sheet default before each one so a test that opens the sheet with
+// real bio/stats can't leak that data into a later, unrelated test.
+beforeEach(() => {
+  usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: false, isError: false });
+});
 
 const side = (name, score) => ({ teamId: name, name, shortName: name,
   crestUrl: null, monogram: name.slice(0, 2).toUpperCase(), colour: null, score });
@@ -348,6 +368,92 @@ test('standouts are withheld pre-match even when the source already publishes th
   // fixture, so assert on the formatted standout row specifically rather
   // than the bare name, which would collide with that unrelated timeline row.
   expect(screen.queryByText(/Shots: Daizen Maeda 5/)).not.toBeInTheDocument();
+});
+
+// --- tappable player names / the peek sheet (spec §13.16) ---
+
+test('a standout entry with a playerId on an ESPN comp is a button that opens the sheet', async () => {
+  usePlayer.mockReturnValue({
+    bio: { id: 'p1', name: 'Daizen Maeda', position: 'Forward', shirt: '9',
+      age: 27, nationality: 'Japan', heightDisplay: null, birthDate: null, birthPlace: null },
+    stats: { appearances: 5, minutes: 450, goals: 5, assists: 0, shotsOnTarget: null,
+      shotsOffTarget: null, totalShots: null, accuratePasses: null, inaccuratePasses: null,
+      totalPasses: null, passPct: null, foulsCommitted: null, yellowCards: null, redCards: null,
+      effectiveTackles: null, saves: null, cleanSheets: null, goalsConceded: null, rating: 7.1 },
+    isLoading: false, isError: false,
+  });
+  const withId = [{ ...standoutsData[0], entries: [{ ...standoutsData[0].entries[0], playerId: 'p1' }] },
+    standoutsData[1]];
+  const standoutsDetail = { ...detail, standouts: withId };
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={standoutsDetail} />
+  </MemoryRouter>);
+
+  const button = screen.getByRole('button', { name: 'Daizen Maeda' });
+  // the row still reads the same sentence even though the name is now
+  // nested inside a <button> (getByText's default direct-text-node match
+  // doesn't reach across that boundary, so this checks the row's full
+  // textContent directly instead).
+  expect(button.closest('p').textContent).toBe('Shots: Daizen Maeda 5');
+  await userEvent.click(button);
+  expect(screen.getByText('Full profile →')).toBeInTheDocument();
+});
+
+test('a standout entry with no playerId stays plain text, not a button', () => {
+  const standoutsDetail = { ...detail, standouts: standoutsData };
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={standoutsDetail} />
+  </MemoryRouter>);
+  expect(screen.queryByRole('button', { name: 'Daizen Maeda' })).not.toBeInTheDocument();
+  expect(screen.getByText(/Shots: Daizen Maeda 5/)).toBeInTheDocument();
+});
+
+test('a standout entry with a playerId on a BBC comp stays plain text (no player data at all)', () => {
+  const bbcFixture = { ...fixture, compId: 'scottish-league-one' };
+  const withId = [{ ...standoutsData[0], entries: [{ ...standoutsData[0].entries[0], playerId: 'p1' }] }];
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...bbcFixture, status: 'ft' }} comp={byId('scottish-league-one')}
+      detail={{ ...detail, standouts: withId }} />
+  </MemoryRouter>);
+  expect(screen.queryByRole('button', { name: 'Daizen Maeda' })).not.toBeInTheDocument();
+});
+
+test('a lineup player with an id on an ESPN comp is a tappable button', () => {
+  const lineupDetail = { ...detail, lineups: [
+    { homeAway: 'home', players: [{ id: 'p2', name: 'Reo Hatate', shirt: '42', starter: true, position: 'MF' }] },
+    { homeAway: 'away', players: [] },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={lineupDetail} />
+  </MemoryRouter>);
+  expect(screen.getByRole('button', { name: 'Reo Hatate' })).toBeInTheDocument();
+});
+
+test('a lineup player with no id stays plain text', () => {
+  const lineupDetail = { ...detail, lineups: [
+    { homeAway: 'home', players: [{ id: null, name: 'Reo Hatate', shirt: '42', starter: true, position: 'MF' }] },
+    { homeAway: 'away', players: [] },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={lineupDetail} />
+  </MemoryRouter>);
+  expect(screen.queryByRole('button', { name: 'Reo Hatate' })).not.toBeInTheDocument();
+  expect(screen.getByText('Reo Hatate')).toBeInTheDocument();
+});
+
+test('a timeline goal-scorer with a playerId is tappable; the substitution\'s off-player never is', () => {
+  const timelineDetail = { ...detail, events: [
+    { minute: "67'", type: 'Goal', player: 'Daizen Maeda', playerId: 'p1', teamId: 'Celtic' },
+    { minute: "72'", type: 'Substitution', player: 'Luke McCowan', playerId: 'p3',
+      playerOff: 'Reo Hatate', playerOffId: 'p2', teamId: 'Celtic' },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={timelineDetail} />
+  </MemoryRouter>);
+  expect(screen.getByRole('button', { name: 'Daizen Maeda' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Luke McCowan' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Reo Hatate' })).not.toBeInTheDocument();
+  expect(screen.getByText(/Reo Hatate/)).toBeInTheDocument();
 });
 
 // --- head-to-head ---
