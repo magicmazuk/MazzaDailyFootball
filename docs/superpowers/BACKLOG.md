@@ -101,3 +101,8 @@ None block usage; candidates for a future 1.2 pass.
   would slip through — change to dedupePairings(...).length < 2.
 - The bowl/rollcall threshold was never actually broken by duplicates (distinctClubCount
   already Set-dedupes); pre-fix bowl at 14 distinct clubs was correct behaviour.
+
+## From v0.9.0 final review (2026-08-16)
+- RollcallList recomputes firstCurrentIndex per render unmemoized — negligible at roll-call sizes, tidy if ever hot.
+- Bowl pool 2D adjacency: pairs can sit beside each other in the wrapping crest cloud; decided out of scope (cloud adjacency is fuzzy, ≤16 clubs). Revisit only if a user notices.
+- UEFA overview editorial gap: the blurb describes the league phase while the field board (correctly, per §13.11) shows qualifying tiers in August — sentence and board describe different stages until the league phase draws. Consider a qualifying-aware second sentence next August.
