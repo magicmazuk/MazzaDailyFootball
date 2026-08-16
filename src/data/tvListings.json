@@ -358,6 +358,54 @@
       "tv": [
         "Sky Sports"
       ]
+    },
+    {
+      "comp": "uefa.champions",
+      "date": "2026-08-18",
+      "home": "Fenerbahce",
+      "tv": [
+        "Amazon Prime"
+      ]
+    },
+    {
+      "comp": "uefa.champions",
+      "date": "2026-08-18",
+      "home": "Levski Sofia",
+      "tv": [
+        "TNT Sports"
+      ]
+    },
+    {
+      "comp": "uefa.champions",
+      "date": "2026-08-19",
+      "home": "Celtic",
+      "tv": [
+        "TNT Sports"
+      ]
+    },
+    {
+      "comp": "uefa.champions",
+      "date": "2026-08-19",
+      "home": "NEC Nijmegen",
+      "tv": [
+        "TNT Sports"
+      ]
+    },
+    {
+      "comp": "uefa.champions",
+      "date": "2026-08-19",
+      "home": "Slovan Bratislava",
+      "tv": [
+        "TNT Sports"
+      ]
+    },
+    {
+      "comp": "uefa.champions",
+      "date": "2026-08-25",
+      "home": "LASK Linz",
+      "tv": [
+        "Amazon Prime"
+      ]
     }
   ]
 }
