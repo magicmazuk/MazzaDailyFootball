@@ -201,7 +201,7 @@ function RollcallList({ clubs, statuses }) {
   );
 }
 
-function Pool({ mode, pool, state, rows, clubs, clubOrdinals }) {
+function Pool({ mode, pool, state, clubs, clubOrdinals }) {
   // pool already carries the presentation-only display order (Ceremony);
   // `indexOf` locates the specific item within that order, since a
   // shuffled position is no longer derivable from `landed`.
@@ -210,18 +210,25 @@ function Pool({ mode, pool, state, rows, clubs, clubOrdinals }) {
 
   // Roll-call statuses, at the CLUB level (hotfix: shuffling ties still
   // rendered each tie's two clubs adjacently — the exact pairing, readable
-  // before the draw). `rows` is landedSides(state) in tie order; a landed
-  // row's two clubs are collected into landedClubs, and currentTie(state)'s
-  // two clubs (if any) into currentClubs — rollcallStatuses then matches
-  // each by occurrence count (see above) against the shuffled display
-  // list. Rollcall-only — opponents rows carry no `tie` (landedSides'
-  // opponents shape is `{ opponent, venue, ... }`, club-centric rather
-  // than tie-centric), and bowl never renders RollcallList, so this is
-  // skipped for either rather than crashing on `row.tie`.
-  const landedClubs = [];
-  const currentClubs = [];
-  if (mode === 'rollcall') {
-    for (const row of rows) {
+  // before the draw). A landed row's two clubs are collected into
+  // landedClubs, and currentTie(state)'s two clubs (if any) into
+  // currentClubs — rollcallStatuses then matches each by occurrence count
+  // (see above) against the shuffled display list. Rollcall-only —
+  // opponents rows carry no `tie` (landedSides' opponents shape is
+  // `{ opponent, venue, ... }`, club-centric rather than tie-centric), and
+  // bowl never renders RollcallList, so this is skipped for either rather
+  // than crashing on `row.tie`.
+  // Memoized on [mode, clubs, state] so `statuses` keeps a stable identity
+  // between renders where nothing landed — `state` only changes identity on
+  // a reducer dispatch, unlike the per-render `rows` array, which is why
+  // the derivation reads landedSides(state) itself rather than taking rows
+  // as a dependency (a fresh-reference dep would defeat the memo, and
+  // RollcallList's own memo keys off this array's identity downstream).
+  const statuses = useMemo(() => {
+    if (mode !== 'rollcall') return [];
+    const landedClubs = [];
+    const currentClubs = [];
+    for (const row of landedSides(state)) {
       if (row.home && row.away) {
         if (row.tie.home) landedClubs.push(row.tie.home);
         if (row.tie.away) landedClubs.push(row.tie.away);
@@ -232,8 +239,8 @@ function Pool({ mode, pool, state, rows, clubs, clubOrdinals }) {
       if (current.home) currentClubs.push(current.home);
       if (current.away) currentClubs.push(current.away);
     }
-  }
-  const statuses = mode === 'rollcall' ? rollcallStatuses(clubs, landedClubs, currentClubs) : [];
+    return rollcallStatuses(clubs, landedClubs, currentClubs);
+  }, [mode, clubs, state]);
 
   return (
     <section className="mb-6">
@@ -493,7 +500,7 @@ function Ceremony({ comp, compId, round, ties, roundFixtures, alreadySeen, markT
         </span>
       </h1>
 
-      <Pool mode={mode} pool={pool} state={state} rows={rows} clubs={shuffledClubs} clubOrdinals={clubOrdinals} />
+      <Pool mode={mode} pool={pool} state={state} clubs={shuffledClubs} clubOrdinals={clubOrdinals} />
 
       {mode === 'rollcall'
         ? <RollcallStage state={state} canTap={canTap} onTap={() => canTap && dispatch({ type: 'TAP' })} />
