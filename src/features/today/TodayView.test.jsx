@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import TodayView from './TodayView.jsx';
+import { byId } from '../../domain/competitions.js';
 
 const side = (teamId, name) => ({ teamId, name, crestUrl: null, monogram: 'XX', score: 1 });
 const fx = (id, h, a, status = 'ft') => ({
@@ -218,4 +219,35 @@ test('renders On TV section with televised fixture', () => {
 
   expect(screen.getByText('On TV')).toBeInTheDocument();
   expect(screen.getByText('Sky')).toBeInTheDocument();
+});
+
+// --- quiet-day ordering (backlog, spec §13.18.4): the "No matches today."
+// line must sit ABOVE On TV / Quick view, not below them. ---
+
+test('on a quiet day, "No matches today." renders above On TV and Quick view', () => {
+  const onTvFixture = {
+    id: 'tv1', compId: 'eng.1', kickoff: '2026-08-21T19:00:00Z', status: 'scheduled',
+    tv: ['Sky Sports'], home: side('1', 'Home'), away: side('2', 'Away'),
+  };
+  const tableRow = { teamId: 't1', name: 'Team One', crestUrl: null, monogram: 'T1', position: 1, points: 10 };
+
+  render(
+    <MemoryRouter>
+      <TodayView
+        date={new Date('2026-08-21T00:00:00Z')}
+        followedIds={new Set()}
+        partition={emptyPartition}
+        onTv={[onTvFixture]}
+        quickTables={[{ comp: byId('sco.1'), rows: [tableRow] }]}
+      />
+    </MemoryRouter>,
+  );
+
+  const quietLine = screen.getByText('No matches today.');
+  const onTvHeading = screen.getByText('On TV');
+  const quickViewHeading = screen.getByText('Quick view');
+  // eslint-disable-next-line no-bitwise
+  expect(quietLine.compareDocumentPosition(onTvHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // eslint-disable-next-line no-bitwise
+  expect(quietLine.compareDocumentPosition(quickViewHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });

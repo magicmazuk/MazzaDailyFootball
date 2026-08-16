@@ -9,6 +9,7 @@ import Crest from '../../ui/Crest.jsx';
 import FixtureRow from '../../ui/FixtureRow.jsx';
 import FormGlyphs from '../../ui/FormGlyphs.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
+import Shirt from '../../ui/Shirt.jsx';
 import StatusWord from '../../ui/StatusWord.jsx';
 import TvBadge from '../../ui/TvBadge.jsx';
 import { prettifyRound } from '../../domain/round.js';
@@ -316,6 +317,7 @@ function Standouts({ standouts, fixture, comp, onOpenPlayer }) {
 function Lineups({ lineups, fixture, comp, onOpenPlayer }) {
   if (!lineups?.some(l => l.players.length)) return null;
   const title = ha => (ha === 'home' ? fixture.home.name : fixture.away.name);
+  const sideColour = ha => (ha === 'home' ? fixture.home.colour : fixture.away.colour) ?? null;
   return (
     <section className="mb-8">
       <SectionLabel muted>Lineups</SectionLabel>
@@ -325,10 +327,8 @@ function Lineups({ lineups, fixture, comp, onOpenPlayer }) {
             {title(l.homeAway)}
           </p>
           {l.players.filter(p => p.starter).map(p => (
-            <div key={p.name} className="flex items-baseline gap-3 py-1.5">
-              <span className="w-6 font-sans text-[11px] text-muted tabular-nums text-right">
-                {p.shirt ?? ''}
-              </span>
+            <div key={p.name} className="flex items-center gap-3 py-1.5">
+              <Shirt colour={sideColour(l.homeAway)} number={p.shirt} size={22} />
               <PlayerTap name={p.name} playerId={p.id} comp={comp} onOpen={onOpenPlayer}
                 className="text-[14px]" />
             </div>
@@ -368,17 +368,19 @@ function HeadToHead({ headToHead }) {
 // used — 'In this round' for a knockout/group tie, 'That day' for a
 // league fixture (whose round carries the season name, not a round).
 // Absent entirely rather than an empty shelf when there are none.
-function Siblings({ siblings, fixture }) {
+function Siblings({ siblings, fixture, followedIds }) {
   if (!siblings?.length) return null;
   return (
     <section className="mb-8">
       <SectionLabel muted>{fixture.round != null ? 'In this round' : 'That day'}</SectionLabel>
-      {siblings.map(f => <FixtureRow key={f.id} fixture={f} showContext={false} />)}
+      {siblings.map(f => (
+        <FixtureRow key={f.id} fixture={f} showContext={false} followedIds={followedIds} />
+      ))}
     </section>
   );
 }
 
-export default function MatchRoom({ fixture, comp, detail, videos, siblings }) {
+export default function MatchRoom({ fixture, comp, detail, videos, siblings, followedIds = new Set() }) {
   // The peek sheet's open/closed player (spec §13.16) — one instance lives
   // at the room's root rather than per tap-site, so standouts, lineups and
   // timeline names all share the same sheet instead of each mounting one.
@@ -412,7 +414,7 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings }) {
           comp.hasMatchDetail, so a BBC-degraded fixture that finished can
           still surface highlights even with no match detail to show. */}
       <VideoCard videos={videos} />
-      <Siblings siblings={siblings} fixture={fixture} />
+      <Siblings siblings={siblings} fixture={fixture} followedIds={followedIds} />
       <PlayerSheet comp={comp} playerId={sheetPlayerId} onClose={() => setSheetPlayerId(null)} />
     </main>
   );

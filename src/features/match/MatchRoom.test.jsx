@@ -91,7 +91,10 @@ test('a live fixture overlays the fresher summary score onto the header, not the
     <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={liveDetail} />
   </MemoryRouter>);
   // fixture itself says 2-1 (stale cache); the summary header says 3-1.
-  const headerScores = [...container.querySelector('header').querySelectorAll('.tabular-nums')]
+  // Scoped to the score spans specifically (text-[30px]) — a plain
+  // '.tabular-nums' selector also now matches the live-minute span
+  // (StatusWord, gold sweep: tabular-nums added there too).
+  const headerScores = [...container.querySelector('header').querySelectorAll('[class*="text-[30px]"]')]
     .map(el => el.textContent);
   expect(headerScores).toEqual(['3', '1']);
 });
@@ -441,6 +444,37 @@ test('a lineup player with no id stays plain text', () => {
   expect(screen.getByText('Reo Hatate')).toBeInTheDocument();
 });
 
+test('each lineup row renders a Shirt in its side\'s colour, number on the chest', () => {
+  const colouredFixture = { ...fixture,
+    home: { ...fixture.home, colour: '009921' },
+    away: { ...fixture.away, colour: 'C8142F' } };
+  const lineupDetail = { ...detail, lineups: [
+    { homeAway: 'home', players: [{ id: 'p2', name: 'Reo Hatate', shirt: '42', starter: true, position: 'MF' }] },
+    { homeAway: 'away', players: [{ id: 'p4', name: 'James Tavernier', shirt: '2', starter: true, position: 'DF' }] },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={colouredFixture} comp={byId('sco.1')} detail={lineupDetail} />
+  </MemoryRouter>);
+  const shirts = screen.getAllByTestId('shirt-shape');
+  expect(shirts[0]).toHaveAttribute('fill', '#009921');
+  expect(shirts[1]).toHaveAttribute('fill', '#C8142F');
+  // Number is scoped to each shirt's own svg (not screen-wide) since the
+  // scoreline header can coincidentally render the same digit as a score.
+  expect(shirts[0].closest('svg').textContent).toBe('42');
+  expect(shirts[1].closest('svg').textContent).toBe('2');
+});
+
+test('a side with no colour renders the Shirt fallback fill', () => {
+  const lineupDetail = { ...detail, lineups: [
+    { homeAway: 'home', players: [{ id: 'p2', name: 'Reo Hatate', shirt: '42', starter: true, position: 'MF' }] },
+    { homeAway: 'away', players: [] },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={lineupDetail} />
+  </MemoryRouter>);
+  expect(screen.getByTestId('shirt-shape')).toHaveAttribute('fill', '#F4F0E7');
+});
+
 test('a timeline goal-scorer with a playerId is tappable; the substitution\'s off-player never is', () => {
   const timelineDetail = { ...detail, events: [
     { minute: "67'", type: 'Goal', player: 'Daizen Maeda', playerId: 'p1', teamId: 'Celtic' },
@@ -564,4 +598,24 @@ test('the siblings section is absent when the prop is omitted entirely', () => {
   </MemoryRouter>);
   expect(screen.queryByText('In this round')).not.toBeInTheDocument();
   expect(screen.queryByText('That day')).not.toBeInTheDocument();
+});
+
+// A followed club's sibling row shows its star (backlog, 2.2 review:
+// siblings never received followedIds, so ★ never showed there).
+test('a followed sibling club shows the star', () => {
+  const siblings = [siblingFixture('s1', 'Hibernian', 'Hearts', { round: 'fourth-round' })];
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, round: 'fourth-round', status: 'ft' }} comp={byId('sco.1')}
+      detail={detail} siblings={siblings} followedIds={new Set(['Hibernian'])} />
+  </MemoryRouter>);
+  expect(screen.getByText('★')).toBeInTheDocument();
+});
+
+test('siblings show no star when followedIds is omitted (defaults to empty)', () => {
+  const siblings = [siblingFixture('s1', 'Hibernian', 'Hearts', { round: 'fourth-round' })];
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, round: 'fourth-round', status: 'ft' }} comp={byId('sco.1')}
+      detail={detail} siblings={siblings} />
+  </MemoryRouter>);
+  expect(screen.queryByText('★')).not.toBeInTheDocument();
 });

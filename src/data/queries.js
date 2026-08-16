@@ -289,17 +289,26 @@ export function useSquad(comp, teamId) {
     queryFn: async () => {
       const candidates = [comp.id, ...SQUAD_FALLBACK_LEAGUES.filter(id => id !== comp.id)];
       let lastAsOf = null;
+      let lastError = null;
+      let anyLegSucceeded = false;
       for (const leagueId of candidates) {
         try {
           const { data, asOf } = await getJson(
             espnUrl(`${SOCCER}/${leagueId}/teams/${teamId}`, { enable: 'roster' }));
+          anyLegSucceeded = true;
           lastAsOf = asOf ?? lastAsOf;
           const players = adaptSquad(data);
           if (players.length > 0) return { players, asOf, resolvedCompId: leagueId };
-        } catch {
-          // this league grouping has no roster for this team — try the next
+        } catch (err) {
+          // this league grouping either has no roster for this team, or the
+          // fetch itself failed — keep trying the remaining legs either way,
+          // but remember the failure: if EVERY leg throws (a full outage,
+          // not just an empty roster), that must surface as isError rather
+          // than silently caching as a legit empty squad for 24h.
+          lastError = err;
         }
       }
+      if (!anyLegSucceeded && lastError) throw lastError;
       return { players: [], asOf: lastAsOf, resolvedCompId: null };
     },
   });

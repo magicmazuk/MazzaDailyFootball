@@ -20,3 +20,14 @@ test('caps at eight', () => {
     fx(String(i), `2026-08-${15 + i}T14:00:00Z`, ['BBC']));
   expect(upcomingTv(many, now)).toHaveLength(8);
 });
+
+// --- window starts tomorrow, not now (backlog, spec §13.18.4): a fixture
+// kicking off later today is already shown under Live/Later today — On TV
+// must not duplicate it. ---
+
+test('a fixture kicking off later today is excluded; one kicking off tomorrow is included', () => {
+  const laterToday = fx('lt', '2026-08-14T20:00:00Z', ['Sky Sports']); // same local day as `now`
+  const tomorrow = fx('tm', '2026-08-15T10:00:00Z', ['Sky Sports']);
+  const out = upcomingTv([laterToday, tomorrow], now);
+  expect(out.map(f => f.id)).toEqual(['tm']);
+});

@@ -4,7 +4,7 @@ import { expect, test, vi } from 'vitest';
 
 vi.mock('../../data/queries.js', () => ({ usePlayer: vi.fn() }));
 
-import PlayerScreen from './PlayerScreen.jsx';
+import PlayerScreen, { Splits } from './PlayerScreen.jsx';
 import { usePlayer } from '../../data/queries.js';
 
 const outfieldBio = {
@@ -51,6 +51,24 @@ test('an outfield player renders the attacking splits with real numbers and no k
   expect(screen.getByText('38 attempted — 60.5%')).toBeInTheDocument();
   expect(screen.queryByText('Keeper')).not.toBeInTheDocument();
   expect(screen.queryByText('Saves')).not.toBeInTheDocument();
+});
+
+// --- pass-share clamp (backlog #86): passPct is a 0-1 fraction; clamp it
+// before computing the bar width so an out-of-range feed value can never
+// overshoot the bar past 100% or push the remainder negative. ---
+
+test('an out-of-range passPct (> 1) clamps the bar to 100%, not beyond', () => {
+  const overStats = { ...outfieldStats, passPct: 1.5 };
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: overStats, isLoading: false, isError: false });
+  renderAt('sco.1', '272624');
+  expect(screen.getByText('38 attempted — 100.0%')).toBeInTheDocument();
+});
+
+test('a negative passPct clamps the bar to 0%, not below', () => {
+  const underStats = { ...outfieldStats, passPct: -0.2 };
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: underStats, isLoading: false, isError: false });
+  renderAt('sco.1', '272624');
+  expect(screen.getByText('38 attempted — 0.0%')).toBeInTheDocument();
 });
 
 test('a keeper renders the keeper view and no attacking section', () => {
@@ -154,4 +172,22 @@ test('a null bio shows the unavailable line even when isError is false — gated
   usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: false, isError: false });
   renderAt('sco.1', '272624');
   expect(screen.getByText('Player unavailable right now.')).toBeInTheDocument();
+});
+
+// --- extracted Splits (spec §13.18.3): PlayerSheet reuses this exact body
+// when it expands, so it has to work standalone, given bio/stats/comp
+// directly rather than via usePlayer + route params. ---
+
+test('the exported Splits component renders the same attacking section standalone, outside PlayerScreen', () => {
+  render(<Splits bio={outfieldBio} stats={outfieldStats} comp={{ id: 'sco.1', name: 'Scottish Premiership' }} />);
+  expect(screen.getByText('Attacking')).toBeInTheDocument();
+  expect(screen.getByText('13 shots — 5 on target')).toBeInTheDocument();
+  expect(screen.getByText('38 attempted — 60.5%')).toBeInTheDocument();
+});
+
+test('the exported Splits component renders the keeper section standalone', () => {
+  render(<Splits bio={keeperBio} stats={keeperStats} comp={{ id: 'sco.1', name: 'Scottish Premiership' }} />);
+  expect(screen.getByText('Saves')).toBeInTheDocument();
+  expect(screen.getByText('Rating')).toBeInTheDocument();
+  expect(screen.getByText('6.8')).toBeInTheDocument();
 });

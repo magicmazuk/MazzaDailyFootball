@@ -32,7 +32,9 @@ test('StatusWord: scheduled shows kickoff, live shows the minute, postponed show
   const { rerender } = render(<StatusWord fixture={fixture('scheduled')} />);
   expect(screen.getByText(/\d{2}:\d{2}/)).toBeInTheDocument();
   rerender(<StatusWord fixture={fixture('live', { minute: "63'" })} />);
-  expect(screen.getByText("63'")).toBeInTheDocument();
+  // tabular-nums (backlog, spec §13.18.4) — fixed-width digits so the
+  // minute doesn't jitter as it ticks.
+  expect(screen.getByText("63'")).toHaveClass('tabular-nums');
   rerender(<StatusWord fixture={fixture('postponed')} />);
   expect(screen.getByText('P–P')).toBeInTheDocument();
   rerender(<StatusWord fixture={fixture('ft')} />);

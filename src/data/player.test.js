@@ -60,11 +60,19 @@ test('adaptAthlete: maps the probed outfield-player shape, with an empty birthPl
     shirt: '9',
     age: 25,
     nationality: 'Denmark',
-    heightDisplay: "6' 1\"",
+    // Primes, not ESPN's raw straight quotes (backlog, spec §13.18.4) — see
+    // the toPrimes conversion test below.
+    heightDisplay: '6′ 1″',
     birthDate: '2000-12-06T08:00Z',
     birthPlace: null,
     defaultLeagueCode: 'sco.1',
   });
+});
+
+test('adaptAthlete: converts displayHeight\'s straight quotes to primes (feet\' -> ′, inches" -> ″)', () => {
+  expect(adaptAthlete({ displayHeight: "6' 1\"" }).heightDisplay).toBe('6′ 1″');
+  expect(adaptAthlete({ displayHeight: "5' 11\"" }).heightDisplay).toBe('5′ 11″');
+  expect(adaptAthlete({ displayHeight: null }).heightDisplay).toBeNull();
 });
 
 // Production hotfix (Aug 2026): defaultLeague.$ref carries the player's

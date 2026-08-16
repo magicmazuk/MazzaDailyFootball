@@ -31,3 +31,25 @@ test('empty rows render nothing', () => {
   </MemoryRouter>);
   expect(container.firstChild).toBeNull();
 });
+
+// --- pre-season guard (backlog, spec §13.18.4) ---
+
+test('every row on 0 played renders the pre-season one-liner instead of an alphabetical 0-point table', () => {
+  const preSeasonRows = rows.map(r => ({ ...r, played: 0, points: 0 }));
+  render(<MemoryRouter>
+    <MiniTable comp={byId('sco.1')} rows={preSeasonRows} followedIds={new Set()} />
+  </MemoryRouter>);
+  expect(screen.getByText("The season hasn't kicked off.")).toBeInTheDocument();
+  expect(screen.queryByText('Team1')).not.toBeInTheDocument();
+  // The header/link stays intact — still browsable to the full table.
+  expect(screen.getByRole('link')).toHaveAttribute('href', '/competition/sco.1');
+});
+
+test('any row with played > 0 renders the normal table, not the pre-season line', () => {
+  const mixedRows = rows.map((r, i) => ({ ...r, played: i === 0 ? 1 : 0 }));
+  render(<MemoryRouter>
+    <MiniTable comp={byId('sco.1')} rows={mixedRows} followedIds={new Set()} />
+  </MemoryRouter>);
+  expect(screen.queryByText("The season hasn't kicked off.")).not.toBeInTheDocument();
+  expect(screen.getByText('Team1')).toBeInTheDocument();
+});

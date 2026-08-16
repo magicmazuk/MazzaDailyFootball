@@ -134,7 +134,7 @@ test('a club with qualifying phase fixtures in two comps gets one replay link ea
 
 // --- squad rows open the player sheet (sheet-first consistency, Aug 2026):
 // every player tap opens PlayerSheet; the full page is reached only via the
-// sheet's "Full profile →" link (or a direct URL). ---
+// sheet's expanded "Open as page →" link (or a direct URL). ---
 
 test('a squad row is a button (not a link) that opens the player sheet', async () => {
   const celtic = side('256', 'Celtic');
@@ -158,7 +158,8 @@ test('a squad row is a button (not a link) that opens the player sheet', async (
 
   await userEvent.click(row);
 
-  expect(screen.getByRole('link', { name: 'Full profile →' })).toHaveAttribute('href', '/player/sco.1/p1');
+  await userEvent.click(screen.getByRole('button', { name: 'Full profile →' }));
+  expect(screen.getByRole('link', { name: 'Open as page →' })).toHaveAttribute('href', '/player/sco.1/p1');
 });
 
 // --- home-league hotfix (Aug 2026): useSquad resolves squads under a
@@ -185,7 +186,8 @@ test('a squad row opens the sheet under the resolved league, not the route comp,
 
   await userEvent.click(screen.getByRole('button', { name: lbl('Kasper Høgh', '9') }));
 
-  expect(screen.getByRole('link', { name: 'Full profile →' })).toHaveAttribute('href', '/player/sco.1/p1');
+  await userEvent.click(screen.getByRole('button', { name: 'Full profile →' }));
+  expect(screen.getByRole('link', { name: 'Open as page →' })).toHaveAttribute('href', '/player/sco.1/p1');
 });
 
 test('an empty squad (resolved through every fallback, still zero players) shows the distinct unavailable line', () => {
@@ -380,6 +382,33 @@ test('a BBC comp (hasSquads false): the degraded line still renders, unaffected 
   renderAt('scottish-league-one', '256');
 
   expect(screen.getByText("Squad details aren't published for Scottish League One.")).toBeInTheDocument();
+});
+
+// --- full-bleed watermark (spec §13.18.1) ---
+
+test('the crest watermark is fixed to the viewport (not clipped by an overflow-hidden main)', () => {
+  const celtic = side('256', 'Celtic', { crestUrl: 'https://example.com/crest.png' });
+  stubSeasons({
+    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
+  });
+
+  const { container } = renderAt('sco.1', '256');
+
+  const main = container.querySelector('main');
+  expect(main.className).not.toMatch(/overflow-hidden/);
+  expect(main.className).toMatch(/relative/);
+  // The crest div itself is absolute inside a fixed, column-centred
+  // wrapper — the wrapper does the viewport-fixing (so nothing clips at
+  // the padded column), the inner max-w-md re-anchors it to the content
+  // column on wide screens.
+  const crest = container.querySelector('[style*="crest.png"]');
+  expect(crest.className).toMatch(/-top-\[140px\]/);
+  expect(crest.className).toMatch(/-right-\[140px\]/);
+  const wrapper = crest.closest('[aria-hidden]');
+  expect(wrapper.className).toMatch(/fixed/);
+  expect(wrapper.className).toMatch(/pointer-events-none/);
+  expect(wrapper.className).toMatch(/z-0/);
+  expect(crest.closest('[class*="max-w-md"]')).not.toBeNull();
 });
 
 test('a club with no phase fixtures at all renders the page normally, no replay link', () => {

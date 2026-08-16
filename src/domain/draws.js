@@ -86,7 +86,12 @@ export function unrevealedDraws(fixturesByComp, seenTies) {
 
     for (const [round, roundFixtures] of byRound) {
       if (PHASE_ROUNDS.has(round)) continue;
-      if (roundFixtures.length < 2) continue;
+      // Gate on distinct PAIRINGS, not raw legs (backlog, two-leg hotfix
+      // review): a single-pairing two-legged round publishes 2 fixtures for
+      // ONE tie — dedupePairings collapses those to 1, correctly failing
+      // this gate (a draw ceremony draws pairings, and one drawn pairing is
+      // scheduling, not a draw, same as the single-tie single-leg case).
+      if (dedupePairings(roundFixtures).length < 2) continue;
       if (!roundFixtures.every(f => f.status === 'scheduled')) continue;
       if (!roundFixtures.every(f => !seenTies?.[tieId(comp.id, f.id)])) continue;
       const roundLabel = prettifyRound(round) ?? fallbackRoundLabel(round);

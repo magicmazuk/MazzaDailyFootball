@@ -7,7 +7,7 @@ export default function StatusWord({ fixture }) {
       <span className="font-sans text-[10px] uppercase tracking-[.14em] text-accent
                        inline-flex items-center gap-1.5">
         <span className="w-1.5 h-1.5 rounded-full bg-accent" aria-hidden />
-        {fixture.minute ?? 'Live'}
+        <span className="tabular-nums">{fixture.minute ?? 'Live'}</span>
       </span>
     );
   }
