@@ -3,6 +3,7 @@ import FixtureRow from '../../ui/FixtureRow.jsx';
 import NextUpRow from './NextUpRow.jsx';
 import MiniTable from './MiniTable.jsx';
 import DrawInvitation from './DrawInvitation.jsx';
+import Papers from './Papers.jsx';
 
 const longDate = d => d.toLocaleDateString('en-GB',
   { weekday: 'long', day: 'numeric', month: 'long' });
@@ -64,6 +65,7 @@ export default function TodayView({ partition, followedIds, date, asOf = null, n
       <Section label="Later today" muted fixtures={later} followedIds={followedIds} />
       <Section label="Earlier today" muted fixtures={earlier} followedIds={followedIds} />
       {quiet && <p className="text-muted mt-2">No matches today.</p>}
+      <Papers />
       {onTv.length > 0 && (
         <section className="mt-8">
           <SectionLabel muted>On TV</SectionLabel>

@@ -714,3 +714,24 @@ as right-aligned serif numerals on the same rule (GateRule, local to FieldBoard)
    single-pairing two-leg invitation gate, calendar month-paging selection reset, On TV starts
    tomorrow (no duplicate of today's rows), sibling fixtures show ★, live-minute tabular-nums,
    height in primes, pass-share clamp, memo/tidy items.
+
+## 13.19 The morning edition (v1.1)
+
+1. **The fixture drawer** — tapping a fixture row unfolds an inline drawer beneath it (the
+   LeagueTable Drawer pattern), instead of navigating. A RESULT's drawer: goalscorers by side,
+   attendance, "Full detail ->" link to the match page. An UPCOMING fixture's drawer: recent
+   head-to-head meetings, "Full detail ->". Detail is fetched ONLY when a drawer first opens
+   (lazy useMatchDetail). LIVE (in-play/HT) rows keep direct navigation to the match room — when
+   the ball is rolling you want the room, not a drawer. BBC comps (no match detail) keep direct
+   navigation too. Drawer degrades in one line ("Match detail unavailable.").
+2. **The papers** — a news section on Today, after Earlier today and before On TV: label "The
+   papers", two sub-blocks: Celtic and British football, each from the corresponding BBC Sport
+   RSS feed via a new allowlisted proxy (api/news.js: exactly two feeds, 15-min edge cache,
+   last-known-good). Each block opens with its TOP story (serif headline linking out to the
+   article, two-line standfirst, "BBC Sport · Nh ago" meta, optional thumbnail); a quiet
+   "+ 4 more" reveals the next four as compact headline rows, rendered (and their images
+   loaded) only on reveal. Degraded: "The papers haven't arrived." Loading: "Fetching the
+   papers…". External links open in a new tab.
+3. **European TV listings** — the curated tvListings.json gains verified UK broadcast entries
+   for upcoming UEFA fixtures (TNT Sports / Amazon Prime era). Verified-only rule unchanged:
+   a fixture whose UK broadcaster can't be confirmed stays unlisted.

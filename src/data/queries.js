@@ -7,8 +7,9 @@ import { computeTable } from '../domain/table.js';
 import { adaptScoreboard, adaptStandings, adaptSquad, adaptSummary, adaptTeams } from './espn.js';
 import { adaptAthlete, adaptPlayerStats } from './player.js';
 import { adaptBbcFixtures } from './bbc.js';
+import { adaptFeed } from './news.js';
 import { applyTv } from './tv.js';
-import { bbcUrl, espnUrl, getJson } from './client.js';
+import { bbcUrl, espnUrl, getJson, getText, newsUrl } from './client.js';
 import { buildTeamIndex, mergeCupFixtures } from './mergeCup.js';
 
 const SOCCER = '/apis/site/v2/sports/soccer';
@@ -267,6 +268,21 @@ export function teamsQuery(comp) {
 
 export const useTeams = comp => useQuery(teamsQuery(comp));
 export const useAllTeams = comps => useQueries({ queries: comps.map(teamsQuery) });
+
+// The papers (spec §13.19.2) — BBC Sport RSS behind the news proxy, £0 and
+// keyless. The proxy passes the upstream XML straight through, so this
+// uses getText (not getJson) and adapts the raw body itself. 15-minute
+// staleTime mirrors the proxy's own edge TTL (s-maxage=900).
+export function useNews(feed) {
+  return useQuery({
+    queryKey: ['news', feed],
+    staleTime: 15 * MIN,
+    queryFn: async () => {
+      const { text, asOf } = await getText(newsUrl(feed));
+      return { items: adaptFeed(text), asOf };
+    },
+  });
+}
 
 // Production regression (hotfix, Aug 2026): ESPN only populates a
 // team's roster (athletes[]) under the club's DOMESTIC league grouping —

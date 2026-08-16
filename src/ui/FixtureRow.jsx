@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { byId } from '../domain/competitions.js';
 import { prettifyRound } from '../domain/round.js';
+import { useMatchDetail } from '../data/queries.js';
 import Crest from './Crest.jsx';
 import StatusWord from './StatusWord.jsx';
 import TvBadge from './TvBadge.jsx';
@@ -57,28 +59,195 @@ function TeamLine({ side, compId, followed, dim, showScore }) {
   );
 }
 
+// The row's own content (spec §13.19.1) — identical whether the row ends
+// up wrapped in a Link (navigate) or a button (toggle the drawer), so the
+// two wrapper branches below share this rather than duplicating it.
+function RowBody({ fixture, followedIds, showContext, dim, showScore }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="w-12 shrink-0 pt-1 space-y-1.5">
+        <StatusWord fixture={fixture} />
+        <TvBadge tv={fixture.tv} />
+      </div>
+      <div className="flex-1 min-w-0 space-y-1.5">
+        {showContext && <ContextLine fixture={fixture} />}
+        <TeamLine side={fixture.home} compId={fixture.compId} showScore={showScore}
+          followed={followedIds.has(fixture.home.teamId)} dim={dim} />
+        <TeamLine side={fixture.away} compId={fixture.compId} showScore={showScore}
+          followed={followedIds.has(fixture.away.teamId)} dim={dim} />
+      </div>
+    </div>
+  );
+}
+
+const shortDate = iso => new Date(iso).toLocaleDateString('en-GB',
+  { day: 'numeric', month: 'short', year: 'numeric' });
+
+// A goal event's qualifier (spec §13.19.1) — a penalty or own goal keeps
+// its marker beside the minute, exactly like the match room's timeline;
+// a plain run-of-play goal carries none.
+function goalMarker(type = '') {
+  if (/penalty/i.test(type)) return ' (pen)';
+  if (/own goal/i.test(type)) return ' (og)';
+  return '';
+}
+
+// Which side a goal event credits (spec §13.19.1): e.teamId's own side,
+// for own goals too — verified against the LIVE feed at the v1.1 final
+// review (8 own goals across eng.1/sco.1: ESPN's keyEvents[].team.id is
+// always the team the goal counts FOR, and the per-teamId tally reproduces
+// every final scoreline exactly; e.g. O'Hora's og in Hibs 1-2 Hearts
+// carries the Hearts id). Do NOT "flip" own goals to the other side — a
+// fix round tried that on the strength of a hand-authored test fixture
+// and it inverted real drawers. The (og) marker still renders; only the
+// grouping stays raw. Returns null when the teamId matches neither side.
+function creditedSide(event, fixture) {
+  if (event.teamId === fixture.home.teamId) return 'home';
+  if (event.teamId === fixture.away.teamId) return 'away';
+  return null;
+}
+
+// Scorers grouped by the side credited for each goal, then by player (spec
+// §13.19.1): every goal one player scored collapses onto a single
+// "Maeda 12′, 61′" line; different scorers on the same side join with
+// ' · '. Events with no player, or that credit neither side, are skipped
+// rather than crashing.
+function scorersBySide(events, fixture) {
+  const goalsBySide = { home: [], away: [] };
+  for (const e of events ?? []) {
+    if (!e.scoringPlay || e.player == null) continue;
+    const side = creditedSide(e, fixture);
+    if (side) goalsBySide[side].push(e);
+  }
+  const format = goals => {
+    const order = [];
+    const minutesByPlayer = new Map();
+    for (const g of goals) {
+      if (!minutesByPlayer.has(g.player)) {
+        minutesByPlayer.set(g.player, []);
+        order.push(g.player);
+      }
+      minutesByPlayer.get(g.player).push(`${g.minute}${goalMarker(g.type)}`);
+    }
+    return order.map(player => `${player} ${minutesByPlayer.get(player).join(', ')}`).join(' · ');
+  };
+  return { home: format(goalsBySide.home), away: format(goalsBySide.away) };
+}
+
+function FullDetailLink({ comp, fixture }) {
+  return (
+    <Link to={`/match/${comp.id}/${fixture.id}`}
+      className="font-sans text-[9.5px] uppercase tracking-[.14em] text-muted underline
+                 underline-offset-4 inline-block mt-4">
+      Full detail →
+    </Link>
+  );
+}
+
+// Result drawer content (spec §13.19.1): each side's scorers, then
+// attendance when the source published it, then the way through to the
+// full page. A goalless side (or a goalless match) simply contributes no
+// line — nothing to report is not a degraded state.
+function ResultDrawer({ detail, fixture, comp }) {
+  const scorers = scorersBySide(detail.events, fixture);
+  const attendance = detail.gameInfo?.attendance;
+  return (
+    <>
+      {scorers.home && <p className="text-[13px] mb-1">{fixture.home.name}: {scorers.home}</p>}
+      {scorers.away && <p className="text-[13px] mb-1">{fixture.away.name}: {scorers.away}</p>}
+      {attendance != null && (
+        <p className="font-sans text-[10px] text-muted tabular-nums mt-2">
+          Attendance {Number(attendance).toLocaleString('en-GB')}
+        </p>
+      )}
+      <FullDetailLink comp={comp} fixture={fixture} />
+    </>
+  );
+}
+
+// Upcoming drawer content (spec §13.19.1): the last three head-to-head
+// meetings, most recent first — sorted here rather than trusted from the
+// feed, since seasonseries' event order isn't guaranteed. "No recent
+// meetings." keeps the line honest rather than blank when there are none.
+function UpcomingDrawer({ detail, fixture, comp }) {
+  const meetings = [...(detail.headToHead?.meetings ?? [])]
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 3);
+  return (
+    <>
+      {meetings.length === 0
+        ? <p className="text-[13px] text-muted mb-1">No recent meetings.</p>
+        : meetings.map((m, i) => (
+          <p key={i} className="text-[12px] mb-1">
+            {shortDate(m.date)} · {m.homeName} {m.homeScore}–{m.awayScore} {m.awayName}
+          </p>
+        ))}
+      <FullDetailLink comp={comp} fixture={fixture} />
+    </>
+  );
+}
+
+// The inline drawer (spec §13.19.1): the LeagueTable Drawer's own
+// furniture — same background, same negative-margin bleed, same underline
+// link style — so a tapped fixture row reads as the same piece of the
+// page as a tapped table row. Mounted only while its row is open, so the
+// summary fetch behind useMatchDetail never fires until the first tap.
+function FixtureDrawer({ comp, fixture }) {
+  const { data, isLoading, isError } = useMatchDetail(comp, fixture.id, false);
+  return (
+    <div className="bg-drawer -mx-5 px-5 py-4">
+      {isLoading && (
+        <p className="font-sans text-[11px] text-muted">Fetching the detail…</p>
+      )}
+      {!isLoading && isError && (
+        <p className="font-sans text-[11px] text-muted">Match detail unavailable.</p>
+      )}
+      {!isLoading && !isError && (
+        fixture.status === 'ft'
+          ? <ResultDrawer detail={data?.detail ?? {}} fixture={fixture} comp={comp} />
+          : <UpcomingDrawer detail={data?.detail ?? {}} fixture={fixture} comp={comp} />
+      )}
+    </div>
+  );
+}
+
 export default function FixtureRow({ fixture, followedIds = new Set(), showContext = true }) {
+  const [open, setOpen] = useState(false);
   const dim = fixture.status === 'postponed' || fixture.status === 'canceled';
   // ESPN reports score:"0" before kickoff — never render a score for a
   // fixture that hasn't started or finished, or every scheduled match
   // in the calendar/On TV/fixture lists would show a phantom 0-0.
   const showScore = fixture.status === 'live' || fixture.status === 'ft';
+  const comp = byId(fixture.compId);
+  // The drawer pattern (spec §13.19.1) applies only where there's detail
+  // worth unfolding: a finished or upcoming fixture on an ESPN competition
+  // that publishes match detail. A live/HT fixture keeps the direct Link
+  // (the room is what you want mid-match), and so does anything with no
+  // detail to show (a BBC comp, or hasMatchDetail: false).
+  const expandable = comp?.source === 'espn' && !!comp?.hasMatchDetail
+    && (fixture.status === 'ft' || fixture.status === 'scheduled');
+
+  const body = (
+    <RowBody fixture={fixture} followedIds={followedIds} showContext={showContext}
+      dim={dim} showScore={showScore} />
+  );
+
+  if (!expandable) {
+    return (
+      <Link to={`/match/${fixture.compId}/${fixture.id}`}
+        className="block py-3 border-b border-rule/70">
+        {body}
+      </Link>
+    );
+  }
+
   return (
-    <Link to={`/match/${fixture.compId}/${fixture.id}`}
-      className="block py-3 border-b border-rule/70">
-      <div className="flex items-start gap-3">
-        <div className="w-12 shrink-0 pt-1 space-y-1.5">
-          <StatusWord fixture={fixture} />
-          <TvBadge tv={fixture.tv} />
-        </div>
-        <div className="flex-1 min-w-0 space-y-1.5">
-          {showContext && <ContextLine fixture={fixture} />}
-          <TeamLine side={fixture.home} compId={fixture.compId} showScore={showScore}
-            followed={followedIds.has(fixture.home.teamId)} dim={dim} />
-          <TeamLine side={fixture.away} compId={fixture.compId} showScore={showScore}
-            followed={followedIds.has(fixture.away.teamId)} dim={dim} />
-        </div>
-      </div>
-    </Link>
+    <div>
+      <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)}
+        className="w-full text-left block py-3 border-b border-rule/70">
+        {body}
+      </button>
+      {open && <FixtureDrawer comp={comp} fixture={fixture} />}
+    </div>
   );
 }
