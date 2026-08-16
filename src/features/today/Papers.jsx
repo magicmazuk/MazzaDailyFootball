@@ -14,9 +14,10 @@ const clampStyle = {
 };
 
 function Meta({ publishedAt }) {
+  const ago = timeAgo(publishedAt);
   return (
     <p className="font-sans text-[9.5px] uppercase tracking-[.14em] text-muted">
-      BBC Sport · {timeAgo(publishedAt)}
+      BBC Sport{ago && ` · ${ago}`}
     </p>
   );
 }
@@ -64,6 +65,9 @@ function Block({ label, feed }) {
   const { data, isLoading } = useNews(feed);
   const items = data?.items ?? [];
   const [top, ...rest] = items;
+  // Per-block unique id — Block renders twice (celtic, football) — for
+  // aria-controls to target unambiguously.
+  const moreId = `papers-${feed}-more`;
 
   return (
     <div>
@@ -76,11 +80,12 @@ function Block({ label, feed }) {
           {rest.length > 0 && (
             <div className="mt-4">
               <button type="button" onClick={() => setRevealed(r => !r)}
+                aria-expanded={revealed} aria-controls={moreId}
                 className="font-sans text-[10px] uppercase tracking-[.16em] text-accent">
                 {revealed ? '− fewer' : `+ ${rest.length} more`}
               </button>
               {revealed && (
-                <div className="mt-3 divide-y divide-rule/60">
+                <div id={moreId} className="mt-3 divide-y divide-rule/60">
                   {rest.map(item => <CompactRow key={item.id} item={item} />)}
                 </div>
               )}

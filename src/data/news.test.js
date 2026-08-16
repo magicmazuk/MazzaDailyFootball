@@ -72,6 +72,35 @@ test('missing media:thumbnail yields null, not undefined or empty string', () =>
   expect(second.thumbnail).toBeNull();
 });
 
+test.each([
+  ['http://ichef.bbci.co.uk/img.jpg'], // insecure scheme
+  ['data:image/png;base64,AAAA'], // inline payload, not a real fetch
+])('a %s thumbnail url is rejected down to null — only https: is trusted', url => {
+  const feed = rssWithItems([{ title: 'Story', description: 'Standfirst.',
+    link: 'https://www.bbc.co.uk/sport/football/x', guid: 'https://www.bbc.co.uk/sport/football/x',
+    pubDate: 'Thu, 13 Aug 2026 09:00:00 GMT', thumbnail: url }]);
+  expect(adaptFeed(feed)[0].thumbnail).toBeNull();
+});
+
+// --- inert parsing (security fix, review round 1) ---
+// Titles/descriptions are untrusted third-party content (BBC RSS). Tag
+// stripping MUST go through an inert DOMParser document rather than a live
+// div's innerHTML — a live-document parse can execute inline event
+// handlers (e.g. <img onerror=...>) even on an element that's never
+// attached to the page. This proves both halves: the handler never runs,
+// AND the visible text comes out clean.
+test('a title containing an <img onerror> payload never executes it, and strips down to clean text', () => {
+  window.exploited = undefined;
+  const evil = rssWithItems([{
+    title: '<img src="x" onerror="window.exploited = true">Breaking news',
+    description: 'Standfirst.', link: 'https://www.bbc.co.uk/sport/football/evil',
+    guid: 'https://www.bbc.co.uk/sport/football/evil', pubDate: 'Thu, 13 Aug 2026 09:00:00 GMT',
+  }]);
+  const [item] = adaptFeed(evil);
+  expect(item.title).toBe('Breaking news');
+  expect(window.exploited).toBeUndefined();
+});
+
 test('malformed XML yields an empty list rather than throwing', () => {
   expect(adaptFeed('<rss><channel><item><title>unclosed')).toEqual([]);
   expect(adaptFeed('this is not xml at all')).toEqual([]);
@@ -102,4 +131,11 @@ test('hours ago under a day old', () => {
 
 test('days ago beyond 24 hours', () => {
   expect(timeAgo(new Date('2026-08-11T12:00:00Z').toISOString(), now)).toBe('2d ago');
+});
+
+test('a missing or unparseable timestamp yields an empty string, not a nonsense epoch-derived span', () => {
+  expect(timeAgo(null, now)).toBe('');
+  expect(timeAgo(undefined, now)).toBe('');
+  expect(timeAgo('', now)).toBe('');
+  expect(timeAgo('not a date', now)).toBe('');
 });

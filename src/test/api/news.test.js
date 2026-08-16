@@ -33,6 +33,22 @@ test('no arbitrary URL passthrough — an unrecognised feed value never reaches 
   expect(spy).not.toHaveBeenCalled();
 });
 
+// FEEDS is a plain object literal — a bracket lookup with a prototype-chain
+// key (FEEDS['__proto__'], FEEDS['constructor'], FEEDS['toString']) resolves
+// to a real, truthy object rather than undefined, which would sail past a
+// naive `!upstreamUrl` guard and reach fetch() with a non-URL value —
+// surfacing as a misleading 502 instead of the contracted 400. hasOwn-based
+// lookup must reject all three the same as any other unknown feed.
+test.each(['__proto__', 'constructor', 'toString'])(
+  'feed=%s never resolves via the prototype chain — rejected with 400, no fetch', async key => {
+    const spy = vi.fn();
+    vi.stubGlobal('fetch', spy);
+    const res = await call(`/api/news?feed=${key}`);
+    expect(res.statusCode).toBe(400);
+    expect(spy).not.toHaveBeenCalled();
+  },
+);
+
 // The handler's last-known-good Map is module-level and persists for the
 // life of this file (same convention as bbc.test.js/espn.test.js) — the
 // two "no prior LKG" tests below must run before anything else populates
@@ -58,6 +74,30 @@ test('a 200 with a non-XML body is never cached as last-known-good', async () =>
   // with that bad body instead of surfacing the failure.
   expect(second.statusCode).toBe(500);
   expect(second.headers['x-lkg-at']).toBeUndefined();
+});
+
+test('an HTML doctype error page is never cached as last-known-good; a genuine RSS response afterwards is', async () => {
+  const url = '/api/news?feed=celtic';
+  const doctypeBody = '<!DOCTYPE html><html><head><title>503 Service Unavailable</title></head>'
+    + '<body>Down for maintenance</body></html>';
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(doctypeBody, { status: 200 })));
+  const first = await call(url);
+  // Not recognised as a real feed body, so it surfaces as a failure rather
+  // than a false 200 — and, per the assertions below, is never stored.
+  expect(first.statusCode).not.toBe(200);
+
+  const goodRss = '<?xml version="1.0"?><rss><channel><item><title>Real story</title></item></channel></rss>';
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(goodRss, { status: 200 })));
+  const second = await call(url);
+  expect(second.statusCode).toBe(200);
+  expect(second.body).toBe(goodRss);
+
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('down', { status: 500 })));
+  const third = await call(url);
+  // If the doctype page had wrongly been cached, this would now serve ITS
+  // body instead of the genuine RSS the second call stored.
+  expect(third.statusCode).toBe(200);
+  expect(third.body).toBe(goodRss);
 });
 
 test('feed=celtic maps to exactly the Celtic team feed and passes the XML body through', async () => {

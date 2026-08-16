@@ -68,6 +68,9 @@ test('hidden items are not in the DOM before reveal; "+ n more" reveals them and
   expect(screen.queryByText('Story c2')).not.toBeInTheDocument();
   expect(screen.queryByText('Story c5')).not.toBeInTheDocument();
   const button = screen.getByRole('button', { name: '+ 4 more' });
+  expect(button).toHaveAttribute('aria-expanded', 'false');
+  const controlsId = button.getAttribute('aria-controls');
+  expect(controlsId).toBeTruthy();
 
   await user.click(button);
 
@@ -77,11 +80,27 @@ test('hidden items are not in the DOM before reveal; "+ n more" reveals them and
   expect(screen.getByText('Story c5')).toBeInTheDocument();
   // The top story (c1) stays put, not duplicated among the compact rows.
   expect(screen.getAllByText('Story c1')).toHaveLength(1);
-  expect(screen.getByRole('button', { name: '− fewer' })).toBeInTheDocument();
+  const fewerButton = screen.getByRole('button', { name: '− fewer' });
+  expect(fewerButton).toHaveAttribute('aria-expanded', 'true');
+  expect(fewerButton).toHaveAttribute('aria-controls', controlsId);
+  // The revealed rows container is exactly what aria-controls names.
+  // eslint-disable-next-line testing-library/no-node-access
+  expect(document.getElementById(controlsId)).toContainElement(screen.getByText('Story c2'));
 
-  await user.click(screen.getByRole('button', { name: '− fewer' }));
+  await user.click(fewerButton);
   expect(screen.queryByText('Story c2')).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '+ 4 more' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '+ 4 more' })).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('the two blocks use distinct aria-controls ids for their reveal buttons', () => {
+  stub({
+    celtic: { isLoading: false, data: { items: fiveItems } },
+    football: { isLoading: false, data: { items: fiveItems.map(it => ({ ...it, id: `f-${it.id}` })) } },
+  });
+  render(<Papers />);
+  const [celticMore, footballMore] = screen.getAllByRole('button', { name: '+ 4 more' });
+  expect(celticMore.getAttribute('aria-controls'))
+    .not.toBe(footballMore.getAttribute('aria-controls'));
 });
 
 test('loading state renders a one-liner per block, independently', () => {
@@ -96,6 +115,16 @@ test('error/empty state renders the degraded one-liner per block', () => {
   render(<Papers />);
   const lines = screen.getAllByText("The papers haven't arrived.");
   expect(lines).toHaveLength(2);
+});
+
+test('a story with no usable timestamp shows the meta line as plain "BBC Sport", no dangling separator', () => {
+  stub({
+    celtic: { isLoading: false, data: { items: [item('c1', { publishedAt: null })] } },
+    football: empty,
+  });
+  render(<Papers />);
+  expect(screen.getByText('BBC Sport')).toBeInTheDocument();
+  expect(screen.queryByText(/BBC Sport ·/)).not.toBeInTheDocument();
 });
 
 test('each block groups its own content under its own sub-label', () => {

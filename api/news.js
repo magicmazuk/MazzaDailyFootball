@@ -13,10 +13,16 @@ const lastKnownGood = new Map(); // key: feed → { body, at }
 export default async function handler(req, res) {
   const params = new URLSearchParams(req.url.split('?')[1] ?? '');
   const feed = params.get('feed');
-  const upstreamUrl = FEEDS[feed];
-  if (!upstreamUrl) {
+  // Object.hasOwn, not a bare FEEDS[feed] truthiness check: FEEDS is a
+  // plain object literal, so feed values like '__proto__' or 'constructor'
+  // resolve via the prototype chain to a real (truthy) object rather than
+  // undefined — that would sail past a `!upstreamUrl` guard, reach fetch()
+  // with a non-URL value, and surface as a misleading 502 instead of the
+  // contracted 400. hasOwn only ever matches the two real keys.
+  if (!Object.hasOwn(FEEDS, feed ?? '')) {
     return send(res, 400, JSON.stringify({ error: 'feed must be celtic or football' }), 'application/json');
   }
+  const upstreamUrl = FEEDS[feed];
 
   try {
     const upstream = await fetch(upstreamUrl, { headers: { accept: 'application/rss+xml, text/xml' } });
@@ -42,8 +48,17 @@ function serveFallback(res, feed, status, failureBody) {
   return send(res, status >= 400 ? status : 502, failureBody, 'application/json');
 }
 
+// A CDN/WAF outage page still answers with HTTP 200 and a body starting
+// with '<' (an HTML error page) — a bare "starts with '<'" check would
+// wrongly cache that as last-known-good. Reject an HTML doctype outright,
+// and additionally require an actual feed root tag near the top of the
+// body — real BBC RSS opens with an XML declaration then <rss ...> within
+// the first line or two, well inside this 300-char window.
 function looksLikeXml(text) {
-  return typeof text === 'string' && text.trimStart().startsWith('<');
+  if (typeof text !== 'string') return false;
+  const head = text.slice(0, 300);
+  if (/^\s*<!doctype\s+html/i.test(head)) return false;
+  return /<rss\b|<feed\b/i.test(head);
 }
 
 function send(res, status, body, contentType = 'text/xml') {
