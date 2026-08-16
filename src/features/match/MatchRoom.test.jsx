@@ -91,7 +91,10 @@ test('a live fixture overlays the fresher summary score onto the header, not the
     <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={liveDetail} />
   </MemoryRouter>);
   // fixture itself says 2-1 (stale cache); the summary header says 3-1.
-  const headerScores = [...container.querySelector('header').querySelectorAll('.tabular-nums')]
+  // Scoped to the score spans specifically (text-[30px]) — a plain
+  // '.tabular-nums' selector also now matches the live-minute span
+  // (StatusWord, gold sweep: tabular-nums added there too).
+  const headerScores = [...container.querySelector('header').querySelectorAll('[class*="text-[30px]"]')]
     .map(el => el.textContent);
   expect(headerScores).toEqual(['3', '1']);
 });
@@ -564,4 +567,24 @@ test('the siblings section is absent when the prop is omitted entirely', () => {
   </MemoryRouter>);
   expect(screen.queryByText('In this round')).not.toBeInTheDocument();
   expect(screen.queryByText('That day')).not.toBeInTheDocument();
+});
+
+// A followed club's sibling row shows its star (backlog, 2.2 review:
+// siblings never received followedIds, so ★ never showed there).
+test('a followed sibling club shows the star', () => {
+  const siblings = [siblingFixture('s1', 'Hibernian', 'Hearts', { round: 'fourth-round' })];
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, round: 'fourth-round', status: 'ft' }} comp={byId('sco.1')}
+      detail={detail} siblings={siblings} followedIds={new Set(['Hibernian'])} />
+  </MemoryRouter>);
+  expect(screen.getByText('★')).toBeInTheDocument();
+});
+
+test('siblings show no star when followedIds is omitted (defaults to empty)', () => {
+  const siblings = [siblingFixture('s1', 'Hibernian', 'Hearts', { round: 'fourth-round' })];
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, round: 'fourth-round', status: 'ft' }} comp={byId('sco.1')}
+      detail={detail} siblings={siblings} />
+  </MemoryRouter>);
+  expect(screen.queryByText('★')).not.toBeInTheDocument();
 });

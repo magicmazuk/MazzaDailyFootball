@@ -5,6 +5,11 @@ import Crest from '../../ui/Crest.jsx';
 // The whole widget is one link — detail lives on the competition page.
 export default function MiniTable({ comp, rows, followedIds }) {
   if (!rows?.length) return null;
+  // Pre-season guard (backlog, spec §13.18.4): every row still on 0 played
+  // means the league hasn't kicked off — an alphabetical 0-point table
+  // (ESPN's standings order before any results exist) reads as noise, not
+  // a table. Same degraded-line style as the app's other honest one-liners.
+  const preSeason = rows.every(r => r.played === 0);
   const top = rows.slice(0, 4);
   const followedBelow = rows.filter(r => r.position > 4 && followedIds.has(r.teamId));
   return (
@@ -17,11 +22,17 @@ export default function MiniTable({ comp, rows, followedIds }) {
           Full table →
         </span>
       </div>
-      {top.map(r => <Row key={r.teamId} r={r} followedIds={followedIds} />)}
-      {followedBelow.length > 0 && (
-        <p className="text-muted text-center leading-none py-1" aria-hidden>⋯</p>
+      {preSeason ? (
+        <p className="font-sans text-[11px] text-muted">The season hasn't kicked off.</p>
+      ) : (
+        <>
+          {top.map(r => <Row key={r.teamId} r={r} followedIds={followedIds} />)}
+          {followedBelow.length > 0 && (
+            <p className="text-muted text-center leading-none py-1" aria-hidden>⋯</p>
+          )}
+          {followedBelow.map(r => <Row key={r.teamId} r={r} followedIds={followedIds} />)}
+        </>
       )}
-      {followedBelow.map(r => <Row key={r.teamId} r={r} followedIds={followedIds} />)}
     </Link>
   );
 }

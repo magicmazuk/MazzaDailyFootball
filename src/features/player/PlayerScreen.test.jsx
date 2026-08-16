@@ -53,6 +53,24 @@ test('an outfield player renders the attacking splits with real numbers and no k
   expect(screen.queryByText('Saves')).not.toBeInTheDocument();
 });
 
+// --- pass-share clamp (backlog #86): passPct is a 0-1 fraction; clamp it
+// before computing the bar width so an out-of-range feed value can never
+// overshoot the bar past 100% or push the remainder negative. ---
+
+test('an out-of-range passPct (> 1) clamps the bar to 100%, not beyond', () => {
+  const overStats = { ...outfieldStats, passPct: 1.5 };
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: overStats, isLoading: false, isError: false });
+  renderAt('sco.1', '272624');
+  expect(screen.getByText('38 attempted — 100.0%')).toBeInTheDocument();
+});
+
+test('a negative passPct clamps the bar to 0%, not below', () => {
+  const underStats = { ...outfieldStats, passPct: -0.2 };
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: underStats, isLoading: false, isError: false });
+  renderAt('sco.1', '272624');
+  expect(screen.getByText('38 attempted — 0.0%')).toBeInTheDocument();
+});
+
 test('a keeper renders the keeper view and no attacking section', () => {
   usePlayer.mockReturnValue({ bio: keeperBio, stats: keeperStats, isLoading: false, isError: false });
   renderAt('sco.1', '999');

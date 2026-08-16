@@ -110,8 +110,14 @@ export default function PlayerScreen() {
 
   const showPasses = stats?.totalPasses != null;
   const passesOn = stats?.accuratePasses ?? 0;
-  const passesPct = stats?.passPct != null
-    ? stats.passPct * 100
+  // Clamp the pass fraction to [0,1] before turning it into a bar width
+  // (backlog #86): passPct is documented as a 0-1 fraction and today's feed
+  // always honours that, but an out-of-range value (a future 0-100 feed, or
+  // any other anomaly) would otherwise overshoot the bar past 100% or push
+  // the remainder negative.
+  const passPctFraction = stats?.passPct != null ? Math.max(0, Math.min(1, stats.passPct)) : null;
+  const passesPct = passPctFraction != null
+    ? passPctFraction * 100
     : (showPasses && stats.totalPasses > 0 ? (passesOn / stats.totalPasses) * 100 : 0);
 
   const showCards = stats?.yellowCards != null || stats?.redCards != null;

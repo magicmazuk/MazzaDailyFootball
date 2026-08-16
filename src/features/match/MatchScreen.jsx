@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { byId } from '../../domain/competitions.js';
 import { todayWindowQuery, useMatchDetail, useSeasonFixtures } from '../../data/queries.js';
+import { usePrefs } from '../../store/prefs.js';
 import MatchRoom from './MatchRoom.jsx';
 import { siblingFixtures } from './siblings.js';
 import { useMatchVideos } from './video.js';
@@ -21,6 +22,7 @@ export function matchRoomComp(comp, eventId) {
 
 export default function MatchScreen() {
   const { compId, eventId } = useParams();
+  const followed = usePrefs(s => s.followed);
   const comp = byId(compId);
   const season = useSeasonFixtures(comp ?? { id: 'none', source: 'espn' });
   // The season copy (staleTime 1h) can still show a fixture as 'scheduled'
@@ -41,6 +43,10 @@ export default function MatchScreen() {
     return <p className="text-muted">{season.isLoading ? 'Loading match…' : 'Match not found.'}</p>;
   }
   const siblings = siblingFixtures(season.data?.fixtures ?? [], fixture);
+  // Sibling fixture rows never received followedIds (backlog, 2.2 review) —
+  // the room already threads it through the header/timeline; siblings get
+  // the same set so a followed club's row stars there too.
+  const followedIds = new Set(Object.keys(followed));
   return <MatchRoom fixture={fixture} comp={roomComp} detail={detail.data?.detail ?? null}
-    videos={videos.data ?? []} siblings={siblings} />;
+    videos={videos.data ?? []} siblings={siblings} followedIds={followedIds} />;
 }

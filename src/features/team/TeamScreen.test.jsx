@@ -382,6 +382,27 @@ test('a BBC comp (hasSquads false): the degraded line still renders, unaffected 
   expect(screen.getByText("Squad details aren't published for Scottish League One.")).toBeInTheDocument();
 });
 
+// --- full-bleed watermark (spec §13.18.1) ---
+
+test('the crest watermark is fixed to the viewport (not clipped by an overflow-hidden main)', () => {
+  const celtic = side('256', 'Celtic', { crestUrl: 'https://example.com/crest.png' });
+  stubSeasons({
+    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
+  });
+
+  const { container } = renderAt('sco.1', '256');
+
+  const main = container.querySelector('main');
+  expect(main.className).not.toMatch(/overflow-hidden/);
+  expect(main.className).toMatch(/relative/);
+  const watermark = container.querySelector('[aria-hidden][style*="crest.png"]');
+  expect(watermark.className).toMatch(/fixed/);
+  expect(watermark.className).not.toMatch(/absolute/);
+  expect(watermark.className).toMatch(/-top-\[140px\]/);
+  expect(watermark.className).toMatch(/-right-\[140px\]/);
+  expect(watermark.className).toMatch(/z-0/);
+});
+
 test('a club with no phase fixtures at all renders the page normally, no replay link', () => {
   const celtic = side('256', 'Celtic');
   stubSeasons({

@@ -170,9 +170,13 @@ function RollcallList({ clubs, statuses }) {
   // order and as the effect's dependency signal, so it re-scrolls only
   // when which positions are current actually changes (a new tie starts
   // drawing), not on every unrelated re-render or landing transition.
-  const currentPositions = statuses.flatMap((status, i) => (status === 'current' ? [i] : []));
-  const currentSignal = currentPositions.join(',');
-  const firstCurrentIndex = currentPositions[0] ?? -1;
+  // Memoized on `statuses` (backlog, v0.9.0 review) — negligible at
+  // roll-call sizes, but was recomputing on every render regardless of
+  // whether statuses itself had changed.
+  const { firstCurrentIndex, currentSignal } = useMemo(() => {
+    const currentPositions = statuses.flatMap((status, i) => (status === 'current' ? [i] : []));
+    return { firstCurrentIndex: currentPositions[0] ?? -1, currentSignal: currentPositions.join(',') };
+  }, [statuses]);
 
   useEffect(() => {
     currentRef.current?.scrollIntoView?.({ block: 'center' });

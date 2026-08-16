@@ -103,13 +103,18 @@ export default function TeamScreen() {
 
   if (!team) return <p className="text-muted">Loading team…</p>;
   return (
-    <main className="relative overflow-hidden">
+    <main className="relative">
       {team.crestUrl && (
-        <div aria-hidden className="pointer-events-none absolute -top-[140px] -right-[140px]
-                                    w-[420px] h-[420px] bg-no-repeat bg-contain"
+        // Full-bleed watermark (spec §13.18.1): fixed to the VIEWPORT, not
+        // the padded content column, so it bleeds to the actual screen edge
+        // — same offsets/size/opacity as before, just no longer clipped by
+        // the old `overflow-hidden` on main. z-0 keeps it behind the
+        // content column (z-10 below) and PlayerSheet's own z-40/z-50.
+        <div aria-hidden className="pointer-events-none fixed -top-[140px] -right-[140px]
+                                    w-[420px] h-[420px] bg-no-repeat bg-contain z-0"
           style={{ backgroundImage: `url(${team.crestUrl})`, opacity: WATERMARK_OPACITY }} />
       )}
-      <div className="relative">
+      <div className="relative z-10">
         <div className="flex items-center gap-4 mb-2">
           <Crest side={team} size={46} />
           <div className="flex-1 min-w-0">

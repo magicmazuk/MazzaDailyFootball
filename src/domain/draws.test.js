@@ -82,6 +82,21 @@ test('a single-tie round is not detected (broadcast scheduling, not a draw)', ()
   expect(unrevealedDraws([{ comp, fixtures }], {})).toEqual([]);
 });
 
+// A single-pairing two-legged round: 2 raw fixtures (one tie's two legs),
+// but only 1 distinct pairing once dedupePairings collapses them — the
+// ≥2-ties gate must count PAIRINGS, not raw legs, or this slips through
+// as a false "draw" (backlog, two-leg hotfix review).
+test('a single-pairing two-legged round is not detected — 2 legs of ONE tie is not a draw', () => {
+  const comp = cupComp('uefa.champions');
+  const home = side('h1', 'Home Side');
+  const away = side('a1', 'Away Side');
+  const fixtures = [
+    phaseFx('leg1', comp.id, 'playoff-round', '2026-08-19T19:00:00Z', home, away),
+    phaseFx('leg2', comp.id, 'playoff-round', '2026-08-26T19:00:00Z', away, home),
+  ];
+  expect(unrevealedDraws([{ comp, fixtures }], {})).toEqual([]);
+});
+
 test('league competitions are ignored even with qualifying-shaped rounds', () => {
   const comp = leagueComp('sco.1');
   const fixtures = [

@@ -162,6 +162,40 @@ test('MatchScreen computes siblings from the season cache and MatchRoom renders 
   expect(screen.getByText('Hibernian')).toBeInTheDocument();
 });
 
+// A followed sibling club stars in the siblings list (backlog, 2.2 review):
+// Celtic (id '256') is followed by default (store/prefs.js) — its sibling
+// row here must show ★, same as it does everywhere else in the app.
+const siblingsWithCelticScoreboard = JSON.stringify({
+  events: [
+    {
+      id: 'e1', date: '2026-08-22T14:00:00Z', status: { type: { name: 'STATUS_SCHEDULED' } },
+      competitions: [{ competitors: [
+        { homeAway: 'home', team: { id: 'abd', displayName: 'Aberdeen' } },
+        { homeAway: 'away', team: { id: 'dun', displayName: 'Dundee' } },
+      ] }],
+    },
+    {
+      id: 'e2', date: '2026-08-22T16:00:00Z', status: { type: { name: 'STATUS_SCHEDULED' } },
+      competitions: [{ competitors: [
+        { homeAway: 'home', team: { id: '256', displayName: 'Celtic' } },
+        { homeAway: 'away', team: { id: 'hea', displayName: 'Hearts' } },
+      ] }],
+    },
+  ],
+});
+
+test('a followed sibling club (Celtic, followed by default) shows its star in the siblings list', async () => {
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    if (url.includes('/scoreboard')) return new Response(siblingsWithCelticScoreboard, { status: 200 });
+    return new Response('{}', { status: 200 });
+  }));
+
+  renderAt('/match/sco.1/e1');
+
+  await screen.findByText('That day');
+  expect(screen.getByText('★')).toBeInTheDocument();
+});
+
 // --- live match room prefers the fresh today-window fixture over the
 // stale (staleTime 1h) season cache (hotfix 2026-08-15) ---
 

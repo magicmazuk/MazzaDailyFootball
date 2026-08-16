@@ -5,6 +5,15 @@
 // ESPN's shapes, and every lookup stays null-safe — these are
 // undocumented feeds and absent fields are a normal Tuesday.
 
+// ESPN's displayHeight is straight-quoted (6' 1") — the rest of the app's
+// typographic numbers use proper primes (the Minutes gauge's 172′ of 180′,
+// spec §13.16), so height should read the same way rather than looking
+// like a stray copy-paste from a different font. Converts feet/inches
+// marks only; null-safe.
+function toPrimes(s) {
+  return s == null ? null : s.replace(/'/g, '′').replace(/"/g, '″');
+}
+
 export function adaptAthlete(json) {
   return {
     id: json?.id ?? null,
@@ -13,7 +22,7 @@ export function adaptAthlete(json) {
     shirt: json?.jersey ?? null,
     age: json?.age ?? null,
     nationality: json?.citizenship ?? null,
-    heightDisplay: json?.displayHeight ?? null,
+    heightDisplay: toPrimes(json?.displayHeight ?? null),
     birthDate: json?.dateOfBirth ?? null,
     birthPlace: formatBirthPlace(json?.birthPlace),
     defaultLeagueCode: extractLeagueCode(json?.defaultLeague?.$ref),

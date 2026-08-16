@@ -368,17 +368,19 @@ function HeadToHead({ headToHead }) {
 // used — 'In this round' for a knockout/group tie, 'That day' for a
 // league fixture (whose round carries the season name, not a round).
 // Absent entirely rather than an empty shelf when there are none.
-function Siblings({ siblings, fixture }) {
+function Siblings({ siblings, fixture, followedIds }) {
   if (!siblings?.length) return null;
   return (
     <section className="mb-8">
       <SectionLabel muted>{fixture.round != null ? 'In this round' : 'That day'}</SectionLabel>
-      {siblings.map(f => <FixtureRow key={f.id} fixture={f} showContext={false} />)}
+      {siblings.map(f => (
+        <FixtureRow key={f.id} fixture={f} showContext={false} followedIds={followedIds} />
+      ))}
     </section>
   );
 }
 
-export default function MatchRoom({ fixture, comp, detail, videos, siblings }) {
+export default function MatchRoom({ fixture, comp, detail, videos, siblings, followedIds = new Set() }) {
   // The peek sheet's open/closed player (spec §13.16) — one instance lives
   // at the room's root rather than per tap-site, so standouts, lineups and
   // timeline names all share the same sheet instead of each mounting one.
@@ -412,7 +414,7 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings }) {
           comp.hasMatchDetail, so a BBC-degraded fixture that finished can
           still surface highlights even with no match detail to show. */}
       <VideoCard videos={videos} />
-      <Siblings siblings={siblings} fixture={fixture} />
+      <Siblings siblings={siblings} fixture={fixture} followedIds={followedIds} />
       <PlayerSheet comp={comp} playerId={sheetPlayerId} onClose={() => setSheetPlayerId(null)} />
     </main>
   );

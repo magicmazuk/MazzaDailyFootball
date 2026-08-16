@@ -475,3 +475,34 @@ test('useSquad: when the route comp is itself a fallback league, it is fetched o
   expect(calls.some(u => u.includes('/sco.2/teams/500'))).toBe(true);
   expect(result.current.data.resolvedCompId).toBe('eng.1');
 });
+
+// --- outage vs legit-empty (backlog, gold sweep): every leg THROWING (a
+// real fetch failure) must surface as isError, never cache as a resolved
+// players: [] — that would read as "Squad details unavailable." for the
+// rest of the 24h staleTime even once the outage clears. ---
+
+test('useSquad: every leg throwing (a full outage) rethrows — isError true, never cached as legit-empty', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 500 })));
+
+  const comp = { id: 'uefa.champions', hasSquads: true };
+  const { result } = renderHook(() => useSquad(comp, '256'), { wrapper });
+
+  await waitFor(() => expect(result.current.isError).toBe(true));
+  expect(result.current.data).toBeUndefined();
+});
+
+test('useSquad: one leg throwing but a later leg cleanly resolving empty is NOT an error — a real 200 with 0 athletes', async () => {
+  const calls = [];
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    calls.push(url);
+    if (url.includes('/uefa.champions/teams/256')) throw new TypeError('network error');
+    return new Response(emptyRoster, { status: 200 });
+  }));
+
+  const comp = { id: 'uefa.champions', hasSquads: true };
+  const { result } = renderHook(() => useSquad(comp, '256'), { wrapper });
+
+  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  expect(result.current.data.players).toEqual([]);
+  expect(result.current.isError).toBe(false);
+});

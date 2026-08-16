@@ -43,3 +43,19 @@ test('club calendar header falls back to the fixture\'s compId when the club is 
   const link = screen.getByRole('link', { name: /Falkirk/ });
   expect(link).toHaveAttribute('href', '/team/sco.1/254');
 });
+
+// --- month paging clears the selected day (backlog, spec §13.18.4) ---
+
+test('paging to another month clears the selected day — no day stays highlighted from the previous month', async () => {
+  const user = (await import('@testing-library/user-event')).default.setup();
+  usePrefs.setState({ followed: {}, hiddenComps: [] });
+  seasonFixtures = [];
+  renderAt('254');
+
+  // Today starts selected — exactly one day cell is pressed.
+  expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(1);
+
+  await user.click(screen.getByRole('button', { name: 'Next month' }));
+
+  expect(screen.queryAllByRole('button', { pressed: true })).toHaveLength(0);
+});
