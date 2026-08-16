@@ -2,6 +2,7 @@
 // its full record in a drawer. The split is drawn as a real event.
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import Collapse from '../../ui/Collapse.jsx';
 import Crest from '../../ui/Crest.jsx';
 import FormGlyphs from '../../ui/FormGlyphs.jsx';
 import { ZONE_META, zoneFor } from './zones.js';
@@ -27,7 +28,7 @@ function Drawer({ row, form }) {
     ['L', row.lost], ['GF', row.goalsFor], ['GA', row.goalsAgainst],
   ];
   return (
-    <div className="bg-drawer -mx-5 px-5 py-4">
+    <div className="bg-drawer -mx-5 px-5 py-4 xfade-in">
       <div className="grid grid-cols-6 gap-x-1 gap-y-2 text-center">
         {cells.map(([k, v]) => (
           <div key={k}>
@@ -90,9 +91,14 @@ export default function LeagueTable({ comp, rows, followedIds, formByTeam }) {
             </span>
             <span className="text-[17px] tabular-nums">{row.points}</span>
           </button>
-          {openId === row.teamId && (
-            <Drawer row={{ ...row, compId: comp.id }} form={formByTeam[row.teamId]} />
-          )}
+          {/* No fetch here — the row + form are already props (spec §13.21),
+              so the drawer glides straight open to its content, never a
+              skeleton. */}
+          <Collapse open={openId === row.teamId}>
+            {openId === row.teamId && (
+              <Drawer row={{ ...row, compId: comp.id }} form={formByTeam[row.teamId]} />
+            )}
+          </Collapse>
         </div>
       ))}
       {usedZones.length > 0 && (

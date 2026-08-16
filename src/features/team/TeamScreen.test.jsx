@@ -509,19 +509,48 @@ test('collapsed scout film: a quiet tappable card, and the hook is wired with en
   expect(useTeamVideos).toHaveBeenCalledWith({ id: '4411', name: 'Sturm Graz' }, false);
 });
 
-test('tapping the scout film flips the hook to enabled and shows the fetching line while pending', async () => {
+test('tapping the scout film flips the hook to enabled and shows a skeleton block shaped like the iframe while pending, not the button anymore', async () => {
   stubDiscoveredSturmGraz();
   youtubeKey.mockReturnValue('test-key');
   useTeamVideos.mockImplementation((team, enabled) => ({
     isLoading: enabled, isError: false, data: undefined,
   }));
 
-  renderAt('uefa.champions', '4411');
+  const { container } = renderAt('uefa.champions', '4411');
 
   await userEvent.click(screen.getByRole('button', { name: /Watch Sturm Graz — recent highlights/ }));
 
   expect(useTeamVideos).toHaveBeenLastCalledWith({ id: '4411', name: 'Sturm Graz' }, true);
-  expect(screen.getByText('Fetching the film…')).toBeInTheDocument();
+  const skeleton = container.querySelector('.skeleton-pulse.aspect-video');
+  expect(skeleton).toBeInTheDocument();
+  expect(skeleton).toHaveAttribute('aria-hidden', 'true');
+  expect(screen.queryByRole('button', { name: /Watch Sturm Graz/ })).not.toBeInTheDocument();
+});
+
+// --- motion (spec §13.21): the whole card (prompt + whatever replaces it)
+// lives inside one permanently-open Collapse, so the tap-triggered swap
+// from prompt -> skeleton -> video glides instead of snapping. ---
+
+test('the scout film sits inside a Collapse (collapse-glide) both collapsed and tapped', async () => {
+  stubDiscoveredSturmGraz();
+  youtubeKey.mockReturnValue('test-key');
+  useTeamVideos.mockImplementation((team, enabled) => ({
+    isLoading: false, isError: false,
+    data: enabled ? [{ videoId: 'v1', title: 'Sturm Graz recent highlights reel' }] : undefined,
+  }));
+
+  const { container } = renderAt('uefa.champions', '4411');
+  const promptCollapse = [...container.querySelectorAll('.collapse-glide')]
+    .find(el => within(el).queryByText(/Watch Sturm Graz/));
+  expect(promptCollapse).toBeTruthy();
+
+  await userEvent.click(screen.getByRole('button', { name: /Watch Sturm Graz — recent highlights/ }));
+
+  // TeamScreen's Next/Last FixtureRow drawers also carry their own (closed)
+  // Collapse now — find the one that actually holds the landed video.
+  const openCollapse = [...container.querySelectorAll('.collapse-glide')]
+    .find(el => within(el).queryByText('Sturm Graz recent highlights reel'));
+  expect(openCollapse).toBeTruthy();
 });
 
 test('tapping the scout film, on results, renders VideoCard with the fetched videos', async () => {

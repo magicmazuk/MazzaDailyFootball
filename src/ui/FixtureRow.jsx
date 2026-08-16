@@ -3,7 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { byId } from '../domain/competitions.js';
 import { prettifyRound } from '../domain/round.js';
 import { useMatchDetail } from '../data/queries.js';
+import Collapse from './Collapse.jsx';
 import Crest from './Crest.jsx';
+import { SkeletonLines } from './Skeleton.jsx';
 import StatusWord from './StatusWord.jsx';
 import TvBadge from './TvBadge.jsx';
 
@@ -193,19 +195,23 @@ function UpcomingDrawer({ detail, fixture, comp }) {
 // page as a tapped table row. Mounted only while its row is open, so the
 // summary fetch behind useMatchDetail never fires until the first tap.
 function FixtureDrawer({ comp, fixture }) {
+  // isLoading (never isFetching): true only on the FIRST fetch for this
+  // key, so a cached/re-visited drawer never re-flashes the skeleton on a
+  // background refetch (spec §13.21) — see useMatchDetail (React Query v5:
+  // isLoading = isPending && isFetching).
   const { data, isLoading, isError } = useMatchDetail(comp, fixture.id, false);
   return (
     <div className="bg-drawer -mx-5 px-5 py-4">
-      {isLoading && (
-        <p className="font-sans text-[11px] text-muted">Fetching the detail…</p>
-      )}
+      {isLoading && <SkeletonLines lines={3} />}
       {!isLoading && isError && (
         <p className="font-sans text-[11px] text-muted">Match detail unavailable.</p>
       )}
       {!isLoading && !isError && (
-        fixture.status === 'ft'
-          ? <ResultDrawer detail={data?.detail ?? {}} fixture={fixture} comp={comp} />
-          : <UpcomingDrawer detail={data?.detail ?? {}} fixture={fixture} comp={comp} />
+        <div className="xfade-in">
+          {fixture.status === 'ft'
+            ? <ResultDrawer detail={data?.detail ?? {}} fixture={fixture} comp={comp} />
+            : <UpcomingDrawer detail={data?.detail ?? {}} fixture={fixture} comp={comp} />}
+        </div>
       )}
     </div>
   );
@@ -247,7 +253,9 @@ export default function FixtureRow({ fixture, followedIds = new Set(), showConte
         className="w-full text-left block py-3 border-b border-rule/70">
         {body}
       </button>
-      {open && <FixtureDrawer comp={comp} fixture={fixture} />}
+      <Collapse open={open}>
+        {open && <FixtureDrawer comp={comp} fixture={fixture} />}
+      </Collapse>
     </div>
   );
 }

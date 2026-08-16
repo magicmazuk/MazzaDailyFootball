@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import LeagueTable from './LeagueTable.jsx';
@@ -77,4 +77,24 @@ test('a zero or missing rankChange renders no glyph', () => {
     <LeagueTable comp={byId('sco.1')} rows={withZero} followedIds={new Set()} formByTeam={{}} />
   </MemoryRouter>);
   expect(screen.queryByText(/▲|▼/)).not.toBeInTheDocument();
+});
+
+// --- motion (spec §13.21): the drawer glides via Collapse. Its data is
+// already props (no fetch), so it must never show a skeleton — it opens
+// straight to content. ---
+
+test('the drawer renders inside a Collapse (collapse-glide) and never shows a skeleton — its data is already props, no fetch', async () => {
+  const { container } = render(<MemoryRouter>
+    <LeagueTable comp={byId('sco.1')} rows={rows} followedIds={new Set()}
+      formByTeam={{ Team2: ['W', 'W', 'D', 'W', 'L'] }} />
+  </MemoryRouter>);
+
+  await userEvent.click(screen.getByText('Team2'));
+
+  // Every row carries its own Collapse (open or closed) — find the one
+  // that actually opened, rather than assuming the first in DOM order.
+  const collapses = [...container.querySelectorAll('.collapse-glide')];
+  const open = collapses.find(el => within(el).queryByText('GF'));
+  expect(open).toBeTruthy();
+  expect(container.querySelectorAll('.skeleton-pulse')).toHaveLength(0);
 });

@@ -103,11 +103,41 @@ test('the two blocks use distinct aria-controls ids for their reveal buttons', (
     .not.toBe(footballMore.getAttribute('aria-controls'));
 });
 
-test('loading state renders a one-liner per block, independently', () => {
+test('loading state renders skeleton lines per block, independently, not the old fetching text', () => {
   stub({ celtic: loading, football: { isLoading: false, data: { items: [item('f1')] } } });
-  render(<Papers />);
-  expect(screen.getByText('Fetching the papers…')).toBeInTheDocument();
+  const { container } = render(<Papers />);
+  expect(screen.queryByText('Fetching the papers…')).not.toBeInTheDocument();
+  const bars = container.querySelectorAll('.skeleton-pulse');
+  expect(bars).toHaveLength(2); // the loading celtic block only — football already has data
+  expect([...bars].map(b => b.style.width)).toEqual(['92%', '55%']);
   expect(screen.getByText('Story f1')).toBeInTheDocument();
+});
+
+// --- the "+ n more" reveal (spec §13.21): now a Collapse, not a plain
+// mount/unmount, so the extra rows glide open/closed instead of snapping.
+// The top story's content root also crossfades in once it lands. ---
+
+test('the revealed rows sit inside a Collapse (collapse-glide) that glides open on reveal and closed on "− fewer"', async () => {
+  const user = (await import('@testing-library/user-event')).default.setup();
+  stub({ celtic: { isLoading: false, data: { items: fiveItems } }, football: empty });
+  const { container } = render(<Papers />);
+
+  await user.click(screen.getByRole('button', { name: '+ 4 more' }));
+
+  const collapse = container.querySelector('.collapse-glide');
+  expect(collapse).toBeInTheDocument();
+  expect(within(collapse).getByText('Story c2')).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: '− fewer' }));
+  expect(screen.queryByText('Story c2')).not.toBeInTheDocument();
+});
+
+test('the top story\'s content root crossfades in (.xfade-in) once it lands', () => {
+  stub({ celtic: { isLoading: false, data: { items: [item('c1')] } }, football: empty });
+  const { container } = render(<Papers />);
+  const xfade = container.querySelector('.xfade-in');
+  expect(xfade).toBeInTheDocument();
+  expect(within(xfade).getByText('Story c1')).toBeInTheDocument();
 });
 
 test('error/empty state renders the degraded one-liner per block', () => {

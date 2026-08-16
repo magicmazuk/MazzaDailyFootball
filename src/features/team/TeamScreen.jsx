@@ -6,7 +6,9 @@ import { prettifyRound } from '../../domain/round.js';
 import { fallbackRoundLabel } from '../../domain/field.js';
 import { useAllSeasonFixtures, useMatchDetail, useSquad, useTeams } from '../../data/queries.js';
 import { usePrefs } from '../../store/prefs.js';
+import Collapse from '../../ui/Collapse.jsx';
 import Crest from '../../ui/Crest.jsx';
+import { SkeletonBlock } from '../../ui/Skeleton.jsx';
 import FixtureRow from '../../ui/FixtureRow.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
 import CalendarGlyph from '../../ui/CalendarGlyph.jsx';
@@ -90,36 +92,53 @@ function scoutLine(squadData) {
 // fetched before that. No toggle back to collapsed — once tapped, the card
 // settles on fetching/found/not-found, same one-way shape as a fixture
 // drawer never re-collapsing its own fetch.
+//
+// Motion (spec §13.21): the whole thing — prompt AND whatever replaces it —
+// lives inside a single, permanently-open Collapse. Collapse's own
+// ResizeObserver glide (not its open/close toggle, which never fires here)
+// is what turns the tap-triggered swap from prompt -> skeleton -> video
+// into a smooth height glide instead of a snap; open is always true
+// because the accordion itself never re-collapses, only its content grows.
 function ScoutFilm({ team }) {
   const [tapped, setTapped] = useState(false);
+  // isLoading (never isFetching): true only on the FIRST fetch, which is
+  // the only fetch this card ever makes (staleTime: Infinity, no retry) —
+  // so this always reflects "the search is genuinely in flight".
   const { data, isLoading, isError } = useTeamVideos(team, tapped);
-  if (!tapped) {
-    return (
-      <button type="button" onClick={() => setTapped(true)}
-        className="w-full text-left block py-3 mb-8 border-b border-rule/70">
-        <p className="font-sans text-[10px] uppercase tracking-[.14em] text-muted mb-1">
-          The scout film
-        </p>
-        <p className="font-serif text-[14.5px]">
-          Watch {team.name} — recent highlights →
-        </p>
-      </button>
-    );
-  }
-  if (isLoading) {
-    return <p className="font-sans text-[11px] text-muted mb-8">Fetching the film…</p>;
-  }
   const videos = data ?? [];
-  // Design law: degraded says so, never blank — a failed search and a
-  // genuinely empty result set read the same to the user either way.
-  if (isError || videos.length === 0) {
-    return <p className="font-sans text-[11px] text-muted mb-8">No film found.</p>;
-  }
-  // Review round 2 (LOW fix): without exhaustedLine, dismissing every
-  // video left this section permanently blank once tapped — the section
-  // itself doesn't unmount, so an empty result and "I dismissed them all"
-  // looked identical (nothing) to the reader.
-  return <VideoCard videos={videos} exhaustedLine="That's the whole reel." />;
+  return (
+    <Collapse open>
+      {!tapped && (
+        <button type="button" onClick={() => setTapped(true)}
+          className="w-full text-left block py-3 mb-8 border-b border-rule/70">
+          <p className="font-sans text-[10px] uppercase tracking-[.14em] text-muted mb-1">
+            The scout film
+          </p>
+          <p className="font-serif text-[14.5px]">
+            Watch {team.name} — recent highlights →
+          </p>
+        </button>
+      )}
+      {tapped && isLoading && (
+        <div className="mb-8">
+          <SkeletonBlock className="aspect-video w-full" />
+          <p className="sr-only">Fetching the film…</p>
+        </div>
+      )}
+      {/* Design law: degraded says so, never blank — a failed search and a
+          genuinely empty result set read the same to the user either way. */}
+      {tapped && !isLoading && (isError || videos.length === 0) && (
+        <p className="font-sans text-[11px] text-muted mb-8">No film found.</p>
+      )}
+      {/* Review round 2 (LOW fix): without exhaustedLine, dismissing every
+          video left this section permanently blank once tapped — the
+          section itself doesn't unmount, so an empty result and "I
+          dismissed them all" looked identical (nothing) to the reader. */}
+      {tapped && !isLoading && !isError && videos.length > 0 && (
+        <VideoCard videos={videos} exhaustedLine="That's the whole reel." />
+      )}
+    </Collapse>
+  );
 }
 
 function FollowButton({ team }) {

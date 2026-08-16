@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, test, vi } from 'vitest';
@@ -281,17 +281,46 @@ test('FixtureRow: a sched espn row with no head-to-head history says so, and sti
   expect(screen.getByRole('link', { name: 'Full detail →' })).toBeInTheDocument();
 });
 
-test('FixtureRow: the drawer shows a muted loading line while useMatchDetail is pending, with no link yet', async () => {
+test('FixtureRow: the drawer shows skeleton lines (aria-hidden) while useMatchDetail is pending, not the old fetching text, with no link yet', async () => {
   const user = userEvent.setup();
   useMatchDetail.mockReturnValue({ isLoading: true, isError: false, data: undefined });
-  render(
+  const { container } = render(
     <MemoryRouter>
       <FixtureRow fixture={fixture('ft')} followedIds={new Set()} />
     </MemoryRouter>,
   );
   await user.click(screen.getByRole('button', { expanded: false }));
-  expect(screen.getByText('Fetching the detail…')).toBeInTheDocument();
+  expect(screen.queryByText('Fetching the detail…')).not.toBeInTheDocument();
+  const skeleton = container.querySelectorAll('.skeleton-pulse');
+  expect(skeleton).toHaveLength(3);
+  skeleton.forEach(bar => expect(bar.closest('[aria-hidden="true"]')).toBeTruthy());
   expect(screen.queryByRole('link')).not.toBeInTheDocument();
+});
+
+// --- the Collapse wrapper (spec §13.21): the drawer's open/close is now
+// driven by Collapse's measured-height glide, not a plain mount/unmount —
+// this is the reported defect's fix ("content loading and then jutting
+// into place"). Collapse's own open/close/lazy-mount contract is tested
+// directly in Collapse.test.jsx; these only check FixtureRow wires it in
+// (the drawer content lives inside the collapse-glide element) and that
+// content landing crossfades in rather than hard-cutting. ---
+
+test('FixtureRow: the open drawer sits inside a Collapse (collapse-glide), and landed content crossfades in (.xfade-in)', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { headToHead: { meetings: [] } } },
+  });
+  const { container } = render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('scheduled')} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  const collapse = container.querySelector('.collapse-glide');
+  expect(collapse).toBeInTheDocument();
+  expect(within(collapse).getByText('No recent meetings.')).toBeInTheDocument();
+  expect(collapse.querySelector('.xfade-in')).toBeInTheDocument();
 });
 
 test('FixtureRow: the drawer shows a muted "unavailable" line on a failed fetch, with no link', async () => {

@@ -5,7 +5,9 @@
 import { useState } from 'react';
 import { useNews } from '../../data/queries.js';
 import { timeAgo } from '../../data/news.js';
+import Collapse from '../../ui/Collapse.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
+import { SkeletonLines } from '../../ui/Skeleton.jsx';
 
 // 2-line standfirst clamp — no Tailwind line-clamp plugin installed here,
 // so this is the same plain CSS box-clamp technique FieldBoard uses.
@@ -62,6 +64,9 @@ function CompactRow({ item }) {
 
 function Block({ label, feed }) {
   const [revealed, setRevealed] = useState(false);
+  // isLoading (never isFetching): true only on the FIRST fetch for this
+  // feed, so a re-visit landing on cached news never re-flashes the
+  // skeleton on a background refetch (spec §13.21).
   const { data, isLoading } = useNews(feed);
   const items = data?.items ?? [];
   const [top, ...rest] = items;
@@ -72,10 +77,10 @@ function Block({ label, feed }) {
   return (
     <div>
       <p className="font-sans text-[9px] uppercase tracking-[.14em] text-muted mb-3">{label}</p>
-      {isLoading && <p className="text-muted">Fetching the papers…</p>}
+      {isLoading && <SkeletonLines lines={2} widths={['92%', '55%']} />}
       {!isLoading && !top && <p className="text-muted">The papers haven&apos;t arrived.</p>}
       {!isLoading && top && (
-        <>
+        <div className="xfade-in">
           <TopStory item={top} />
           {rest.length > 0 && (
             <div className="mt-4">
@@ -84,14 +89,16 @@ function Block({ label, feed }) {
                 className="font-sans text-[10px] uppercase tracking-[.16em] text-accent">
                 {revealed ? '− fewer' : `+ ${rest.length} more`}
               </button>
-              {revealed && (
-                <div id={moreId} className="mt-3 divide-y divide-rule/60">
-                  {rest.map(item => <CompactRow key={item.id} item={item} />)}
-                </div>
-              )}
+              <Collapse open={revealed}>
+                {revealed && (
+                  <div id={moreId} className="mt-3 divide-y divide-rule/60">
+                    {rest.map(item => <CompactRow key={item.id} item={item} />)}
+                  </div>
+                )}
+              </Collapse>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
