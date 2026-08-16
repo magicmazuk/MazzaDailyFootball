@@ -115,57 +115,84 @@ function BowlPool({ pool, revealingIndex, clubOrdinals }) {
   );
 }
 
-function RollcallList({ rows, currentTieIndex }) {
+// A club's identity key for roll-call status lookups (landed/current) —
+// teamId when present, else its name. Kept tiny and separate from the
+// React `key` prop below (which additionally disambiguates a missing
+// teamId by index, since two different no-teamId clubs could share a name).
+const clubKey = club => club.teamId ?? club.name;
+
+function RollcallList({ clubs, landedKeys, currentKeys }) {
   const currentRef = useRef(null);
+  // Depend on a stable signal for the current tie's identity (the joined
+  // current keys) rather than the Set instance itself — Pool builds a new
+  // Set every render, so keying the effect off the object would re-scroll
+  // on every unrelated re-render instead of only when the drawing tie
+  // actually changes.
+  const currentSignal = [...currentKeys].join(',');
 
   useEffect(() => {
     currentRef.current?.scrollIntoView?.({ block: 'center' });
-  }, [currentTieIndex]);
+  }, [currentSignal]);
 
   const nameClass = (landed, isCurrent) => `text-[10.5px] leading-[1.85] break-inside-avoid ${
     landed ? 'line-through opacity-55 text-muted'
       : isCurrent ? 'text-accent text-[11.5px] font-semibold' : ''}`;
 
+  // The scrollIntoView ref sits on the first current club in DISPLAY order
+  // (not tie order) — with the two current clubs scattered by the shuffle,
+  // "first" only makes sense relative to how they're actually rendered.
+  const firstCurrentIndex = clubs.findIndex(club => currentKeys.has(clubKey(club)));
+
   return (
     <div className="border border-rule rounded-xl p-3 max-h-[200px] overflow-y-auto columns-2">
-      {rows.flatMap(({ tie, home, away }, i) => {
-        const isCurrent = i === currentTieIndex;
-        const landed = home && away;
-        return [
-          <p key={`${tie.id}-h`} ref={isCurrent ? currentRef : null} className={nameClass(landed, isCurrent)}>
-            {tie.home?.name}
-          </p>,
-          <p key={`${tie.id}-a`} className={nameClass(landed, isCurrent)}>
-            {tie.away?.name}
-          </p>,
-        ];
+      {clubs.map((club, i) => {
+        const key = clubKey(club);
+        const landed = landedKeys.has(key);
+        const isCurrent = currentKeys.has(key);
+        return (
+          <p key={club.teamId ?? `${club.name}-${i}`} ref={i === firstCurrentIndex ? currentRef : null}
+            className={nameClass(landed, isCurrent)}>
+            {club.name}
+          </p>
+        );
       })}
     </div>
   );
 }
 
-function Pool({ mode, pool, state, rows, shuffledTies, clubOrdinals }) {
-  // pool and shuffledTies already carry the presentation-only display
-  // order (Ceremony); `indexOf` locates the specific item within that
-  // order, since a shuffled position is no longer derivable from `landed`.
+function Pool({ mode, pool, state, rows, clubs, clubOrdinals }) {
+  // pool already carries the presentation-only display order (Ceremony);
+  // `indexOf` locates the specific item within that order, since a
+  // shuffled position is no longer derivable from `landed`.
   const revealing = revealingClub(state);
   const revealingIndex = revealing ? pool.indexOf(revealing) : -1;
 
-  const current = currentTie(state);
-  const currentTieIndex = current ? shuffledTies.indexOf(current) : -1;
-
-  // rows is landedSides(state) in original tie order; re-key by tie id so
-  // the roll-call list can render each tie's landed status in the shuffled
-  // display order instead. Rollcall-only — opponents rows carry no `tie`
-  // (landedSides' opponents shape is `{ opponent, venue, ... }`, club-
-  // centric rather than tie-centric), and bowl never renders RollcallList,
-  // so this is skipped rather than crashing on `r.tie.id` for either.
-  const displayRows = mode === 'rollcall'
-    ? (() => {
-      const byTieId = new Map(rows.map(r => [r.tie.id, r]));
-      return shuffledTies.map(t => byTieId.get(t.id));
-    })()
-    : [];
+  // Roll-call status lookups, at the CLUB level (hotfix: shuffling ties
+  // still rendered each tie's two clubs adjacently — the exact pairing,
+  // readable before the draw). `rows` is landedSides(state) in tie order;
+  // a landed row's two clubs go into landedKeys, and currentTie(state)'s
+  // two clubs (if any) go into currentKeys — RollcallList then renders the
+  // shuffled club list directly and looks up each club's status by key,
+  // independent of its position. Rollcall-only — opponents rows carry no
+  // `tie` (landedSides' opponents shape is `{ opponent, venue, ... }`,
+  // club-centric rather than tie-centric), and bowl never renders
+  // RollcallList, so this is skipped for either rather than crashing on
+  // `row.tie`.
+  const landedKeys = new Set();
+  const currentKeys = new Set();
+  if (mode === 'rollcall') {
+    for (const row of rows) {
+      if (row.home && row.away) {
+        if (row.tie.home) landedKeys.add(clubKey(row.tie.home));
+        if (row.tie.away) landedKeys.add(clubKey(row.tie.away));
+      }
+    }
+    const current = currentTie(state);
+    if (current) {
+      if (current.home) currentKeys.add(clubKey(current.home));
+      if (current.away) currentKeys.add(clubKey(current.away));
+    }
+  }
 
   return (
     <section className="mb-6">
@@ -175,7 +202,7 @@ function Pool({ mode, pool, state, rows, shuffledTies, clubOrdinals }) {
       </div>
       {mode === 'bowl' || mode === 'opponents'
         ? <BowlPool pool={pool} revealingIndex={revealingIndex} clubOrdinals={clubOrdinals} />
-        : <RollcallList rows={displayRows} currentTieIndex={currentTieIndex} />}
+        : <RollcallList clubs={clubs} landedKeys={landedKeys} currentKeys={currentKeys} />}
     </section>
   );
 }
@@ -354,10 +381,6 @@ function Ceremony({ comp, compId, round, ties, roundFixtures, alreadySeen, markT
     () => seededShuffle(remainingClubs(initDraw(ties, mode, { subjectTeamId })), shuffleSeed),
     [ties, mode, subjectTeamId, shuffleSeed],
   );
-  const shuffledTies = useMemo(
-    () => seededShuffle(ties, `${compId}:${round}`),
-    [ties, compId, round],
-  );
 
   // Seen-marking (spec §8.5, §13.15; hotfix-two-leg-draw): fire exactly
   // once, on reaching complete, by taps or by Reveal the rest. An
@@ -418,7 +441,7 @@ function Ceremony({ comp, compId, round, ties, roundFixtures, alreadySeen, markT
         </span>
       </h1>
 
-      <Pool mode={mode} pool={pool} state={state} rows={rows} shuffledTies={shuffledTies} clubOrdinals={clubOrdinals} />
+      <Pool mode={mode} pool={pool} state={state} rows={rows} clubs={shuffledClubs} clubOrdinals={clubOrdinals} />
 
       {mode === 'rollcall'
         ? <RollcallStage state={state} canTap={canTap} onTap={() => canTap && dispatch({ type: 'TAP' })} />

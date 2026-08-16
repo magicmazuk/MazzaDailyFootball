@@ -13,7 +13,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, expect, test, vi } from 'vitest';
 import DrawScreen from './DrawScreen.jsx';
-import { TIMINGS } from './drawEngine.js';
+import { TIMINGS, seededShuffle } from './drawEngine.js';
 import { usePrefs, CELTIC } from '../../store/prefs.js';
 import { tieId } from '../../domain/draws.js';
 
@@ -330,6 +330,76 @@ test('the roll-call "currently drawing" highlight tracks the right tie through t
   expect(within(rollcallList).getByText('Home 1')).toHaveClass('text-accent');
   expect(within(rollcallList).getByText('Away 1')).toHaveClass('text-accent');
   expect(within(rollcallList).getByText('Home 1')).not.toHaveClass('line-through');
+});
+
+// --- club-level roll-call shuffle (fix: the roll call telegraphed pairings
+// — shuffling TIES still rendered each tie's two clubs as adjacent lines,
+// which reads as the pairing before the draw; the list must shuffle at the
+// CLUB level so pairs scatter). `sco.tennents:round-2` is used (rather than
+// this suite's usual `first-round`) because it was checked empirically
+// (via seededShuffle directly) to leave none of the 9 ties' two clubs
+// adjacent in the club-level shuffle order — first-round's real seed still
+// leaves a few pairs adjacent, which would make the anti-telegraph
+// assertion below pass by luck rather than by construction.
+const rollcallShuffleEvents = Array.from({ length: 9 }, (_, i) =>
+  teamEvent(`s${i}`, `2026-11-0${(i % 9) + 1}T15:00:00Z`, `sh${i}`, `RC Home ${i}`, `sa${i}`, `RC Away ${i}`, 'round-2'));
+
+const rollcallShuffleNames = () => {
+  const rollcallList = document.querySelector('.columns-2');
+  return within(rollcallList).getAllByText(/^RC (Home|Away) \d$/).map(el => el.textContent);
+};
+
+test('the roll-call list renders clubs in club-level seeded-shuffle order, matching seededShuffle(allClubs, seed) directly', async () => {
+  stubScoreboard(rollcallShuffleEvents);
+  renderAt('/draw/sco.tennents/round-2');
+  await screen.findByText('Tap to draw the first tie');
+
+  const allClubs = Array.from({ length: 9 }, (_, i) => [
+    { teamId: `sh${i}`, name: `RC Home ${i}` },
+    { teamId: `sa${i}`, name: `RC Away ${i}` },
+  ]).flat();
+  const expectedOrder = seededShuffle(allClubs, 'sco.tennents:round-2').map(c => c.name);
+
+  expect(rollcallShuffleNames()).toEqual(expectedOrder);
+});
+
+test('the roll-call list never seats a tie\'s two clubs adjacently — pairings are not readable before the draw', async () => {
+  stubScoreboard(rollcallShuffleEvents);
+  renderAt('/draw/sco.tennents/round-2');
+  await screen.findByText('Tap to draw the first tie');
+
+  const positions = new Map(rollcallShuffleNames().map((name, i) => [name, i]));
+  for (let i = 0; i < 9; i += 1) {
+    const homePos = positions.get(`RC Home ${i}`);
+    const awayPos = positions.get(`RC Away ${i}`);
+    expect(Math.abs(homePos - awayPos)).not.toBe(1);
+  }
+});
+
+test('a tap highlights both current clubs wherever they land in the shuffle, then strikes both through once landed — the list never shrinks', async () => {
+  stubScoreboard(rollcallEvents);
+  renderAt('/draw/sco.tennents/first-round');
+  await screen.findByText('Tap to draw the first tie');
+
+  const rollcallList = document.querySelector('.columns-2');
+  expect(within(rollcallList).getAllByText(/^(Home|Away) \d$/)).toHaveLength(18);
+
+  vi.useFakeTimers();
+  fireEvent.click(drawButton()); // starts drawing tie 0 (Home 0 / Away 0)
+
+  // Both clubs of the tie being drawn are highlighted, wherever they sit in
+  // the shuffled display order — and not yet struck through.
+  expect(within(rollcallList).getByText('Home 0')).toHaveClass('text-accent');
+  expect(within(rollcallList).getByText('Away 0')).toHaveClass('text-accent');
+  expect(within(rollcallList).getByText('Home 0')).not.toHaveClass('line-through');
+  expect(within(rollcallList).getByText('Away 0')).not.toHaveClass('line-through');
+
+  await act(async () => { await vi.advanceTimersByTimeAsync(TIMINGS.rollcallGap * 2); });
+
+  expect(within(rollcallList).getByText('Home 0')).toHaveClass('line-through');
+  expect(within(rollcallList).getByText('Away 0')).toHaveClass('line-through');
+  // The list is never filtered down as clubs land — only their style changes.
+  expect(within(rollcallList).getAllByText(/^(Home|Away) \d$/)).toHaveLength(18);
 });
 
 // --- two-legged rounds (hotfix-two-leg-draw): a ceremony draws PAIRINGS,
