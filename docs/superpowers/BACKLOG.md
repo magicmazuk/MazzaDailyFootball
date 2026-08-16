@@ -111,3 +111,7 @@ None block usage; candidates for a future 1.2 pass.
 - Nested interactive controls now sit inside a row BUTTON (was an anchor) — React's DOM-nesting validator logs dev-only errors on Today; the sibling-control restructure would clear it (same standing item, kind changed not just scale).
 - TodayView.test.jsx mocks queries.js with only useNews — useMatchDetail is undefined there; will confuse the first TodayView test that taps a fixture row open.
 - FixtureRow H2H drawer rows keyed by array index (static list per render; consistency nit).
+
+## From v1.2.0 final review (2026-08-16)
+- Domestic-shape guard also discards GENUINE rosters ESPN serves under qualifier slugs (Gornik-class, ~22/50 sampled clubs): they now show "Squad details unavailable." (same as pre-wave, honest, not a regression) though a real squad exists under uefa.*_qual. Future: fetch the non-domestic slug for the ROSTER while refusing to name it as a league.
+- Scout-line phrasing is clunky at small N ("Won 1 of their last 1") — consider "Won their only league game so far" style special-casing.

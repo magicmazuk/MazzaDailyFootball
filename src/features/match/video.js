@@ -17,9 +17,13 @@ export function buildVideoQuery(fixture) {
   return `${fixture.home.name} vs ${fixture.away.name} highlights ${date}`;
 }
 
-export async function searchVideos(query, key) {
+// params is an optional extra-query-params bag (e.g. { order: 'date' } for
+// the team-video call below) — empty by default, so the match-video call
+// above stays byte-identical to before this seam grew a second caller.
+export async function searchVideos(query, key, params = {}) {
+  const extra = Object.entries(params).map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
   const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video`
-    + `&maxResults=5&q=${encodeURIComponent(query)}&key=${key}`;
+    + `&maxResults=5&q=${encodeURIComponent(query)}&key=${key}${extra}`;
   const r = await fetch(url);
   if (!r.ok) throw new Error(`HTTP ${r.status} for YouTube search`);
   const data = await r.json();
@@ -38,5 +42,25 @@ export function useMatchVideos(fixture) {
     staleTime: Infinity,
     retry: false,
     queryFn: () => searchVideos(buildVideoQuery(fixture), youtubeKey()),
+  });
+}
+
+// The scout film (spec §13.20.3): recent highlights for a DISCOVERED
+// foreign opponent's club, not a specific fixture — no date in the query,
+// recency instead comes from the API's order=date param. LAZY by design:
+// `enabled` is caller-controlled (the card only flips it true once tapped),
+// so this never spends quota just from the team page mounting. Cached
+// forever once fetched and never retried, same reasoning as match videos.
+export function buildTeamVideoQuery(team) {
+  return `"${team.name}" highlights`;
+}
+
+export function useTeamVideos(team, enabled) {
+  return useQuery({
+    queryKey: ['team-videos', team?.id],
+    enabled: enabled && !!youtubeKey(),
+    staleTime: Infinity,
+    retry: false,
+    queryFn: () => searchVideos(buildTeamVideoQuery(team), youtubeKey(), { order: 'date' }),
   });
 }

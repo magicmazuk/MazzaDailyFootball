@@ -167,14 +167,20 @@ export function Splits({ bio, stats }) {
 export default function PlayerScreen() {
   const { compId, playerId } = useParams();
   const location = useLocation();
-  const comp = byId(compId);
+  // The scout (spec §13.20.2, review fix): a foreign discovered league
+  // (e.g. aut.1) has no registry entry — byId returns undefined. That used
+  // to dead-end "Open as page →" from a foreign player's sheet on
+  // "Unknown competition.", even though usePlayer only ever reads id+
+  // source off comp (see routeBase below) and the header line just below
+  // already tolerates an unknown name — a minimal synthetic descriptor
+  // lets the page render exactly like any other comp.
+  const comp = byId(compId) ?? { id: compId, source: 'espn', name: null };
   // Gated on bio alone (hotfix, Aug 2026): a stats-only failure (e.g. the
   // statistics feed 404ing under a UEFA/cup comp) must never blank the
   // page — every stat section below already null-renders when stats is
   // absent, so there is a full page to show as long as bio resolved.
-  const { bio, stats, isLoading } = usePlayer(comp ?? { id: 'none', source: 'bbc' }, playerId);
+  const { bio, stats, isLoading } = usePlayer(comp, playerId);
 
-  if (!comp) return <p className="text-muted">Unknown competition.</p>;
   if (isLoading) return <p className="text-muted">Loading player…</p>;
   if (!bio) return <p className="text-muted">Player unavailable right now.</p>;
 
@@ -186,7 +192,9 @@ export default function PlayerScreen() {
   return (
     <main>
       <p className="font-sans text-[10px] uppercase tracking-[.22em] text-muted">
-        {comp.name}{bio.position && ` · ${bio.position}`}
+        {/* comp.name is null for a synthetic (discovered-league) comp —
+            filtered out rather than rendering the literal string "null". */}
+        {[comp.name, bio.position].filter(Boolean).join(' · ')}
       </p>
       <div className="flex items-baseline gap-3 mt-3">
         <h1 className="text-[26px]">{bio.name}</h1>

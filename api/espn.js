@@ -19,28 +19,58 @@ const UPSTREAM_CORE = 'https://sports.core.api.espn.com';
 const LEAGUE =
   '(sco\\.1|sco\\.2|sco\\.tennents|sco\\.cis|sco\\.challenge|eng\\.1|eng\\.fa|eng\\.league_cup|uefa\\.champions|uefa\\.europa|uefa\\.europa\\.conf)';
 // The three UEFA club competitions' qualifying rounds (spec §13.11) live
-// under their own ESPN league code — scoreboard only, never teams/
-// summary/standings, since queries.js only ever fetches the qualifier
-// code's scoreboard and adapts it under the parent comp's id.
+// under their own ESPN league code. queries.js only ever fetches the
+// qualifier code's scoreboard directly (adapted under the parent comp's
+// id), so QUALIFIER itself stays scoreboard-only. (Review round 2, LOW
+// fix: this comment used to claim that made a qualifier code rejected on
+// teams/summary/standings outright — no longer literally true, since a
+// qualifier slug like uefa.champions_qual also fits LEAGUE_ANY's shape
+// below and so is technically ALLOWED on the single-team teams/{id}
+// route. That's harmless — path shape stays fully pinned there regardless
+// of which slug it is — and moot in practice, since useSquad's
+// domestic-league discovery, spec §13.20.1 review round 2, now excludes
+// qualifier-shaped slugs from ever being fetched in the first place.)
 const QUALIFIER = '(uefa\\.champions_qual|uefa\\.europa_qual|uefa\\.europa\\.conf_qual)';
+// The scout (spec §13.20.1, review-round CRITICAL fix): useSquad discovers
+// a foreign opponent's actual domestic league from team.defaultLeague
+// (e.g. 'aut.1') and fetches its roster directly under THAT slug — a code
+// the enumerated LEAGUE alternation can never anticipate, since it's not
+// one of our own leagues/cups. Path shape is the allowlist's real safety
+// job here (no slashes, so no traversal or extra path segments); WHICH
+// league someone requests a public team roster for is not sensitive, so a
+// single-team lookup is safe to widen. Only the ONE route below
+// (teams/{numeric id}, the exact shape useSquad hits) uses this — every
+// other route (scoreboard/standings/summary/plain teams-list) stays on the
+// tight, enumerated LEAGUE list, since queries.js never fetches those for
+// a discovered league.
+const LEAGUE_ANY = '[a-z][a-z0-9._]{1,30}';
 const ALLOWED = [
   new RegExp(`^/apis/site/v2/sports/soccer/${LEAGUE}/scoreboard$`),
   new RegExp(`^/apis/site/v2/sports/soccer/${QUALIFIER}/scoreboard$`),
   new RegExp(`^/apis/site/v2/sports/soccer/${LEAGUE}/teams$`),
-  new RegExp(`^/apis/site/v2/sports/soccer/${LEAGUE}/teams/\\d+$`),
+  new RegExp(`^/apis/site/v2/sports/soccer/${LEAGUE_ANY}/teams/\\d+$`),
   new RegExp(`^/apis/site/v2/sports/soccer/${LEAGUE}/summary$`),
   new RegExp(`^/apis/v2/sports/soccer/${LEAGUE}/standings$`),
 ];
-// Player bio + per-season statistics (spec §13.16) — the qualifier codes
-// have no player data of their own, so only the 11 base league ids apply.
+// Player bio + per-season statistics (spec §13.16). These take LEAGUE_ANY
+// for the same reason the single-team route does (spec §13.20.1): a
+// discovered foreign league's players fetch their bio/stats under that
+// league's code (usePlayer via comp.id and bio.defaultLeagueCode), and an
+// enumerated list here would 400 exactly the class of prod-only failure
+// the teams-route widening fixed. Path shape stays fully pinned — numeric
+// ids, fixed segment count, no slashes in the slug.
 const ALLOWED_CORE = [
-  new RegExp(`^/v2/sports/soccer/leagues/${LEAGUE}/seasons/\\d{4}/athletes/\\d+$`),
-  new RegExp(`^/v2/sports/soccer/leagues/${LEAGUE}/seasons/\\d{4}/types/\\d/athletes/\\d+/statistics$`),
+  new RegExp(`^/v2/sports/soccer/leagues/${LEAGUE_ANY}/seasons/\\d{4}/athletes/\\d+$`),
+  new RegExp(`^/v2/sports/soccer/leagues/${LEAGUE_ANY}/seasons/\\d{4}/types/\\d/athletes/\\d+/statistics$`),
 ];
 
 const lastKnownGood = new Map(); // key: rest+query → { body, at }
 
 export default async function handler(req, res) {
+  // Confirmed (review-round CRITICAL fix): ALLOWED/ALLOWED_CORE only ever
+  // test `rest` (the path) — `query` (e.g. useSquad's ?enable=roster) is
+  // never part of the allowlist match, on any route, and is appended
+  // verbatim to the upstream URL below once the path itself clears.
   const { rest, query } = extractRest(req.url);
   const upstreamHost = ALLOWED_CORE.some(rx => rx.test(rest)) ? UPSTREAM_CORE
     : ALLOWED.some(rx => rx.test(rest)) ? UPSTREAM

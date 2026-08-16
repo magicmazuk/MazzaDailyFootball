@@ -148,10 +148,33 @@ test('an errored/missing player shows a muted one-liner', () => {
   expect(screen.getByText('Player unavailable right now.')).toBeInTheDocument();
 });
 
-test('an unknown competition id shows the honest message', () => {
+// --- the scout (spec §13.20.2, review fix): a compId with no registry
+// entry no longer dead-ends the page on "Unknown competition." — byId
+// falling through now builds a minimal synthetic { id, source: 'espn',
+// name: null } descriptor instead, since usePlayer only ever reads id and
+// source off comp. This is what makes "Open as page →" work from a
+// foreign squad shirt's sheet (the discovered league, e.g. aut.1, has no
+// registry entry either). ---
+
+test('a compId with no registry entry falls back to a synthetic comp descriptor — never "Unknown competition."', () => {
   usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: false, isError: false });
   renderAt('does-not-exist', '272624');
-  expect(screen.getByText('Unknown competition.')).toBeInTheDocument();
+  expect(screen.queryByText('Unknown competition.')).not.toBeInTheDocument();
+  // bio never resolved (as if the synthetic id 404'd upstream) — still an
+  // honest message, never a crash or a blank page.
+  expect(screen.getByText('Player unavailable right now.')).toBeInTheDocument();
+});
+
+test('a foreign discovered league (aut.1, no registry entry) renders the player via the synthetic comp descriptor', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  renderAt('aut.1', '272624');
+
+  expect(screen.queryByText('Unknown competition.')).not.toBeInTheDocument();
+  expect(screen.getByText('Kasper Høgh')).toBeInTheDocument();
+  expect(usePlayer).toHaveBeenCalledWith({ id: 'aut.1', source: 'espn', name: null }, '272624');
+  // comp.name is null on the synthetic descriptor — the header line omits
+  // it rather than rendering the literal string "null"; bio.position alone.
+  expect(screen.getByText('Forward')).toBeInTheDocument();
 });
 
 // --- home-league hotfix (Aug 2026): a stats-only failure must not blank

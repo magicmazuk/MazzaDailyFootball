@@ -157,11 +157,85 @@ test('a non-numeric athlete id 400s on the statistics shape too, without touchin
   expect(fetchSpy).not.toHaveBeenCalled();
 });
 
+// --- the scout (spec §13.20.1, review-round CRITICAL fix): useSquad
+// discovers a foreign opponent's actual domestic league (e.g. 'aut.1')
+// from team.defaultLeague and fetches its roster directly — a slug the
+// enumerated LEAGUE alternation can never anticipate. Only the single-team
+// teams/{id} route (the exact shape useSquad hits) widens to any safe
+// slug shape; every other route stays on the tight, enumerated list. ---
+
+test('the scout: a discovered league slug (aut.1) is allowed through the single-team teams route, ?enable=roster included', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(
+    JSON.stringify({ team: { athletes: [] } }), { status: 200 })));
+  const res = await call('/api/espn/apis/site/v2/sports/soccer/aut.1/teams/4411?enable=roster');
+  expect(res.statusCode).toBe(200);
+  expect(fetch).toHaveBeenCalledWith(
+    'https://site.api.espn.com/apis/site/v2/sports/soccer/aut.1/teams/4411?enable=roster',
+    expect.objectContaining({ headers: { accept: 'application/json' } }),
+  );
+});
+
+test('the scout: any lowercase-dotted league slug works on the widened route, not just aut.1', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('{"team":{}}', { status: 200 })));
+  const res = await call('/api/espn/apis/site/v2/sports/soccer/ger.1/teams/123?enable=roster');
+  expect(res.statusCode).toBe(200);
+});
+
+test('the scout: a traversal-ish path in the league slot is still rejected, even on the widened teams route', async () => {
+  const fetchSpy = vi.fn();
+  vi.stubGlobal('fetch', fetchSpy);
+  const dotdot = await call('/api/espn/apis/site/v2/sports/soccer/../teams/1');
+  expect(dotdot.statusCode).toBe(400);
+  const encodedSlash = await call('/api/espn/apis/site/v2/sports/soccer/aut%2F1/teams/1');
+  expect(encodedSlash.statusCode).toBe(400);
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
+
+test('the scout: scoreboard/standings/plain teams-list for a discovered league stay rejected — only the single-team route widens', async () => {
+  const fetchSpy = vi.fn();
+  vi.stubGlobal('fetch', fetchSpy);
+  const scoreboard = await call('/api/espn/apis/site/v2/sports/soccer/aut.1/scoreboard');
+  expect(scoreboard.statusCode).toBe(400);
+  const standings = await call('/api/espn?_p=/apis/v2/sports/soccer/aut.1/standings');
+  expect(standings.statusCode).toBe(400);
+  const summary = await call('/api/espn/apis/site/v2/sports/soccer/aut.1/summary');
+  expect(summary.statusCode).toBe(400);
+  const teamsList = await call('/api/espn/apis/site/v2/sports/soccer/aut.1/teams');
+  expect(teamsList.statusCode).toBe(400);
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
+
 test('other core-API paths off the two player shapes 400 without touching the network', async () => {
   const fetchSpy = vi.fn();
   vi.stubGlobal('fetch', fetchSpy);
   // e.g. the position lookup a $ref points at — never proxied directly.
   const res = await call('/api/espn/v2/sports/soccer/leagues/sco.1/positions/19');
   expect(res.statusCode).toBe(400);
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
+
+// --- the scout, athlete routes (spec §13.20.2, combined-review Medium):
+// a discovered league's PLAYERS fetch bio/stats under that league's core
+// code too — the athlete routes widen to LEAGUE_ANY with the same pinned
+// path shape, or foreign player pages 400 in prod while mocked tests
+// stay green (the exact failure class the teams-route widening fixed). ---
+
+test('the scout: a discovered league slug is allowed through both core athlete routes', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('{"id":"1"}', { status: 200 })));
+  const bio = await call('/api/espn/v2/sports/soccer/leagues/aut.1/seasons/2026/athletes/12345');
+  expect(bio.statusCode).toBe(200);
+  const stats = await call('/api/espn/v2/sports/soccer/leagues/aut.1/seasons/2026/types/1/athletes/12345/statistics');
+  expect(stats.statusCode).toBe(200);
+});
+
+test('the scout: traversal and encoded slashes in the core athlete league slot stay rejected — including via the ?_p= rewrite branch prod actually uses', async () => {
+  const fetchSpy = vi.fn();
+  vi.stubGlobal('fetch', fetchSpy);
+  const dotdot = await call('/api/espn/v2/sports/soccer/leagues/../seasons/2026/athletes/1');
+  expect(dotdot.statusCode).toBe(400);
+  const encoded = await call('/api/espn?_p=/v2/sports/soccer/leagues/aut%2F1/seasons/2026/athletes/1');
+  expect(encoded.statusCode).toBe(400);
+  const encodedDots = await call('/api/espn?_p=/apis/site/v2/sports/soccer/%2e%2e/teams/1');
+  expect(encodedDots.statusCode).toBe(400);
   expect(fetchSpy).not.toHaveBeenCalled();
 });

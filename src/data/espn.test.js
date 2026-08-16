@@ -1,5 +1,5 @@
 import {
-  adaptScoreboard, adaptStandings, adaptTeams, adaptSquad, adaptSummary,
+  adaptScoreboard, adaptStandings, adaptTeams, adaptSquad, adaptSummary, adaptTeamRecord,
 } from './espn.js';
 
 const scoreboard = {
@@ -206,6 +206,57 @@ test('squad: players map with null-safe optional fields', () => {
     shirt: '1', age: 28, nationality: 'Scotland' });
   expect(players[1].position).toBeNull();
   expect(players[1].shirt).toBeNull();
+});
+
+// --- adaptTeamRecord (the scout, spec §13.20): a foreign club's record —
+// derived from the 'total' record item's NAMED stats array, never the
+// undocumented `summary` string ('3-0-0'), whose field order isn't
+// guaranteed. Live-verified shape (aut.1/teams/4411?enable=roster): named
+// gamesPlayed/losses/points/pointsAgainst/pointDifferential, but wins/ties
+// are not always present by name. ---
+
+const recordFull = { team: { record: { items: [
+  { type: 'total', summary: '3-0-0', stats: [
+    { name: 'gamesPlayed', value: 3 }, { name: 'wins', value: 3 }, { name: 'ties', value: 0 },
+    { name: 'losses', value: 0 }, { name: 'points', value: 9 },
+  ] },
+] } } };
+
+test('team record: full named stats map directly, summary string untouched', () => {
+  expect(adaptTeamRecord(recordFull)).toEqual({ played: 3, wins: 3, draws: 0, losses: 0, points: 9 });
+});
+
+const recordMissingWinsTies = { team: { record: { items: [
+  {
+    type: 'total',
+    summary: '3-0-0', // deliberately NOT parsed — its field order is undocumented
+    stats: [
+      { name: 'gamesPlayed', value: 3 }, { name: 'losses', value: 0 },
+      { name: 'points', value: 9 }, { name: 'pointsAgainst', value: 1 },
+      { name: 'pointDifferential', value: 8 },
+    ],
+  },
+] } } };
+
+test('team record: missing wins/ties by name reconciles exactly from points/losses/played arithmetic', () => {
+  expect(adaptTeamRecord(recordMissingWinsTies)).toEqual({ played: 3, wins: 3, draws: 0, losses: 0, points: 9 });
+});
+
+const recordIrreconcilable = { team: { record: { items: [
+  { type: 'total', summary: '3-0-0', stats: [
+    { name: 'gamesPlayed', value: 3 }, { name: 'losses', value: 0 }, { name: 'points', value: 10 },
+  ] },
+] } } };
+
+test('team record: irreconcilable arithmetic (no non-negative integer solution) yields nulls for the underivable fields, never a guess', () => {
+  expect(adaptTeamRecord(recordIrreconcilable)).toEqual({ played: 3, wins: null, draws: null, losses: 0, points: 10 });
+});
+
+test('team record: no total item, no items array, or no record at all is null', () => {
+  expect(adaptTeamRecord({ team: { record: { items: [{ type: 'home', stats: [] }] } } })).toBeNull();
+  expect(adaptTeamRecord({ team: { record: { items: [] } } })).toBeNull();
+  expect(adaptTeamRecord({ team: {} })).toBeNull();
+  expect(adaptTeamRecord({})).toBeNull();
 });
 
 const summary = {

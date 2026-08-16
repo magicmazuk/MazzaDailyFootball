@@ -111,6 +111,39 @@ export function adaptSquad(json) {
   }));
 }
 
+// The scout (spec §13.20): a foreign club's domestic-league record, from
+// the 'total' record item's NAMED stats array. NEVER parse the `summary`
+// string ('3-0-0') — its field order is undocumented, which is exactly why
+// the stats array is the source of truth. wins/ties aren't always present
+// by name (live-verified: aut.1/teams/{id}?enable=roster names gamesPlayed,
+// losses, points, pointsAgainst, pointDifferential but not wins/ties) — when
+// both are missing, derive wins from points/losses/played arithmetic
+// (points = 3w + d, played = w + d + l) but ONLY when that reconciles to
+// non-negative integers exactly; otherwise leave those fields null rather
+// than guess.
+export function adaptTeamRecord(json) {
+  const item = (json?.team?.record?.items ?? []).find(it => it.type === 'total');
+  if (!item) return null;
+  const byName = Object.fromEntries((item.stats ?? []).map(s => [s.name, s.value]));
+  const played = byName.gamesPlayed ?? null;
+  const losses = byName.losses ?? null;
+  const points = byName.points ?? null;
+  let wins = byName.wins ?? null;
+  let draws = byName.ties ?? null;
+
+  if (wins == null && draws == null && played != null && losses != null && points != null) {
+    const undecided = played - losses; // wins + draws
+    const w = (points - undecided) / 2; // points = 3w + d = 2w + (w+d)
+    const d = undecided - w;
+    if (Number.isInteger(w) && w >= 0 && Number.isInteger(d) && d >= 0) {
+      wins = w;
+      draws = d;
+    }
+  }
+
+  return { played, wins, draws, losses, points };
+}
+
 export function adaptSummary(json) {
   const events = (json?.keyEvents ?? []).map(k => {
     const participants = k.participants ?? [];

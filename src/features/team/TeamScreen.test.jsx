@@ -25,8 +25,17 @@ vi.mock('../../data/queries.js', () => ({
   useMatchDetail: vi.fn(() => ({ isLoading: false, isError: false, data: undefined })),
 }));
 
+// The scout film (spec §13.20.3): video.js's own hook + key accessor, mocked
+// the same way as everything above — no QueryClientProvider needed, and
+// each test controls whether a key is "present" and what the hook returns.
+vi.mock('../match/video.js', () => ({
+  useTeamVideos: vi.fn(() => ({ isLoading: false, isError: false, data: undefined })),
+  youtubeKey: vi.fn(() => null),
+}));
+
 import TeamScreen, { matchStarters } from './TeamScreen.jsx';
 import { useTeams, useAllSeasonFixtures, useSquad, usePlayer, useMatchDetail } from '../../data/queries.js';
+import { useTeamVideos, youtubeKey } from '../match/video.js';
 
 // Every shirt button's accessible name is "<number> · <name>" (task 3
 // review — the number was aria-hidden before, so it never reached the a11y
@@ -46,6 +55,8 @@ beforeEach(() => {
   useAllSeasonFixtures.mockImplementation(() => []);
   usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: false, isError: false });
   useMatchDetail.mockImplementation(() => ({ isLoading: false, isError: false, data: undefined }));
+  useTeamVideos.mockImplementation(() => ({ isLoading: false, isError: false, data: undefined }));
+  youtubeKey.mockReturnValue(null);
 });
 
 // Feeds every one of the 13 registry comps a fixture list (default empty)
@@ -188,6 +199,393 @@ test('a squad row opens the sheet under the resolved league, not the route comp,
 
   await userEvent.click(screen.getByRole('button', { name: 'Full profile →' }));
   expect(screen.getByRole('link', { name: 'Open as page →' })).toHaveAttribute('href', '/player/sco.1/p1');
+});
+
+// --- the scout (spec §13.20): when useSquad resolves a foreign club's
+// squad under a DISCOVERED domestic league (discovered: true), a line
+// above the Squad section names it — and the player sheet's synthetic comp
+// descriptor lets it work even though the discovered slug has no registry
+// entry. Never for a domestic resolution (discovered false/undefined). ---
+
+// Season honesty (review round 2, final resolution): ESPN never stamps
+// the record with a season (live-probed), so the copy claims only what
+// the data provably is — the club's most recent `played` league games —
+// rather than asserting "this season" or hiding the record entirely.
+test('a discovered foreign club renders the scout line as their last-N record above the squad section', () => {
+  const opponent = side('4411', 'Sturm Graz');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', opponent, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
+      resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
+      record: { played: 3, wins: 3, draws: 0, losses: 0, points: 9 }, recordSeasonYear: null,
+    },
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  expect(screen.getByText('Won 3 of their last 3 in the Austrian Bundesliga · 9 points')).toBeInTheDocument();
+});
+
+// --- the Pafos regression (review round 2, MEDIUM fix): a full, valid,
+// reconciled record from a completed PRIOR season must never read as
+// "this season" — recordSeasonYear absent (today's real shape) or simply
+// not matching the current season both fall back to the plain line, even
+// though every record field on its own looks perfectly renderable. ---
+
+test('a discovered foreign club with a full record but no verified season (today\'s real ESPN shape) falls back to the plain league line — the Pafos regression', () => {
+  const opponent = side('22281', 'Pafos');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', opponent, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
+      resolvedCompId: 'cyp.1', discovered: true, resolvedLeagueName: 'Cypriot First Division',
+      // A real, completed, fully-reconciled LAST-season table (18-8-10
+      // over 36 games) — recordSeasonYear is null, exactly as useSquad
+      // reads it from today's live feed.
+      record: { played: 36, wins: 18, draws: 8, losses: 10, points: 62 }, recordSeasonYear: null,
+    },
+  }));
+
+  renderAt('uefa.champions', '22281');
+
+  expect(screen.getByText('Won 18 of their last 36 in the Cypriot First Division · 62 points')).toBeInTheDocument();
+  expect(screen.queryByText(/this season/)).not.toBeInTheDocument();
+});
+
+test('a discovered foreign club with a full record whose recordSeasonYear doesn\'t match the current season also falls back to the plain league line', () => {
+  const opponent = side('4411', 'Sturm Graz');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', opponent, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
+      resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
+      record: { played: 3, wins: 3, draws: 0, losses: 0, points: 9 }, recordSeasonYear: 2019,
+    },
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  expect(screen.getByText('Won 3 of their last 3 in the Austrian Bundesliga · 9 points')).toBeInTheDocument();
+});
+
+// --- pluralisation (review round 2, LOW fix): "· 1 points" read wrong
+// for a club sitting on exactly one point. ---
+
+test('a record of exactly 1 point uses the singular "1 point", not "1 points"', () => {
+  const opponent = side('4411', 'Sturm Graz');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', opponent, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
+      resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
+      record: { played: 3, wins: 0, draws: 1, losses: 2, points: 1 }, recordSeasonYear: null,
+    },
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  expect(screen.getByText('Won 0 of their last 3 in the Austrian Bundesliga · 1 point')).toBeInTheDocument();
+  expect(screen.queryByText(/1 points/)).not.toBeInTheDocument();
+});
+
+test('a discovered foreign club with a null record falls back to the plain league line', () => {
+  const opponent = side('4411', 'Sturm Graz');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', opponent, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
+      resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
+      record: null,
+    },
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  expect(screen.getByText('They play in the Austrian Bundesliga.')).toBeInTheDocument();
+  expect(screen.queryByText(/^Won /)).not.toBeInTheDocument();
+});
+
+test('a discovered foreign club with a partial record (wins underivable) falls back to the plain league line', () => {
+  const opponent = side('4411', 'Sturm Graz');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', opponent, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
+      resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
+      record: { played: 3, wins: null, draws: null, losses: 0, points: 10 },
+    },
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  expect(screen.getByText('They play in the Austrian Bundesliga.')).toBeInTheDocument();
+});
+
+// --- review fix: a zeroed pre-season record (every field present and
+// reconciled, but played: 0) must never read "Won 0 of 0 … · 0 points" —
+// technically true, practically useless. ---
+
+test('a discovered foreign club with a zeroed pre-season record (played: 0) falls back to the plain league line, not "Won 0 of 0"', () => {
+  const opponent = side('4411', 'Sturm Graz');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', opponent, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
+      resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
+      record: { played: 0, wins: 0, draws: 0, losses: 0, points: 0 },
+    },
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  expect(screen.getByText('They play in the Austrian Bundesliga.')).toBeInTheDocument();
+  expect(screen.queryByText(/^Won /)).not.toBeInTheDocument();
+});
+
+test('a domestic squad resolution never renders the scout line, discovered or not set', () => {
+  const celtic = side('256', 'Celtic');
+  stubSeasons({
+    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: { players: [{ id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' }], resolvedCompId: 'sco.1' },
+  }));
+
+  renderAt('sco.1', '256');
+
+  expect(screen.queryByText(/They play in the/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/^Won /)).not.toBeInTheDocument();
+});
+
+test('a club that resolves under a fallback league (sco.1, discovered undefined) via a UEFA route also gets no scout line', () => {
+  const celtic = side('256', 'Celtic');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', celtic, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: { players: [{ id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' }], resolvedCompId: 'sco.1' },
+  }));
+
+  renderAt('uefa.champions', '256');
+
+  expect(screen.queryByText(/They play in the/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/^Won /)).not.toBeInTheDocument();
+});
+
+test('a discovered foreign squad shirt opens the sheet with a synthetic comp descriptor (id/name/source, no registry entry)', async () => {
+  const opponent = side('4411', 'Sturm Graz');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', opponent, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
+      resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
+      record: { played: 3, wins: 3, draws: 0, losses: 0, points: 9 },
+    },
+  }));
+  usePlayer.mockReturnValue({
+    bio: { id: 'p1', name: 'Foreign Player', position: 'Forward', shirt: '9', age: 24, nationality: 'Austria' },
+    stats: { appearances: 3, minutes: 270, goals: 1 },
+    isLoading: false, isError: false,
+  });
+
+  renderAt('uefa.champions', '4411');
+
+  await userEvent.click(screen.getByRole('button', { name: lbl('Foreign Player', '9') }));
+
+  // byId('aut.1') is undefined (no registry entry for a foreign slug) —
+  // the synthetic descriptor is what usePlayer actually gets called with.
+  const lastCallArgs = usePlayer.mock.calls.at(-1);
+  expect(lastCallArgs[0]).toEqual({ id: 'aut.1', name: 'Austrian Bundesliga', source: 'espn' });
+  expect(lastCallArgs[1]).toBe('p1');
+
+  await userEvent.click(screen.getByRole('button', { name: 'Full profile →' }));
+  expect(screen.getByRole('link', { name: 'Open as page →' })).toHaveAttribute('href', '/player/aut.1/p1');
+});
+
+// --- the scout film (spec §13.20.3): a LAZY YouTube card, rendered only
+// for a discovered foreign opponent with a key present. Collapsed fetches
+// nothing (useTeamVideos is wired with enabled=false until tapped); tapping
+// flips enabled true and the card settles on fetching/found/not-found. ---
+
+function discoveredSquad(over = {}) {
+  return {
+    players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
+    resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
+    record: { played: 3, wins: 3, draws: 0, losses: 0, points: 9 },
+    ...over,
+  };
+}
+
+function stubDiscoveredSturmGraz(over = {}) {
+  const opponent = side('4411', 'Sturm Graz');
+  stubSeasons({
+    'uefa.champions': [
+      fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', opponent, side('o1', 'Opponent 1')),
+    ],
+  });
+  useSquad.mockImplementation(() => ({ isLoading: false, isError: false, data: discoveredSquad(over) }));
+}
+
+test('missing youtubeKey(): the scout film card does not render at all', () => {
+  stubDiscoveredSturmGraz();
+  youtubeKey.mockReturnValue(null);
+
+  renderAt('uefa.champions', '4411');
+
+  expect(screen.queryByText('The scout film')).not.toBeInTheDocument();
+  expect(useTeamVideos).not.toHaveBeenCalled();
+});
+
+test('a domestic (non-discovered) team page never renders the scout film, even with a key present', () => {
+  const celtic = side('256', 'Celtic');
+  stubSeasons({
+    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: { players: [{ id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' }], resolvedCompId: 'sco.1' },
+  }));
+  youtubeKey.mockReturnValue('test-key');
+
+  renderAt('sco.1', '256');
+
+  expect(screen.queryByText('The scout film')).not.toBeInTheDocument();
+});
+
+test('collapsed scout film: a quiet tappable card, and the hook is wired with enabled false — nothing fetched', () => {
+  stubDiscoveredSturmGraz();
+  youtubeKey.mockReturnValue('test-key');
+
+  renderAt('uefa.champions', '4411');
+
+  expect(screen.getByText('The scout film')).toBeInTheDocument();
+  const card = screen.getByRole('button', { name: /Watch Sturm Graz — recent highlights/ });
+  expect(card).toBeInTheDocument();
+  expect(useTeamVideos).toHaveBeenCalledWith({ id: '4411', name: 'Sturm Graz' }, false);
+});
+
+test('tapping the scout film flips the hook to enabled and shows the fetching line while pending', async () => {
+  stubDiscoveredSturmGraz();
+  youtubeKey.mockReturnValue('test-key');
+  useTeamVideos.mockImplementation((team, enabled) => ({
+    isLoading: enabled, isError: false, data: undefined,
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  await userEvent.click(screen.getByRole('button', { name: /Watch Sturm Graz — recent highlights/ }));
+
+  expect(useTeamVideos).toHaveBeenLastCalledWith({ id: '4411', name: 'Sturm Graz' }, true);
+  expect(screen.getByText('Fetching the film…')).toBeInTheDocument();
+});
+
+test('tapping the scout film, on results, renders VideoCard with the fetched videos', async () => {
+  stubDiscoveredSturmGraz();
+  youtubeKey.mockReturnValue('test-key');
+  useTeamVideos.mockImplementation((team, enabled) => ({
+    isLoading: false, isError: false,
+    data: enabled ? [{ videoId: 'v1', title: 'Sturm Graz recent highlights reel' }] : undefined,
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  await userEvent.click(screen.getByRole('button', { name: /Watch Sturm Graz — recent highlights/ }));
+
+  expect(screen.getByText('Sturm Graz recent highlights reel')).toBeInTheDocument();
+});
+
+test('tapping the scout film on a failed search shows "No film found."', async () => {
+  stubDiscoveredSturmGraz();
+  youtubeKey.mockReturnValue('test-key');
+  useTeamVideos.mockImplementation((team, enabled) => ({
+    isLoading: false, isError: enabled, data: undefined,
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  await userEvent.click(screen.getByRole('button', { name: /Watch Sturm Graz — recent highlights/ }));
+
+  expect(screen.getByText('No film found.')).toBeInTheDocument();
+});
+
+test('tapping the scout film on an empty result set shows "No film found."', async () => {
+  stubDiscoveredSturmGraz();
+  youtubeKey.mockReturnValue('test-key');
+  useTeamVideos.mockImplementation((team, enabled) => ({
+    isLoading: false, isError: false, data: enabled ? [] : undefined,
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  await userEvent.click(screen.getByRole('button', { name: /Watch Sturm Graz — recent highlights/ }));
+
+  expect(screen.getByText('No film found.')).toBeInTheDocument();
+});
+
+// --- review round 2 (LOW fix): dismissing every scout-film video used to
+// leave the section permanently blank (VideoCard returned null once
+// exhausted, with no affordance distinguishing that from "nothing ever
+// loaded"). ScoutFilm now opts into VideoCard's exhaustedLine. ---
+
+test('dismissing every scout-film video shows "That\'s the whole reel." instead of a blank section', async () => {
+  stubDiscoveredSturmGraz();
+  youtubeKey.mockReturnValue('test-key');
+  useTeamVideos.mockImplementation((team, enabled) => ({
+    isLoading: false, isError: false,
+    data: enabled ? [{ videoId: 'v1', title: 'Sturm Graz recent highlights reel' }] : undefined,
+  }));
+
+  renderAt('uefa.champions', '4411');
+
+  await userEvent.click(screen.getByRole('button', { name: /Watch Sturm Graz — recent highlights/ }));
+  await userEvent.click(screen.getByLabelText('Dismiss video'));
+
+  expect(screen.getByText("That's the whole reel.")).toBeInTheDocument();
 });
 
 test('an empty squad (resolved through every fallback, still zero players) shows the distinct unavailable line', () => {

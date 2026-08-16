@@ -735,3 +735,23 @@ as right-aligned serif numerals on the same rule (GateRule, local to FieldBoard)
 3. **European TV listings** — the curated tvListings.json gains verified UK broadcast entries
    for upcoming UEFA fixtures (TNT Sports / Amazon Prime era). Verified-only rule unchanged:
    a fixture whose UK broadcaster can't be confirmed stays unlisted.
+
+## 13.20 The scout (v1.2)
+
+User use case: tap a European opponent (LASK Linz) from Today "with the intention of finding out
+if they are a good team" — and find nothing. Fix, verified against the live feed and £0:
+
+1. **Domestic-league discovery** — ESPN's team endpoint carries `defaultLeague` (slug + human
+   name) even when fetched under a UEFA code, and useSquad's FIRST fallback leg already fetches
+   exactly that endpoint. The discovered league joins the fallback chain, so any European
+   opponent's roster resolves generically (LASK → aut.1 → 26 players) with no curated map and no
+   extra requests for the discovery itself.
+2. **The scout line** — on a team page whose squad resolved under a DISCOVERED foreign league
+   (not the route comp, not a registry comp), a one-line scouting note above the squad: the
+   domestic league's name and the club's record in it this season, derived from the same
+   response ("Won 3 of 3 in the Austrian Bundesliga · 9 points"). Player sheets keep working via
+   a minimal synthetic comp descriptor for the foreign league.
+3. **The scout film** — the same team page offers a LAZY YouTube card ("The scout film"): nothing
+   is searched until tapped (zero quota when unused); on tap, a search for recent highlights of
+   the club plays inline with the match-room VideoCard's dismiss-to-next behaviour. Foreign
+   (discovered-league) clubs only — you don't need a scouting film for Celtic.
