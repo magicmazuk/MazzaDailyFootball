@@ -5,7 +5,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { beforeEach, expect, test, vi } from 'vitest';
+import { vi } from 'vitest'; // vi.mock() hoisting needs vi imported this way, not the ambient global
 import { usePrefs, CELTIC } from '../../store/prefs.js';
 
 // PlayerSheet (mounted at TeamScreen's root, sheet-first consistency,
@@ -22,7 +22,8 @@ vi.mock('../../data/queries.js', () => ({
 import TeamScreen from './TeamScreen.jsx';
 import { useTeams, useAllSeasonFixtures, useSquad, usePlayer } from '../../data/queries.js';
 
-const side = (teamId, name) => ({ teamId, name, crestUrl: null, monogram: name.slice(0, 2).toUpperCase() });
+const side = (teamId, name, over = {}) =>
+  ({ teamId, name, crestUrl: null, monogram: name.slice(0, 2).toUpperCase(), colour: null, ...over });
 const fx = (id, compId, round, kickoff, home, away, status = 'scheduled') =>
   ({ id, compId, kickoff, status, minute: null, round, venue: null, home, away });
 
@@ -192,11 +193,11 @@ test('an empty squad (resolved through every fallback, still zero players) shows
   expect(screen.queryByText(/aren't published for/)).not.toBeInTheDocument();
 });
 
-// --- the visual squad experiment (squad-visual branch, Aug 2026): rows
-// become 4-column number tiles grouped into pitch-order sections, with a
-// balance-strip pitch schematic summarising GK/DEF/MID/FWD counts above
-// them. Position bucketing keys off a first-letter match so it copes with
-// both ESPN's abbreviations ('G'/'D'/'M'/'F') and full names alike. ---
+// --- the visual squad experiment (squad-visual branch, Aug 2026, v2): rows
+// of club-coloured shirt icons grouped into pitch-order sections (v1's
+// balance strip and 4-column tile grid are gone). Position bucketing keys
+// off a first-letter match so it copes with both ESPN's abbreviations
+// ('G'/'D'/'M'/'F') and full names alike. ---
 
 const mixedSquad = [
   { id: 'g1', name: 'Keeper One', shirt: '1', position: 'Goalkeeper' },
@@ -237,8 +238,8 @@ test('a squad with no unrecognised positions renders no trailing Squad bucket', 
   expect(screen.queryByTestId('squad-group-squad')).not.toBeInTheDocument();
 });
 
-test('a tile is a button with a player-name aria-label, the shirt number as its hero and the name beneath', () => {
-  const celtic = side('256', 'Celtic');
+test('a squad row is a button with a player-name aria-label, a club-coloured shirt icon, the name and its position abbrev', () => {
+  const celtic = side('256', 'Celtic', { colour: '009921' });
   stubSeasons({
     'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
   });
@@ -250,25 +251,28 @@ test('a tile is a button with a player-name aria-label, the shirt number as its 
 
   renderAt('sco.1', '256');
 
-  const tile = screen.getByRole('button', { name: 'Kasper Høgh' });
-  expect(within(tile).getByText('9')).toBeInTheDocument();
-  expect(within(tile).getByText('Kasper Høgh')).toBeInTheDocument();
+  const row = screen.getByRole('button', { name: 'Kasper Høgh' });
+  expect(within(row).getByText('9')).toBeInTheDocument();
+  expect(within(row).getByText('Kasper Høgh')).toBeInTheDocument();
+  expect(within(row).getByText('FWD')).toBeInTheDocument();
+  // the shirt fill is the CLUB's colour (team.colour), same for every row.
+  expect(row.querySelector('[data-testid="shirt-shape"]')).toHaveAttribute('fill', '#009921');
 
-  const blankTile = screen.getByRole('button', { name: 'No Number' });
-  expect(within(blankTile).getByText('—')).toBeInTheDocument();
+  const blankRow = screen.getByRole('button', { name: 'No Number' });
+  expect(within(blankRow).getByText('—')).toBeInTheDocument();
 });
 
-test('the balance strip surfaces GK/DEF/MID/FWD counts as accessible tabular numerals, excluding the trailing Squad bucket', () => {
+test('the squad section renders no leftover grid/tile classes or balance strip from the earlier design', () => {
   const celtic = side('256', 'Celtic');
   stubSeasons({
     'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
   });
   useSquad.mockImplementation(() => ({ isLoading: false, isError: false, data: { players: mixedSquad } }));
 
-  renderAt('sco.1', '256');
+  const { container } = renderAt('sco.1', '256');
 
-  // mixedSquad: 1 GK, 2 DEF, 1 MID, 2 FWD, 1 unresolved (trailing Squad bucket, not counted here)
-  expect(screen.getByRole('img', { name: /1 · 2 · 1 · 2/ })).toBeInTheDocument();
+  expect(container.querySelector('.grid-cols-4')).not.toBeInTheDocument();
+  expect(screen.queryByRole('img', { name: /Squad balance/ })).not.toBeInTheDocument();
 });
 
 test('a club with no phase fixtures at all renders the page normally, no replay link', () => {
