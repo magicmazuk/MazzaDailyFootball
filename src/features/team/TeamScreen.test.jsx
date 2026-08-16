@@ -112,6 +112,24 @@ test('a club with qualifying phase fixtures in two comps gets one replay link ea
   ]);
 });
 
+// --- squad rows link to the player page (spec §13.16) ---
+
+test('a squad row is a whole-row link to the player page, carrying the club name as router state', () => {
+  const celtic = side('256', 'Celtic');
+  stubSeasons({
+    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: { players: [{ id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' }] },
+  }));
+
+  renderAt('sco.1', '256');
+
+  const link = screen.getByRole('link', { name: /Kasper Høgh/ });
+  expect(link).toHaveAttribute('href', '/player/sco.1/p1');
+});
+
 test('a club with no phase fixtures at all renders the page normally, no replay link', () => {
   const celtic = side('256', 'Celtic');
   stubSeasons({

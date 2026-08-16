@@ -50,3 +50,31 @@ test('followed club carries its star', () => {
   </MemoryRouter>);
   expect(screen.getByText('★')).toBeInTheDocument();
 });
+
+// --- table movement (rankChange, spec §13.16) ---
+
+test('a positive rankChange renders an up glyph with an accessible label', () => {
+  const moved = rows.map(r => (r.teamId === 'Team2' ? { ...r, rankChange: 3 } : r));
+  render(<MemoryRouter>
+    <LeagueTable comp={byId('sco.1')} rows={moved} followedIds={new Set()} formByTeam={{}} />
+  </MemoryRouter>);
+  expect(screen.getByText('▲3')).toBeInTheDocument();
+  expect(screen.getByLabelText('up 3')).toBeInTheDocument();
+});
+
+test('a negative rankChange renders a down glyph with an accessible label', () => {
+  const moved = rows.map(r => (r.teamId === 'Team2' ? { ...r, rankChange: -2 } : r));
+  render(<MemoryRouter>
+    <LeagueTable comp={byId('sco.1')} rows={moved} followedIds={new Set()} formByTeam={{}} />
+  </MemoryRouter>);
+  expect(screen.getByText('▼2')).toBeInTheDocument();
+  expect(screen.getByLabelText('down 2')).toBeInTheDocument();
+});
+
+test('a zero or missing rankChange renders no glyph', () => {
+  const withZero = rows.map(r => (r.teamId === 'Team2' ? { ...r, rankChange: 0 } : r));
+  render(<MemoryRouter>
+    <LeagueTable comp={byId('sco.1')} rows={withZero} followedIds={new Set()} formByTeam={{}} />
+  </MemoryRouter>);
+  expect(screen.queryByText(/▲|▼/)).not.toBeInTheDocument();
+});
