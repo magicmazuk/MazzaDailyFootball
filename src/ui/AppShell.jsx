@@ -11,7 +11,9 @@ export default function AppShell() {
   return (
     <div className="min-h-screen max-w-md mx-auto px-5 pt-7 pb-24">
       <Outlet />
-      <nav className="fixed bottom-0 inset-x-0 max-w-md mx-auto bg-paper/95 backdrop-blur border-t border-rule flex">
+      {/* z-30: above any page content (team pages lift to z-10 over their
+          watermark), below the player sheet's scrim/panel (z-40/z-50). */}
+      <nav className="fixed bottom-0 inset-x-0 z-30 max-w-md mx-auto bg-paper/95 backdrop-blur border-t border-rule flex">
         {TABS.map(([to, label]) => (
           <NavLink
             key={to}

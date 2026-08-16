@@ -242,3 +242,27 @@ test('changing playerId resets expanded back to the peek', async () => {
   expect(screen.queryByText('Attacking')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Expand profile' })).toBeInTheDocument();
 });
+
+// --- gold-review regressions: the closed sheet must be fully inert, and an
+// open sheet must not let the page scroll away underneath (the sheet's
+// promise is "close it and you're exactly where you were"). ---
+
+test('a closed sheet renders no handle button — no invisible tap strip over the nav, no phantom tab stop', () => {
+  usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: false, isError: false });
+  render(<MemoryRouter><PlayerSheet comp={comp} playerId={null} onClose={() => {}} /></MemoryRouter>);
+  expect(screen.queryByLabelText('Expand profile')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
+});
+
+test('opening the sheet locks body scroll and closing restores the prior value', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  document.body.style.overflow = 'scroll';
+  const { rerender } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
+  expect(document.body.style.overflow).toBe('hidden');
+  usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: false, isError: false });
+  rerender(<MemoryRouter><PlayerSheet comp={comp} playerId={null} onClose={() => {}} /></MemoryRouter>);
+  expect(document.body.style.overflow).toBe('scroll');
+  document.body.style.overflow = '';
+});

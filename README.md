@@ -49,6 +49,8 @@ live-data from the first run.
 **Optional — YouTube highlights:** create `.env.local` with
 `VITE_YOUTUBE_API_KEY=<your key>` (a free [YouTube Data API v3](https://developers.google.com/youtube/v3/getting-started)
 key). Without it the app simply doesn't show the highlights card. Everything else is keyless.
+Because a Vite `VITE_` key ships in the client bundle, restrict it in Google Cloud Console:
+API restrictions → YouTube Data API v3 only, plus HTTP-referrer restrictions for your domains.
 
 **Deploying:** the repo deploys to [Vercel](https://vercel.com) as-is (`vercel.json` included) —
 import the repo, optionally add `VITE_YOUTUBE_API_KEY` as an environment variable, done. The two

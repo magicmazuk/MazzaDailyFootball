@@ -10,7 +10,7 @@ commit, print, or log it).
 ## Commands
 
 - `npm run dev` — Vite on 5173
-- `npm run test:run` — Vitest (55+ files; add `--no-file-parallelism` if workers flake)
+- `npm run test:run` — Vitest (50+ files; add `--no-file-parallelism` if workers flake)
 - `npm run build` — production build
 
 ## Architecture (data flows left to right)

@@ -105,14 +105,20 @@ export default function TeamScreen() {
   return (
     <main className="relative">
       {team.crestUrl && (
-        // Full-bleed watermark (spec §13.18.1): fixed to the VIEWPORT, not
-        // the padded content column, so it bleeds to the actual screen edge
-        // — same offsets/size/opacity as before, just no longer clipped by
-        // the old `overflow-hidden` on main. z-0 keeps it behind the
-        // content column (z-10 below) and PlayerSheet's own z-40/z-50.
-        <div aria-hidden className="pointer-events-none fixed -top-[140px] -right-[140px]
-                                    w-[420px] h-[420px] bg-no-repeat bg-contain z-0"
-          style={{ backgroundImage: `url(${team.crestUrl})`, opacity: WATERMARK_OPACITY }} />
+        // Full-bleed watermark (spec §13.18.1): fixed, so it bleeds to the
+        // screen edge on mobile instead of clipping at the padded content
+        // column — but anchored to the CENTERED COLUMN (max-w-md, matching
+        // AppShell), not the raw viewport, so on a wide screen the crest
+        // hugs the page like a letterhead rather than floating in the far
+        // gutter. At phone widths the column IS the viewport, so the two
+        // anchorings are identical there. z-0 keeps it behind the content
+        // column (z-10 below), the nav (z-30) and PlayerSheet (z-40/z-50).
+        <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-0">
+          <div className="max-w-md mx-auto relative">
+            <div className="absolute -top-[140px] -right-[140px] w-[420px] h-[420px] bg-no-repeat bg-contain"
+              style={{ backgroundImage: `url(${team.crestUrl})`, opacity: WATERMARK_OPACITY }} />
+          </div>
+        </div>
       )}
       <div className="relative z-10">
         <div className="flex items-center gap-4 mb-2">

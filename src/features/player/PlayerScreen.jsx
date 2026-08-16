@@ -89,9 +89,8 @@ function MinutesGauge({ minutes, of }) {
 // PlayerScreen's page-level header (kicker/name/bio line, which stays
 // page-only). Extracted (spec §13.18.3) so PlayerSheet can render the
 // exact same content inline when it expands, rather than navigating away
-// from the match/team context. comp is accepted for symmetry with the
-// sheet's usePlayer(comp, playerId) call site; the splits themselves are
-// driven entirely by bio/stats.
+// from the match/team context. Callers pass comp too, but the splits are
+// driven entirely by bio/stats, so the signature doesn't take it.
 export function Splits({ bio, stats }) {
   const keeper = isKeeper(bio);
 

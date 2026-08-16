@@ -397,12 +397,18 @@ test('the crest watermark is fixed to the viewport (not clipped by an overflow-h
   const main = container.querySelector('main');
   expect(main.className).not.toMatch(/overflow-hidden/);
   expect(main.className).toMatch(/relative/);
-  const watermark = container.querySelector('[aria-hidden][style*="crest.png"]');
-  expect(watermark.className).toMatch(/fixed/);
-  expect(watermark.className).not.toMatch(/absolute/);
-  expect(watermark.className).toMatch(/-top-\[140px\]/);
-  expect(watermark.className).toMatch(/-right-\[140px\]/);
-  expect(watermark.className).toMatch(/z-0/);
+  // The crest div itself is absolute inside a fixed, column-centred
+  // wrapper — the wrapper does the viewport-fixing (so nothing clips at
+  // the padded column), the inner max-w-md re-anchors it to the content
+  // column on wide screens.
+  const crest = container.querySelector('[style*="crest.png"]');
+  expect(crest.className).toMatch(/-top-\[140px\]/);
+  expect(crest.className).toMatch(/-right-\[140px\]/);
+  const wrapper = crest.closest('[aria-hidden]');
+  expect(wrapper.className).toMatch(/fixed/);
+  expect(wrapper.className).toMatch(/pointer-events-none/);
+  expect(wrapper.className).toMatch(/z-0/);
+  expect(crest.closest('[class*="max-w-md"]')).not.toBeNull();
 });
 
 test('a club with no phase fixtures at all renders the page normally, no replay link', () => {

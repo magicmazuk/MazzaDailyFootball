@@ -65,6 +65,18 @@ export default function PlayerSheet({ comp, playerId, onClose }) {
   const [expanded, setExpanded] = useState(false);
   useEffect(() => { setExpanded(false); }, [playerId]);
 
+  // Body scroll lock while open (gold review): without it a swipe on the
+  // sheet also scrolls the page behind, so dismissing left the reader
+  // ~100-200px from where they tapped — breaking the sheet's whole promise
+  // of keeping the previous page in context. Restores the prior inline
+  // value on close/unmount rather than assuming ''.
+  useEffect(() => {
+    if (!open) return undefined;
+    const prior = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prior; };
+  }, [open]);
+
   const touchStartRef = useRef(null);
   const scrollRef = useRef(null);
 
@@ -121,6 +133,12 @@ export default function PlayerSheet({ comp, playerId, onClose }) {
           open ? 'translate-y-0' : 'translate-y-full'} ${
           reducedMotion ? '' : 'transition-[transform,height] duration-[380ms] ease-[cubic-bezier(0.3,0.9,0.3,1)]'}`}
       >
+        {/* Gated on `open` (gold review): when the sheet is closed the whole
+            panel sits translated below the viewport, but the handle's 44px
+            negative-margin hit area still poked ~5px into the page, forming
+            an invisible z-50 strip over the bottom nav and a phantom tab
+            stop on every route that mounts the sheet. */}
+        {open && (
         <div className="shrink-0 flex justify-center mb-3.5">
           {/* Real button now (spec §13.18.3): visual bar stays small, but the
               button itself carries generous padding — canceled by an equal
@@ -132,6 +150,7 @@ export default function PlayerSheet({ comp, playerId, onClose }) {
             <span aria-hidden className="block w-9 h-[3px] rounded-sm bg-rule" />
           </button>
         </div>
+        )}
 
         {isError && (
           <p className="text-muted font-sans text-[11px]">Player information unavailable.</p>
@@ -172,7 +191,7 @@ export default function PlayerSheet({ comp, playerId, onClose }) {
             )}
 
             {expanded && (
-              <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto mt-4">
+              <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain mt-4">
                 <Splits bio={bio} stats={stats} comp={comp} />
                 <Link to={`/player/${comp?.id}/${playerId}`} onClick={onClose}
                   className="block text-center font-sans text-[10px] uppercase tracking-[.14em] text-muted mt-2 mb-1">
