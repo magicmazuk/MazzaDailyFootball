@@ -1,12 +1,13 @@
 // Cheap wiring assertions for the cup Overview tab (spec §13.10) — tab
 // set/default per comp.type/hasTable, and the season-loading state. The
-// StructureStrip/FieldBoard component tests carry the real behavioural
-// coverage; this file only checks CompetitionScreen wires them in.
+// FieldBoard component tests carry the real behavioural coverage; this
+// file only checks CompetitionScreen wires them in.
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { usePrefs } from '../../store/prefs.js';
+import { byId } from '../../domain/competitions.js';
 import CompetitionScreen from './CompetitionScreen.jsx';
 
 beforeEach(() => {
@@ -56,11 +57,14 @@ test('while the season query loads, Overview shows a muted loading line instead 
   expect(screen.getByText('Loading the field…')).toBeInTheDocument();
 });
 
-test('once loaded with no fixtures, Overview shows the structure strip plus the honest pre-draw line', async () => {
-  renderAt('uefa.champions');
+test('once loaded with no fixtures, Overview shows the blurb plus the honest pre-draw line', async () => {
+  const comp = byId('sco.cis');
+  renderAt('sco.cis');
   expect(await screen.findByText("The draw hasn't been made yet.")).toBeInTheDocument();
-  // Structure strip renders immediately from registry config, independent of fetch.
-  expect(screen.getByText('league phase')).toBeInTheDocument();
+  // The blurb renders immediately from registry config, independent of fetch.
+  expect(screen.getByText(comp.blurb)).toBeInTheDocument();
+  // No structure-strip artifacts remain — its '›' separator glyph is gone.
+  expect(screen.queryByText('›')).not.toBeInTheDocument();
 });
 
 // --- fixture context suppression (spec §13.12 — the page itself is the context) ---
