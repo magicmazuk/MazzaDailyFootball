@@ -72,7 +72,7 @@ export default function FieldBoard({ fixtures, comp, followedIds }) {
   // A club whose first appearance happened to be an unrounded fixture but
   // who is still `in` would otherwise never be drawn anywhere — collect
   // any survivor absent from every tier and give it its own untiered grid
-  // so the crest count always matches the "Still in — N" total.
+  // so the crest count always matches the Still in numeral.
   const tieredTeamIds = new Set(inTierGroups.flatMap(t => t.clubs.map(c => c.teamId)));
   const untieredClubs = inClubs.filter(c => !tieredTeamIds.has(c.teamId));
   const outCount = out.reduce((n, g) => n + g.clubs.length, 0);
