@@ -3,18 +3,24 @@
 // (phaseReplayGroups), tested directly there; this file only checks
 // TeamScreen renders what that returns, in the Season section header area.
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { usePrefs, CELTIC } from '../../store/prefs.js';
 
+// PlayerSheet (mounted at TeamScreen's root, sheet-first consistency,
+// Aug 2026) fetches via usePlayer internally — mocked here the same way
+// MatchRoom.test.jsx mocks it, so these tests don't need a
+// QueryClientProvider.
 vi.mock('../../data/queries.js', () => ({
   useTeams: vi.fn(() => ({ isLoading: false, data: undefined })),
   useAllSeasonFixtures: vi.fn(() => []),
   useSquad: vi.fn(() => ({ isLoading: false, isError: false, data: undefined })),
+  usePlayer: vi.fn(() => ({ bio: null, stats: null, isLoading: false, isError: false })),
 }));
 
 import TeamScreen from './TeamScreen.jsx';
-import { useTeams, useAllSeasonFixtures, useSquad } from '../../data/queries.js';
+import { useTeams, useAllSeasonFixtures, useSquad, usePlayer } from '../../data/queries.js';
 
 const side = (teamId, name) => ({ teamId, name, crestUrl: null, monogram: name.slice(0, 2).toUpperCase() });
 const fx = (id, compId, round, kickoff, home, away, status = 'scheduled') =>
@@ -26,6 +32,7 @@ beforeEach(() => {
   useTeams.mockImplementation(() => ({ isLoading: false, data: undefined }));
   useSquad.mockImplementation(() => ({ isLoading: false, isError: false, data: undefined }));
   useAllSeasonFixtures.mockImplementation(() => []);
+  usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: false, isError: false });
 });
 
 // Feeds every one of the 13 registry comps a fixture list (default empty)
@@ -112,9 +119,11 @@ test('a club with qualifying phase fixtures in two comps gets one replay link ea
   ]);
 });
 
-// --- squad rows link to the player page (spec §13.16) ---
+// --- squad rows open the player sheet (sheet-first consistency, Aug 2026):
+// every player tap opens PlayerSheet; the full page is reached only via the
+// sheet's "Full profile →" link (or a direct URL). ---
 
-test('a squad row is a whole-row link to the player page, carrying the club name as router state', () => {
+test('a squad row is a button (not a link) that opens the player sheet', async () => {
   const celtic = side('256', 'Celtic');
   stubSeasons({
     'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
@@ -123,18 +132,28 @@ test('a squad row is a whole-row link to the player page, carrying the club name
     isLoading: false, isError: false,
     data: { players: [{ id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' }] },
   }));
+  usePlayer.mockReturnValue({
+    bio: { id: 'p1', name: 'Kasper Høgh', position: 'Forward', shirt: '9', age: 24, nationality: 'Denmark' },
+    stats: { appearances: 10, minutes: 900, goals: 3 },
+    isLoading: false, isError: false,
+  });
 
   renderAt('sco.1', '256');
 
-  const link = screen.getByRole('link', { name: /Kasper Høgh/ });
-  expect(link).toHaveAttribute('href', '/player/sco.1/p1');
+  expect(screen.queryByRole('link', { name: /Kasper Høgh/ })).not.toBeInTheDocument();
+  const row = screen.getByRole('button', { name: 'Kasper Høgh' });
+
+  await userEvent.click(row);
+
+  expect(screen.getByRole('link', { name: 'Full profile →' })).toHaveAttribute('href', '/player/sco.1/p1');
 });
 
 // --- home-league hotfix (Aug 2026): useSquad resolves squads under a
-// fallback league and reports resolvedCompId; the row link and the
-// "still empty after resolving" state both key off that. ---
+// fallback league and reports resolvedCompId; the sheet's comp (and so its
+// Full profile link, and the stats it fetches with) key off that, not the
+// route comp. ---
 
-test('a squad row links to the player page under the resolved league, not the route comp, when they differ', () => {
+test('a squad row opens the sheet under the resolved league, not the route comp, when they differ', async () => {
   const celtic = side('256', 'Celtic');
   stubSeasons({
     'uefa.champions': [fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
@@ -143,11 +162,17 @@ test('a squad row links to the player page under the resolved league, not the ro
     isLoading: false, isError: false,
     data: { players: [{ id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' }], resolvedCompId: 'sco.1' },
   }));
+  usePlayer.mockReturnValue({
+    bio: { id: 'p1', name: 'Kasper Høgh', position: 'Forward', shirt: '9', age: 24, nationality: 'Denmark' },
+    stats: { appearances: 10, minutes: 900, goals: 3 },
+    isLoading: false, isError: false,
+  });
 
   renderAt('uefa.champions', '256');
 
-  const link = screen.getByRole('link', { name: /Kasper Høgh/ });
-  expect(link).toHaveAttribute('href', '/player/sco.1/p1');
+  await userEvent.click(screen.getByRole('button', { name: 'Kasper Høgh' }));
+
+  expect(screen.getByRole('link', { name: 'Full profile →' })).toHaveAttribute('href', '/player/sco.1/p1');
 });
 
 test('an empty squad (resolved through every fallback, still zero players) shows the distinct unavailable line', () => {
