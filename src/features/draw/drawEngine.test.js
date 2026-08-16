@@ -3,7 +3,8 @@
 // timeouts; this file only proves the state machine itself is correct.
 import { expect, test } from 'vitest';
 import {
-  TIMINGS, drawMode, drawReducer, initDraw, isComplete, landedSides, remainingClubs, seededShuffle,
+  TIMINGS, drawMode, drawReducer, initDraw, isComplete, landedSides, remainingClubs, scatterShuffle,
+  seededShuffle,
 } from './drawEngine.js';
 
 const side = (teamId, name) => ({ teamId, name, crestUrl: null, monogram: name.slice(0, 2).toUpperCase() });
@@ -317,4 +318,56 @@ test('seededShuffle never mutates the input array', () => {
   const original = sixteen.slice();
   seededShuffle(sixteen, 'sco.tennents:fourth-round');
   expect(sixteen).toEqual(original);
+});
+
+// --- scatterShuffle: anti-telegraph guarantee for the roll-call list (fix
+// — a plain seededShuffle still coincidentally seats a tie's two clubs
+// consecutively often enough, in ~65% of realistic seeds, to read as the
+// same "pairings visible before the draw" bug; scatterShuffle re-salts
+// deterministically until none are) ---
+
+const scatterClubs = rollcallTies.flatMap(t => [t.home, t.away]);
+
+test('scatterShuffle removes an adjacency the plain shuffle has, for a real seed', () => {
+  // sco.tennents:first-round is a real (compId, round) seed that, checked
+  // directly, leaves three of rollcallTies' nine pairs consecutive under
+  // plain seededShuffle — exactly the bug scatterShuffle exists to fix.
+  const plain = seededShuffle(scatterClubs, 'sco.tennents:first-round');
+  const plainPairKeys = new Set(rollcallTies.map(t => [t.home.teamId, t.away.teamId].sort().join('|')));
+  const plainHasAdjacency = plain.some((club, i) => i < plain.length - 1
+    && plainPairKeys.has([club.teamId, plain[i + 1].teamId].sort().join('|')));
+  expect(plainHasAdjacency).toBe(true); // the plain shuffle does have the bug for this seed
+
+  const scattered = scatterShuffle(scatterClubs, rollcallTies, 'sco.tennents:first-round');
+  const scatteredHasAdjacency = scattered.some((club, i) => i < scattered.length - 1
+    && plainPairKeys.has([club.teamId, scattered[i + 1].teamId].sort().join('|')));
+  expect(scatteredHasAdjacency).toBe(false); // scatterShuffle clears it
+  // Still a permutation of the same clubs, not a different set.
+  expect([...scattered].sort((a, b) => a.teamId.localeCompare(b.teamId)))
+    .toEqual([...scatterClubs].sort((a, b) => a.teamId.localeCompare(b.teamId)));
+});
+
+test('scatterShuffle is deterministic — the same clubs, ties and seed always produce the same order', () => {
+  const a = scatterShuffle(scatterClubs, rollcallTies, 'sco.tennents:first-round');
+  const b = scatterShuffle(scatterClubs, rollcallTies, 'sco.tennents:first-round');
+  expect(a).toEqual(b);
+});
+
+test('scatterShuffle terminates for a pathological input with no adjacency-free arrangement, instead of hanging', () => {
+  // 2 ties, both between the SAME pair of clubs (a genuine "replay pair" —
+  // the same two clubs meeting twice in a round, per remainingClubs'
+  // comments) — mathematically unsatisfiable: with only 2 distinct club
+  // identities filling 4 slots, at least one A-next-to-B adjacency is
+  // unavoidable in any arrangement, so the re-salt cap is always exhausted.
+  const alpha = side('alpha', 'Alpha');
+  const bravo = side('bravo', 'Bravo');
+  const replayTies = [tie('x1', alpha, bravo, '2026-08-01T15:00:00Z'), tie('x2', alpha, bravo, '2026-08-08T15:00:00Z')];
+  const replayClubs = [alpha, bravo, alpha, bravo];
+
+  const start = Date.now();
+  const result = scatterShuffle(replayClubs, replayTies, 'any-seed');
+  expect(Date.now() - start).toBeLessThan(1000); // returns promptly, doesn't hang hunting for the impossible
+  expect(result).toHaveLength(4);
+  expect([...result].sort((a, b) => a.teamId.localeCompare(b.teamId)))
+    .toEqual([...replayClubs].sort((a, b) => a.teamId.localeCompare(b.teamId)));
 });

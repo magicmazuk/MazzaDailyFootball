@@ -12,7 +12,8 @@ import { useSeasonFixtures } from '../../data/queries.js';
 import { usePrefs } from '../../store/prefs.js';
 import Crest from '../../ui/Crest.jsx';
 import {
-  TIMINGS, drawMode, drawReducer, initDraw, isComplete, landedSides, remainingClubs, seededShuffle,
+  TIMINGS, drawMode, drawReducer, initDraw, isComplete, landedSides, remainingClubs, scatterShuffle,
+  seededShuffle,
 } from './drawEngine.js';
 
 // Stable per-index jumble for the bowl pool — a fixed table, never random,
@@ -115,47 +116,80 @@ function BowlPool({ pool, revealingIndex, clubOrdinals }) {
   );
 }
 
-// A club's identity key for roll-call status lookups (landed/current) —
-// teamId when present, else its name. Kept tiny and separate from the
-// React `key` prop below (which additionally disambiguates a missing
-// teamId by index, since two different no-teamId clubs could share a name).
-const clubKey = club => club.teamId ?? club.name;
+// A club's grouping key for the OCCURRENCE-COUNTING below — teamId when
+// present, else its name. This is only ever used to count/match same-
+// identity clubs, never as a Set-membership status lookup: two distinct
+// teamId-less clubs sharing a name (a real case per domain/draws.js'
+// pairSideKey, which has the identical fallback) would otherwise collide
+// and show BOTH as landed/current when only one actually is. Counting how
+// many occurrences of a key are landed/current, then consuming exactly
+// that many as `clubs` is walked in display order (same technique as
+// filterToRemaining above), matches each occurrence at most once instead.
+const clubGroupKey = club => club.teamId ?? club.name;
 
-function RollcallList({ clubs, landedKeys, currentKeys }) {
+function countByGroupKey(clubList) {
+  const counts = new Map();
+  for (const club of clubList) {
+    const key = clubGroupKey(club);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+// Per-club roll-call status ('landed' | 'current' | null), one entry per
+// `clubs` position — POSITIONAL rather than a keyed Set, precisely to
+// avoid the identical-name collision above. `landedClubs`/`currentClubs`
+// are the actual club objects (not keys) drawn from `rows`/currentTie;
+// each is counted by clubGroupKey, then `clubs` is walked in display
+// order consuming one matching count per occurrence, landed taking
+// priority (a club can't be both — by the time it's landed it's no longer
+// the current tie).
+function rollcallStatuses(clubs, landedClubs, currentClubs) {
+  const landedCounts = countByGroupKey(landedClubs);
+  const currentCounts = countByGroupKey(currentClubs);
+  return clubs.map(club => {
+    const key = clubGroupKey(club);
+    const landedLeft = landedCounts.get(key) ?? 0;
+    if (landedLeft > 0) {
+      landedCounts.set(key, landedLeft - 1);
+      return 'landed';
+    }
+    const currentLeft = currentCounts.get(key) ?? 0;
+    if (currentLeft > 0) {
+      currentCounts.set(key, currentLeft - 1);
+      return 'current';
+    }
+    return null;
+  });
+}
+
+function RollcallList({ clubs, statuses }) {
   const currentRef = useRef(null);
-  // Depend on a stable signal for the current tie's identity (the joined
-  // current keys) rather than the Set instance itself — Pool builds a new
-  // Set every render, so keying the effect off the object would re-scroll
-  // on every unrelated re-render instead of only when the drawing tie
-  // actually changes.
-  const currentSignal = [...currentKeys].join(',');
+  // The positions currently 'current' (0 or 2, scattered by the shuffle) —
+  // used both to place the scrollIntoView ref on the first one in DISPLAY
+  // order and as the effect's dependency signal, so it re-scrolls only
+  // when which positions are current actually changes (a new tie starts
+  // drawing), not on every unrelated re-render or landing transition.
+  const currentPositions = statuses.flatMap((status, i) => (status === 'current' ? [i] : []));
+  const currentSignal = currentPositions.join(',');
+  const firstCurrentIndex = currentPositions[0] ?? -1;
 
   useEffect(() => {
     currentRef.current?.scrollIntoView?.({ block: 'center' });
   }, [currentSignal]);
 
-  const nameClass = (landed, isCurrent) => `text-[10.5px] leading-[1.85] break-inside-avoid ${
-    landed ? 'line-through opacity-55 text-muted'
-      : isCurrent ? 'text-accent text-[11.5px] font-semibold' : ''}`;
-
-  // The scrollIntoView ref sits on the first current club in DISPLAY order
-  // (not tie order) — with the two current clubs scattered by the shuffle,
-  // "first" only makes sense relative to how they're actually rendered.
-  const firstCurrentIndex = clubs.findIndex(club => currentKeys.has(clubKey(club)));
+  const nameClass = status => `text-[10.5px] leading-[1.85] break-inside-avoid ${
+    status === 'landed' ? 'line-through opacity-55 text-muted'
+      : status === 'current' ? 'text-accent text-[11.5px] font-semibold' : ''}`;
 
   return (
     <div className="border border-rule rounded-xl p-3 max-h-[200px] overflow-y-auto columns-2">
-      {clubs.map((club, i) => {
-        const key = clubKey(club);
-        const landed = landedKeys.has(key);
-        const isCurrent = currentKeys.has(key);
-        return (
-          <p key={club.teamId ?? `${club.name}-${i}`} ref={i === firstCurrentIndex ? currentRef : null}
-            className={nameClass(landed, isCurrent)}>
-            {club.name}
-          </p>
-        );
-      })}
+      {clubs.map((club, i) => (
+        <p key={club.teamId ?? `${club.name}-${i}`} ref={i === firstCurrentIndex ? currentRef : null}
+          className={nameClass(statuses[i])}>
+          {club.name}
+        </p>
+      ))}
     </div>
   );
 }
@@ -167,32 +201,32 @@ function Pool({ mode, pool, state, rows, clubs, clubOrdinals }) {
   const revealing = revealingClub(state);
   const revealingIndex = revealing ? pool.indexOf(revealing) : -1;
 
-  // Roll-call status lookups, at the CLUB level (hotfix: shuffling ties
-  // still rendered each tie's two clubs adjacently — the exact pairing,
-  // readable before the draw). `rows` is landedSides(state) in tie order;
-  // a landed row's two clubs go into landedKeys, and currentTie(state)'s
-  // two clubs (if any) go into currentKeys — RollcallList then renders the
-  // shuffled club list directly and looks up each club's status by key,
-  // independent of its position. Rollcall-only — opponents rows carry no
-  // `tie` (landedSides' opponents shape is `{ opponent, venue, ... }`,
-  // club-centric rather than tie-centric), and bowl never renders
-  // RollcallList, so this is skipped for either rather than crashing on
-  // `row.tie`.
-  const landedKeys = new Set();
-  const currentKeys = new Set();
+  // Roll-call statuses, at the CLUB level (hotfix: shuffling ties still
+  // rendered each tie's two clubs adjacently — the exact pairing, readable
+  // before the draw). `rows` is landedSides(state) in tie order; a landed
+  // row's two clubs are collected into landedClubs, and currentTie(state)'s
+  // two clubs (if any) into currentClubs — rollcallStatuses then matches
+  // each by occurrence count (see above) against the shuffled display
+  // list. Rollcall-only — opponents rows carry no `tie` (landedSides'
+  // opponents shape is `{ opponent, venue, ... }`, club-centric rather
+  // than tie-centric), and bowl never renders RollcallList, so this is
+  // skipped for either rather than crashing on `row.tie`.
+  const landedClubs = [];
+  const currentClubs = [];
   if (mode === 'rollcall') {
     for (const row of rows) {
       if (row.home && row.away) {
-        if (row.tie.home) landedKeys.add(clubKey(row.tie.home));
-        if (row.tie.away) landedKeys.add(clubKey(row.tie.away));
+        if (row.tie.home) landedClubs.push(row.tie.home);
+        if (row.tie.away) landedClubs.push(row.tie.away);
       }
     }
     const current = currentTie(state);
     if (current) {
-      if (current.home) currentKeys.add(clubKey(current.home));
-      if (current.away) currentKeys.add(clubKey(current.away));
+      if (current.home) currentClubs.push(current.home);
+      if (current.away) currentClubs.push(current.away);
     }
   }
+  const statuses = mode === 'rollcall' ? rollcallStatuses(clubs, landedClubs, currentClubs) : [];
 
   return (
     <section className="mb-6">
@@ -202,7 +236,7 @@ function Pool({ mode, pool, state, rows, clubs, clubOrdinals }) {
       </div>
       {mode === 'bowl' || mode === 'opponents'
         ? <BowlPool pool={pool} revealingIndex={revealingIndex} clubOrdinals={clubOrdinals} />
-        : <RollcallList clubs={clubs} landedKeys={landedKeys} currentKeys={currentKeys} />}
+        : <RollcallList clubs={clubs} statuses={statuses} />}
     </section>
   );
 }
@@ -376,11 +410,22 @@ function Ceremony({ comp, compId, round, ties, roundFixtures, alreadySeen, markT
   // — task-2 brief — so two different followed clubs replaying the same
   // phase round each get their own stable-but-distinct shuffle, rather
   // than sharing the round-wide bowl/rollcall seed.
+  //
+  // Rollcall additionally runs that shuffle through scatterShuffle rather
+  // than the plain seededShuffle (fix: a plain shuffle still coincidentally
+  // seats a tie's two clubs next to each other often enough — most
+  // realistic seeds — to read as the same telegraph bug; scatterShuffle
+  // re-salts deterministically until no tie's pair is adjacent). Bowl/
+  // opponents keep the plain shuffle — their pool is a 2D jumble, not a
+  // linear list, so adjacency there isn't the same telegraph risk and is
+  // out of scope here.
   const shuffleSeed = subjectTeamId ? `${compId}:${round}:${subjectTeamId}` : `${compId}:${round}`;
-  const shuffledClubs = useMemo(
-    () => seededShuffle(remainingClubs(initDraw(ties, mode, { subjectTeamId })), shuffleSeed),
-    [ties, mode, subjectTeamId, shuffleSeed],
-  );
+  const shuffledClubs = useMemo(() => {
+    const allClubs = remainingClubs(initDraw(ties, mode, { subjectTeamId }));
+    return mode === 'rollcall'
+      ? scatterShuffle(allClubs, ties, shuffleSeed)
+      : seededShuffle(allClubs, shuffleSeed);
+  }, [ties, mode, subjectTeamId, shuffleSeed]);
 
   // Seen-marking (spec §8.5, §13.15; hotfix-two-leg-draw): fire exactly
   // once, on reaching complete, by taps or by Reveal the rest. An

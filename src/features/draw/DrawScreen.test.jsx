@@ -13,7 +13,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, expect, test, vi } from 'vitest';
 import DrawScreen from './DrawScreen.jsx';
-import { TIMINGS, seededShuffle } from './drawEngine.js';
+import { TIMINGS, scatterShuffle } from './drawEngine.js';
 import { usePrefs, CELTIC } from '../../store/prefs.js';
 import { tieId } from '../../domain/draws.js';
 
@@ -335,45 +335,94 @@ test('the roll-call "currently drawing" highlight tracks the right tie through t
 // --- club-level roll-call shuffle (fix: the roll call telegraphed pairings
 // — shuffling TIES still rendered each tie's two clubs as adjacent lines,
 // which reads as the pairing before the draw; the list must shuffle at the
-// CLUB level so pairs scatter). `sco.tennents:round-2` is used (rather than
-// this suite's usual `first-round`) because it was checked empirically
-// (via seededShuffle directly) to leave none of the 9 ties' two clubs
-// adjacent in the club-level shuffle order — first-round's real seed still
-// leaves a few pairs adjacent, which would make the anti-telegraph
-// assertion below pass by luck rather than by construction.
-const rollcallShuffleEvents = Array.from({ length: 9 }, (_, i) =>
-  teamEvent(`s${i}`, `2026-11-0${(i % 9) + 1}T15:00:00Z`, `sh${i}`, `RC Home ${i}`, `sa${i}`, `RC Away ${i}`, 'round-2'));
-
-const rollcallShuffleNames = () => {
+// CLUB level so pairs scatter). Ceremony runs the rollcall list through
+// scatterShuffle (drawEngine.js), which re-salts a plain seededShuffle
+// until no tie's two clubs are consecutive — a GUARANTEE (barring a
+// pathologically tiny round, covered by scatterShuffle's own unit tests in
+// drawEngine.test.js), not a property of one hand-picked seed/fixture. So
+// this suite's regular rollcallEvents/`first-round` fixture is used
+// directly — no special seed needed, and it's the same fixture that
+// demonstrably had adjacent pairs under the old plain-seededShuffle
+// rendering, making it the most direct proof the fix works.
+const rollcallDisplayNames = () => {
   const rollcallList = document.querySelector('.columns-2');
-  return within(rollcallList).getAllByText(/^RC (Home|Away) \d$/).map(el => el.textContent);
+  return within(rollcallList).getAllByText(/^(Home|Away) \d$/).map(el => el.textContent);
 };
 
-test('the roll-call list renders clubs in club-level seeded-shuffle order, matching seededShuffle(allClubs, seed) directly', async () => {
-  stubScoreboard(rollcallShuffleEvents);
-  renderAt('/draw/sco.tennents/round-2');
+// The same 9-tie/18-club shape as rollcallEvents, as plain {teamId, name}
+// club/tie objects — what scatterShuffle itself takes, so the rendered DOM
+// order can be asserted directly against the pure function's output.
+const rollcallTies = Array.from({ length: 9 }, (_, i) => ({
+  id: `r${i}`,
+  home: { teamId: `h${i}`, name: `Home ${i}` },
+  away: { teamId: `a${i}`, name: `Away ${i}` },
+}));
+
+test('the roll-call list renders clubs in scatterShuffle order — club-level, matching the pure function directly', async () => {
+  stubScoreboard(rollcallEvents);
+  renderAt('/draw/sco.tennents/first-round');
   await screen.findByText('Tap to draw the first tie');
 
-  const allClubs = Array.from({ length: 9 }, (_, i) => [
-    { teamId: `sh${i}`, name: `RC Home ${i}` },
-    { teamId: `sa${i}`, name: `RC Away ${i}` },
-  ]).flat();
-  const expectedOrder = seededShuffle(allClubs, 'sco.tennents:round-2').map(c => c.name);
+  const allClubs = rollcallTies.flatMap(t => [t.home, t.away]);
+  const expectedOrder = scatterShuffle(allClubs, rollcallTies, 'sco.tennents:first-round').map(c => c.name);
 
-  expect(rollcallShuffleNames()).toEqual(expectedOrder);
+  expect(rollcallDisplayNames()).toEqual(expectedOrder);
 });
 
-test('the roll-call list never seats a tie\'s two clubs adjacently — pairings are not readable before the draw', async () => {
-  stubScoreboard(rollcallShuffleEvents);
-  renderAt('/draw/sco.tennents/round-2');
+test('the roll-call list never seats a tie\'s two clubs adjacently — pairings are not readable before the draw (guaranteed by scatterShuffle)', async () => {
+  stubScoreboard(rollcallEvents);
+  renderAt('/draw/sco.tennents/first-round');
   await screen.findByText('Tap to draw the first tie');
 
-  const positions = new Map(rollcallShuffleNames().map((name, i) => [name, i]));
+  const positions = new Map(rollcallDisplayNames().map((name, i) => [name, i]));
   for (let i = 0; i < 9; i += 1) {
-    const homePos = positions.get(`RC Home ${i}`);
-    const awayPos = positions.get(`RC Away ${i}`);
+    const homePos = positions.get(`Home ${i}`);
+    const awayPos = positions.get(`Away ${i}`);
     expect(Math.abs(homePos - awayPos)).not.toBe(1);
   }
+});
+
+// --- status-key collision (fix: clubKey = teamId ?? name collided when two
+// teamId-less clubs share a name — both would show landed/current from a
+// single Set-membership check. Statuses are now POSITIONAL, matched by
+// occurrence count, so exactly the club that actually landed is struck. ---
+
+// 10 ties: 8 ordinary (16 distinct-id clubs) plus two ties each featuring a
+// teamId-less "St Mirren" — a real case class (domain/draws.js' own
+// pairSideKey falls back to name the same way for a side with no id yet).
+// The two "St Mirren"s are genuinely different clubs that happen to share
+// a display name; the OTHER side of each tie differs (Queens Park vs Ayr
+// United), so they're distinct pairings, not a two-legged replay of each
+// other. Kickoffs keep the St Mirren/Queens Park tie earliest (tie 0, the
+// first one landed by a single TAP) and St Mirren/Ayr United latest (the
+// last tie, never landed in this test) so which occurrence struck through
+// is unambiguous. 18 non-null distinct ids (the two St Mirrens don't count
+// — distinctClubCount skips null teamIds) keeps this comfortably in
+// rollcall mode.
+const collisionEvents = [
+  teamEvent('sm-qp', '2026-11-01T15:00:00Z', null, 'St Mirren', 'qp', 'Queens Park', 'collision-round'),
+  ...Array.from({ length: 8 }, (_, i) =>
+    teamEvent(`col${i}`, `2026-11-0${i + 2}T15:00:00Z`, `ch${i}`, `Home ${i}`, `ca${i}`, `Away ${i}`, 'collision-round')),
+  teamEvent('ay-sm', '2026-11-10T15:00:00Z', 'ay', 'Ayr United', null, 'St Mirren', 'collision-round'),
+];
+
+test('two teamId-less clubs sharing a name are tracked independently — landing one does not strike the other', async () => {
+  stubScoreboard(collisionEvents);
+  renderAt('/draw/sco.tennents/collision-round');
+  await screen.findByText('Tap to draw the first tie');
+
+  const rollcallList = document.querySelector('.columns-2');
+  expect(within(rollcallList).getAllByText('St Mirren')).toHaveLength(2);
+
+  vi.useFakeTimers();
+  fireEvent.click(drawButton()); // lands tie 0: St Mirren (h) v Queens Park — earliest kickoff
+  await act(async () => { await vi.advanceTimersByTimeAsync(TIMINGS.rollcallGap * 2); });
+
+  const stMirrenEls = within(rollcallList).getAllByText('St Mirren');
+  expect(stMirrenEls).toHaveLength(2); // the list never shrinks
+  const struck = stMirrenEls.filter(el => el.classList.contains('line-through'));
+  expect(struck).toHaveLength(1); // exactly the landed occurrence, not both, not neither
+  expect(within(rollcallList).getByText('Queens Park')).toHaveClass('line-through');
 });
 
 test('a tap highlights both current clubs wherever they land in the shuffle, then strikes both through once landed — the list never shrinks', async () => {
