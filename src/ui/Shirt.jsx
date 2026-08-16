@@ -10,11 +10,11 @@ const JERSEY_PATH = `M 40,14 L 28,8 C 20,9 12,12 8,17 L 17,34 C 22,30 27,28 31,2
   L 23,88 L 77,88 L 69,26 C 73,28 78,30 83,34 L 92,17 C 88,12 80,9 72,8
   L 60,14 C 57,21 43,21 40,14 Z`;
 
-const FALLBACK_FILL = '#F4F0E7'; // drawer token — the BBC/unknown-colour fallback
+const FALLBACK_HEX = 'F4F0E7'; // drawer token — the BBC/unknown-colour fallback (no #, contrastOn's input shape)
 
-// YIQ luminance (spec: colour null/undefined never reaches here — callers
-// fall back to the drawer hex first, which itself reads well above the
-// threshold, so contrastOn only has to cope with real 6-digit hex strings).
+// YIQ luminance (spec: colour null/undefined/empty never reaches here —
+// Shirt itself falls back to the drawer hex first, which reads well above
+// the threshold, so contrastOn only has to cope with real 6-digit hex strings).
 export function contrastOn(hex) {
   const h = hex.replace('#', '');
   const r = parseInt(h.slice(0, 2), 16);
@@ -25,8 +25,16 @@ export function contrastOn(hex) {
 }
 
 export default function Shirt({ colour, number, size = 26 }) {
-  const fill = colour ? `#${colour}` : FALLBACK_FILL;
-  const textFill = contrastOn(colour ?? 'F4F0E7') === 'white' ? '#FFFFFF' : 'currentColor';
+  // `||`, not `??` — an empty-string colour (seen from a couple of BBC/
+  // merge-cup paths) is just as "no real colour" as null/undefined, and
+  // needs the same fallback for BOTH the fill and the contrast calc that
+  // decides the number's own colour. A `??` guard on only one of the two
+  // (the bug this replaces) let '' slip through to contrastOn on its own,
+  // which parsed to NaN and defaulted to white text on the pale fallback
+  // fill — unreadable.
+  const hex = colour || FALLBACK_HEX;
+  const fill = `#${hex}`;
+  const textFill = contrastOn(hex) === 'white' ? '#FFFFFF' : 'currentColor';
   const label = number ?? '—';
   const twoDigit = String(label).length > 1;
   return (
@@ -35,7 +43,7 @@ export default function Shirt({ colour, number, size = 26 }) {
       <path data-testid="shirt-shape" d={JERSEY_PATH} fill={fill}
         stroke="currentColor" strokeWidth="4" strokeLinejoin="round" />
       <text x="50" y={number == null ? 64 : 58} textAnchor="middle" dominantBaseline="middle"
-        fontFamily="system-ui, sans-serif" fontWeight="600" fontSize={twoDigit ? 30 : 38}
+        className="font-sans" fontWeight="600" fontSize={twoDigit ? 30 : 38}
         fill={textFill}>
         {label}
       </text>

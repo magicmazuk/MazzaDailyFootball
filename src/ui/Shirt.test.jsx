@@ -23,6 +23,17 @@ test('a null/undefined colour falls back to the drawer token fill, not a crash',
   expect(c2.querySelector('[data-testid="shirt-shape"]')).toHaveAttribute('fill', '#F4F0E7');
 });
 
+test('an empty-string colour falls back exactly like null/undefined — fill AND the number\'s own contrast colour', () => {
+  // Regression: an earlier version guarded the fill with `colour ? … :` but
+  // the contrast calc separately with `colour ?? …` — '' is falsy but not
+  // nullish, so it slipped past the second guard into contrastOn('') on its
+  // own, which parsed to NaN and silently defaulted to white text on the
+  // pale fallback fill. Both must resolve through the same fallback now.
+  const { container } = render(<Shirt colour="" number="9" />);
+  expect(container.querySelector('[data-testid="shirt-shape"]')).toHaveAttribute('fill', '#F4F0E7');
+  expect(container.querySelector('text')).toHaveAttribute('fill', 'currentColor'); // ink, not white
+});
+
 test('the shirt shape fill is the club colour, keyed for callers to assert on', () => {
   const { container } = render(<Shirt colour="A11B1B" number="10" />);
   expect(container.querySelector('[data-testid="shirt-shape"]')).toHaveAttribute('fill', '#A11B1B');

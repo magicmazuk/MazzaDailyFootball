@@ -2,9 +2,12 @@
 // presentational — TeamScreen resolves starters/rest and hands down plain
 // arrays, tested here directly rather than through the whole screen.
 import { render, screen, within } from '@testing-library/react';
-import SquadBoard, { formation } from './SquadBoard.jsx';
+import SquadBoard from './SquadBoard.jsx';
 
 const p = (id, name, shirt, position) => ({ id, name, shirt, position });
+// Every shirt's accessible name is "<number> · <name>" (or "— · <name>"
+// for no number) — see ShirtUnit in SquadBoard.jsx.
+const lbl = pl => `${pl.shirt ?? '—'} · ${pl.name}`;
 
 // An 11-player XI shaped like a 4-3-3, plus a small bench so rail ordering
 // has something to prove — a null-shirt bench player exercises the
@@ -30,20 +33,50 @@ const BENCH = [
 ];
 const FULL_SQUAD = [...XI, ...BENCH];
 
-test('with starters: the pitch buckets each row correctly and captions the formation', () => {
+test('with starters: the pitch buckets each row correctly, no numeral formation claim', () => {
   render(<SquadBoard players={FULL_SQUAD} starters={XI} teamColour="009921"
     opponentShortName="Kilmarnock" onOpenPlayer={() => {}} />);
 
-  expect(screen.getByText('Last match · 4-3-3 v Kilmarnock')).toBeInTheDocument();
+  // Caption drops the numerals entirely (buckets are nominal squad
+  // positions, not this match's actual roles — a "4-3-3"-style claim from
+  // that data reads as nonsense for plenty of real clubs).
+  expect(screen.getByText('Last match v Kilmarnock')).toBeInTheDocument();
+  expect(screen.queryByText(/\d-\d/)).not.toBeInTheDocument();
 
   expect(within(screen.getByTestId('pitch-row-gk')).getAllByRole('button').map(b => b.getAttribute('aria-label')))
-    .toEqual(['Artur Sinisalo']);
+    .toEqual([lbl(p('', 'Artur Sinisalo', '1'))]);
   expect(within(screen.getByTestId('pitch-row-def')).getAllByRole('button').map(b => b.getAttribute('aria-label')))
-    .toEqual(['Anthony Ralston', 'Cameron Carter-Vickers', 'Auston Trusty', 'Kieran Tierney']);
+    .toEqual(['Anthony Ralston', 'Cameron Carter-Vickers', 'Auston Trusty', 'Kieran Tierney']
+      .map((name, i) => lbl(p('', name, ['56', '20', '6', '63'][i]))));
   expect(within(screen.getByTestId('pitch-row-mid')).getAllByRole('button').map(b => b.getAttribute('aria-label')))
-    .toEqual(['Callum McGregor', 'Reo Hatate', 'Paulo Bernardo']);
+    .toEqual(['Callum McGregor', 'Reo Hatate', 'Paulo Bernardo']
+      .map((name, i) => lbl(p('', name, ['42', '41', '14'][i]))));
   expect(within(screen.getByTestId('pitch-row-fwd')).getAllByRole('button').map(b => b.getAttribute('aria-label')))
-    .toEqual(['Jota Silva', 'Kasper Høgh', 'Marco Tounekti']);
+    .toEqual(['Jota Silva', 'Kasper Høgh', 'Marco Tounekti']
+      .map((name, i) => lbl(p('', name, ['7', '9', '17'][i]))));
+});
+
+test('without an opponent name the caption still reads "Last match", no trailing "v"', () => {
+  render(<SquadBoard players={FULL_SQUAD} starters={XI} teamColour="009921"
+    opponentShortName={null} onOpenPlayer={() => {}} />);
+  expect(screen.getByText('Last match')).toBeInTheDocument();
+});
+
+test('a starter with no recognisable position (synthesised from the lineup, no squad match) still gets its own pitch row rather than being dropped', () => {
+  // Mirrors what TeamScreen's matchStarters() hands SquadBoard when a
+  // lineup starter's id isn't in the squad list: id/name/shirt from the
+  // lineup entry, position: null.
+  const unmatched = p('espn-999', 'New Signing', '77', null);
+  const xiWithUnmatched = [...XI.slice(0, 10), unmatched]; // 11 starters, one unrecognised
+  render(<SquadBoard players={[...FULL_SQUAD, unmatched]} starters={xiWithUnmatched} teamColour="009921"
+    opponentShortName="Kilmarnock" onOpenPlayer={() => {}} />);
+
+  expect(within(screen.getByTestId('pitch-row-squad')).getByRole('button', { name: lbl(unmatched) }))
+    .toBeInTheDocument();
+  // All 11 starters still on the pitch — none silently vanished.
+  const pitchRows = screen.getAllByTestId(/^pitch-row-/);
+  const onPitch = pitchRows.flatMap(r => within(r).getAllByRole('button'));
+  expect(onPitch).toHaveLength(11);
 });
 
 test('the rail excludes every starter and lists the rest in ascending shirt-number order, numberless last', () => {
@@ -52,8 +85,11 @@ test('the rail excludes every starter and lists the rest in ascending shirt-numb
 
   const rail = document.querySelector('.rail-scroll');
   const names = within(rail).getAllByRole('button').map(b => b.getAttribute('aria-label'));
-  expect(names).toEqual(['Greg Taylor', 'Daizen Maeda', 'Ross Doohan', 'Odin Reserve']);
-  for (const starter of XI) expect(names).not.toContain(starter.name);
+  // BENCH is deliberately not declared in number order — this proves the
+  // rail sorts it (3, 19, 31, then the numberless one last).
+  const [doohan, taylor, maeda, reserve] = BENCH;
+  expect(names).toEqual([taylor, maeda, doohan, reserve].map(lbl));
+  for (const starter of XI) expect(names).not.toContain(lbl(starter));
 });
 
 test('the rail label reads "The bench & the rest" once an XI is known', () => {
@@ -62,7 +98,7 @@ test('the rail label reads "The bench & the rest" once an XI is known', () => {
   expect(screen.getByText('The bench & the rest')).toBeInTheDocument();
 });
 
-test('without a lineup: the bands fallback shows the whole squad, no formation caption, no separate bench rail', () => {
+test('without a lineup: the bands fallback shows the whole squad, no caption, no separate bench rail', () => {
   render(<SquadBoard players={FULL_SQUAD} starters={null} teamColour="009921"
     opponentShortName={null} onOpenPlayer={() => {}} />);
 
@@ -75,7 +111,7 @@ test('without a lineup: the bands fallback shows the whole squad, no formation c
 
   const bandNames = ['squad-band-gk', 'squad-band-def', 'squad-band-mid', 'squad-band-fwd']
     .flatMap(id => within(screen.getByTestId(id)).getAllByRole('button').map(b => b.getAttribute('aria-label')));
-  expect(bandNames.sort()).toEqual(FULL_SQUAD.map(pl => pl.name).sort());
+  expect(bandNames.sort()).toEqual(FULL_SQUAD.map(lbl).sort());
 });
 
 test('an undefined starters prop (still loading) also falls back to bands, not a crash', () => {
@@ -88,17 +124,17 @@ test('an unrecognised position falls into a trailing Squad band rather than bein
   const mystery = p('x1', 'Mystery Player', '99', null);
   render(<SquadBoard players={[...FULL_SQUAD, mystery]} starters={null} teamColour="009921"
     opponentShortName={null} onOpenPlayer={() => {}} />);
-  expect(within(screen.getByTestId('squad-band-squad')).getByRole('button', { name: 'Mystery Player' }))
+  expect(within(screen.getByTestId('squad-band-squad')).getByRole('button', { name: lbl(mystery) }))
     .toBeInTheDocument();
 });
 
-test('every shirt across pitch, rail and bands is a button carrying the player name as its aria-label', () => {
+test('every shirt across pitch, rail and bands is a button carrying "<number> · <name>" as its aria-label', () => {
   render(<SquadBoard players={FULL_SQUAD} starters={XI} teamColour="009921"
     opponentShortName="Kilmarnock" onOpenPlayer={() => {}} />);
   const buttons = screen.getAllByRole('button');
   expect(buttons.length).toBeGreaterThan(0);
-  const knownNames = new Set(FULL_SQUAD.map(pl => pl.name));
-  for (const b of buttons) expect(knownNames.has(b.getAttribute('aria-label'))).toBe(true);
+  const knownLabels = new Set(FULL_SQUAD.map(lbl));
+  for (const b of buttons) expect(knownLabels.has(b.getAttribute('aria-label'))).toBe(true);
 });
 
 test('tapping a shirt calls onOpenPlayer with that player\'s id', async () => {
@@ -106,7 +142,7 @@ test('tapping a shirt calls onOpenPlayer with that player\'s id', async () => {
   const onOpenPlayer = (await import('vitest')).vi.fn();
   render(<SquadBoard players={FULL_SQUAD} starters={XI} teamColour="009921"
     opponentShortName="Kilmarnock" onOpenPlayer={onOpenPlayer} />);
-  await user.click(screen.getByRole('button', { name: 'Kasper Høgh' }));
+  await user.click(screen.getByRole('button', { name: lbl(p('', 'Kasper Høgh', '9')) }));
   expect(onOpenPlayer).toHaveBeenCalledWith('f2');
 });
 
@@ -116,13 +152,41 @@ test('no players at all renders nothing', () => {
   expect(container).toBeEmptyDOMElement();
 });
 
-// --- formation(), the pure D-M-F caption helper ---
+// --- pitch polish: markings only in pitch mode, spacing tightened around the keeper ---
 
-test('formation: counts each outfield bucket, GK excluded, defence-midfield-attack order', () => {
-  expect(formation(XI)).toBe('4-3-3');
+test('the halfway line and box hints render only in pitch mode, not in the bands fallback', () => {
+  const { rerender } = render(<SquadBoard players={FULL_SQUAD} starters={XI} teamColour="009921"
+    opponentShortName="Kilmarnock" onOpenPlayer={() => {}} />);
+  expect(screen.getByTestId('pitch-halfway')).toBeInTheDocument();
+  expect(screen.getByTestId('pitch-box-top')).toBeInTheDocument();
+  expect(screen.getByTestId('pitch-box-bottom')).toBeInTheDocument();
+
+  rerender(<SquadBoard players={FULL_SQUAD} starters={null} teamColour="009921"
+    opponentShortName={null} onOpenPlayer={() => {}} />);
+  expect(screen.queryByTestId('pitch-halfway')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('pitch-box-top')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('pitch-box-bottom')).not.toBeInTheDocument();
 });
 
-test('formation: no starters is 0-0-0, not a crash', () => {
-  expect(formation([])).toBe('0-0-0');
-  expect(formation(undefined)).toBe('0-0-0');
+test('pitch rows run GK-bottom to FWD-top, and the keeper sits tight against the back line rather than stranded', () => {
+  render(<SquadBoard players={FULL_SQUAD} starters={XI} teamColour="009921"
+    opponentShortName="Kilmarnock" onOpenPlayer={() => {}} />);
+
+  const topOf = testId => Number(screen.getByTestId(testId).style.top.replace('%', ''));
+  const gk = topOf('pitch-row-gk');
+  const def = topOf('pitch-row-def');
+  const mid = topOf('pitch-row-mid');
+  const fwd = topOf('pitch-row-fwd');
+
+  // top:X% is X% DOWN from the frame's top edge, so bottom-of-pitch (GK)
+  // is the largest number, top-of-pitch (FWD) the smallest.
+  expect(gk).toBeGreaterThan(def);
+  expect(def).toBeGreaterThan(mid);
+  expect(mid).toBeGreaterThan(fwd);
+
+  // The GK-to-back-line gap is deliberately tighter than the even spacing
+  // between the outfield rows themselves.
+  const gkGap = gk - def;
+  const outfieldGap = def - mid;
+  expect(gkGap).toBeLessThan(outfieldGap);
 });

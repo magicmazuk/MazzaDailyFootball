@@ -25,8 +25,13 @@ vi.mock('../../data/queries.js', () => ({
   useMatchDetail: vi.fn(() => ({ isLoading: false, isError: false, data: undefined })),
 }));
 
-import TeamScreen from './TeamScreen.jsx';
+import TeamScreen, { matchStarters } from './TeamScreen.jsx';
 import { useTeams, useAllSeasonFixtures, useSquad, usePlayer, useMatchDetail } from '../../data/queries.js';
+
+// Every shirt button's accessible name is "<number> · <name>" (task 3
+// review — the number was aria-hidden before, so it never reached the a11y
+// tree at all).
+const lbl = (name, shirt) => `${shirt ?? '—'} · ${name}`;
 
 const side = (teamId, name, over = {}) =>
   ({ teamId, name, crestUrl: null, monogram: name.slice(0, 2).toUpperCase(), colour: null, ...over });
@@ -149,7 +154,7 @@ test('a squad row is a button (not a link) that opens the player sheet', async (
   renderAt('sco.1', '256');
 
   expect(screen.queryByRole('link', { name: /Kasper Høgh/ })).not.toBeInTheDocument();
-  const row = screen.getByRole('button', { name: 'Kasper Høgh' });
+  const row = screen.getByRole('button', { name: lbl('Kasper Høgh', '9') });
 
   await userEvent.click(row);
 
@@ -178,7 +183,7 @@ test('a squad row opens the sheet under the resolved league, not the route comp,
 
   renderAt('uefa.champions', '256');
 
-  await userEvent.click(screen.getByRole('button', { name: 'Kasper Høgh' }));
+  await userEvent.click(screen.getByRole('button', { name: lbl('Kasper Høgh', '9') }));
 
   expect(screen.getByRole('link', { name: 'Full profile →' })).toHaveAttribute('href', '/player/sco.1/p1');
 });
@@ -228,11 +233,11 @@ test('no lineup available: the squad renders as bands, every player shown, unkno
   renderAt('sco.1', '256');
 
   for (const p of mixedSquad) {
-    expect(screen.getByRole('button', { name: p.name })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: lbl(p.name, p.shirt) })).toBeInTheDocument();
   }
 });
 
-test('a squad row is a button with a player-name aria-label and a club-coloured shirt icon', () => {
+test('a squad row is a button with a "<number> · <name>" aria-label and a club-coloured shirt icon', () => {
   const celtic = side('256', 'Celtic', { colour: '009921' });
   stubSeasons({
     'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
@@ -245,12 +250,12 @@ test('a squad row is a button with a player-name aria-label and a club-coloured 
 
   renderAt('sco.1', '256');
 
-  const row = screen.getByRole('button', { name: 'Kasper Høgh' });
+  const row = screen.getByRole('button', { name: lbl('Kasper Høgh', '9') });
   expect(within(row).getByText('9')).toBeInTheDocument();
   // the shirt fill is the CLUB's colour (team.colour), same for every row.
   expect(row.querySelector('[data-testid="shirt-shape"]')).toHaveAttribute('fill', '#009921');
 
-  const blankRow = screen.getByRole('button', { name: 'No Number' });
+  const blankRow = screen.getByRole('button', { name: lbl('No Number', null) });
   expect(within(blankRow).getByText('—')).toBeInTheDocument();
 });
 
@@ -299,9 +304,69 @@ test('a resolved lineup for our club\'s side wires starters into SquadBoard\'s p
 
   renderAt('sco.1', '256');
 
-  expect(screen.getByText('Last match · 0-0-1 v Kilmarnock')).toBeInTheDocument();
+  // No numeral formation claim (task 3 review) — just the plain caption.
+  expect(screen.getByText('Last match v Kilmarnock')).toBeInTheDocument();
   expect(screen.getByText('The bench & the rest')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Bench Player' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: lbl('Bench Player', '20') })).toBeInTheDocument();
+});
+
+// --- a lineup starter with no squad match is never dropped (task 3 review) ---
+
+test('matchStarters: an unmatched lineup starter is synthesised from the lineup entry, not dropped', () => {
+  const lineupPlayers = [
+    { id: 'p1', name: 'Kasper Høgh', shirt: '9', starter: true },
+    { id: 'espn-777', name: 'New Signing', shirt: '77', starter: true },
+    { id: 'p2', name: 'Bench Player', shirt: '20', starter: false },
+  ];
+  const squadPlayers = [
+    { id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' },
+    { id: 'p2', name: 'Bench Player', shirt: '20', position: 'Defender' },
+  ];
+
+  const starters = matchStarters(lineupPlayers, squadPlayers);
+
+  expect(starters).toHaveLength(2); // the two starters, bench excluded
+  expect(starters.find(p => p.id === 'p1'))
+    .toEqual({ id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' });
+  expect(starters.find(p => p.id === 'espn-777'))
+    .toEqual({ id: 'espn-777', name: 'New Signing', shirt: '77', position: null });
+});
+
+test('an XI with one unmatched starter (a signing the squad endpoint hasn\'t caught up on) still renders all 11 shirts on the pitch', () => {
+  const celtic = side('256', 'Celtic');
+  const kilmarnock = side('o1', 'Kilmarnock', { shortName: 'Kilmarnock' });
+  stubSeasons({
+    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, kilmarnock, 'ft')],
+  });
+  const squadPlayers = Array.from({ length: 10 }, (_, i) => ({
+    id: `p${i + 1}`, name: `Player ${i + 1}`, shirt: String(i + 1),
+    position: i === 0 ? 'Goalkeeper' : 'Defender',
+  }));
+  useSquad.mockImplementation(() => ({ isLoading: false, isError: false, data: { players: squadPlayers } }));
+  useMatchDetail.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      detail: {
+        lineups: [
+          {
+            homeAway: 'home',
+            players: [
+              ...squadPlayers.map(p => ({ id: p.id, name: p.name, shirt: p.shirt, starter: true })),
+              { id: 'espn-999', name: 'New Signing', shirt: '77', starter: true }, // 11th, no squad match
+            ],
+          },
+          { homeAway: 'away', players: [] },
+        ],
+      },
+    },
+  }));
+
+  renderAt('sco.1', '256');
+
+  const pitchRows = screen.getAllByTestId(/^pitch-row-/);
+  const onPitch = pitchRows.flatMap(r => within(r).getAllByRole('button'));
+  expect(onPitch).toHaveLength(11);
+  expect(screen.getByRole('button', { name: lbl('New Signing', '77') })).toBeInTheDocument();
 });
 
 test('a BBC comp (hasSquads false): the degraded line still renders, unaffected by the lineup wiring', () => {

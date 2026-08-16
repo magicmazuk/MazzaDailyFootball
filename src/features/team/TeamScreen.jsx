@@ -29,6 +29,21 @@ function ourLineup(detail, fixture, teamId) {
   return detail?.lineups?.find(l => l.homeAway === homeAway) ?? null;
 }
 
+// Starters matched back to the squad list by id for their shirt/position
+// (lineup entries carry id since R2.6) — but a starter the lineup knows
+// about that the squad list doesn't (a summer signing the roster endpoint
+// hasn't caught up on yet, or any other id mismatch) is never silently
+// dropped off the pitch. It's synthesised straight from the lineup entry
+// instead, which already carries id/name/shirt — with no recognisable
+// position, so SquadBoard's bucketing lands it in the trailing 'Squad'
+// row rather than the XI quietly showing ten shirts.
+export function matchStarters(lineupPlayers, squadPlayers) {
+  const bySquadId = new Map(squadPlayers.map(p => [p.id, p]));
+  return (lineupPlayers ?? [])
+    .filter(p => p.starter)
+    .map(p => bySquadId.get(p.id) ?? { id: p.id, name: p.name, shirt: p.shirt, position: null });
+}
+
 function FollowButton({ team }) {
   const { follow, unfollow } = usePrefs();
   const followed = usePrefs(s => Boolean(s.followed[team.id]));
@@ -69,14 +84,10 @@ export default function TeamScreen() {
   const lineupComp = lastComp?.hasMatchDetail ? lastComp : { id: 'none', hasMatchDetail: false };
   const matchDetail = useMatchDetail(lineupComp, last?.id, false);
   const lineup = ourLineup(matchDetail.data?.detail, last, teamId);
-  // Starters matched back to the squad list by id (lineup entries carry id
-  // since R2.6) so the pitch shows the squad's own shirt numbers/positions
-  // rather than whatever the summary endpoint's roster entry happens to
-  // carry. null (not []) when there's no lineup yet — SquadBoard treats
-  // that, and only that, as "fall back to the bands".
-  const starterIds = new Set((lineup?.players ?? []).filter(p => p.starter).map(p => p.id));
+  // null (not []) when there's no lineup yet — SquadBoard treats that, and
+  // only that, as "fall back to the bands".
   const starters = lineup && squad.data?.players
-    ? squad.data.players.filter(p => starterIds.has(p.id))
+    ? matchStarters(lineup.players, squad.data.players)
     : null;
   const opponentSide = last ? (last.home.teamId === teamId ? last.away : last.home) : null;
 

@@ -44,19 +44,6 @@ function groupByBucket(players) {
   return [...buckets, leftover].filter(g => g.players.length > 0);
 }
 
-// The formation caption (e.g. "4-3-3"): outfield bucket counts among the
-// starters, defence-midfield-attack order. A starter with no recognisable
-// position (shouldn't happen with real lineup data) simply isn't counted —
-// the caption is descriptive, not a data-integrity check.
-export function formation(starters) {
-  const counts = { def: 0, mid: 0, fwd: 0 };
-  for (const p of starters ?? []) {
-    const b = bucketOf(p);
-    if (b && counts[b.key] != null) counts[b.key] += 1;
-  }
-  return `${counts.def}-${counts.mid}-${counts.fwd}`;
-}
-
 const surname = name => name.trim().split(/\s+/).pop();
 
 function byShirtNumber(a, b) {
@@ -65,30 +52,67 @@ function byShirtNumber(a, b) {
   return na - nb;
 }
 
-// Row placement for the starters pitch: evenly spaced within a 12%-100%
-// margin, index 0 (GK) nearest the bottom, the last row nearest the top —
-// "GK-bottom -> F-top" per the brief. A single occupied row centres.
-function rowTop(index, total) {
-  if (total <= 1) return 50;
-  const margin = 12;
-  const span = 100 - margin * 2;
-  return 100 - margin - (index * span) / (total - 1);
+// Row placement for the starters pitch. Outfield rows (everything but the
+// keeper) spread evenly between a top clearance — so the frontmost row's
+// shirts never sit under the attacking box hint's lines — and a floor just
+// above the back line; the keeper then sits a small, fixed gap above the
+// deepest outfield row rather than claiming an even share of whatever
+// pitch height is left below it, which read as the keeper stranded alone
+// far off the back of the defence. A single occupied row centres.
+const TOP_CLEARANCE = 22; // % from the frame top
+const OUTFIELD_FLOOR = 78; // % — the deepest outfield row never sits below this
+const GK_GAP = 12; // % — fixed distance from the keeper up to the back line
+
+function rowTops(keys) {
+  const gkAt = keys.indexOf('gk');
+  const outfield = keys.filter((_, i) => i !== gkAt);
+  const tops = {};
+  outfield.forEach((key, i) => {
+    tops[key] = outfield.length <= 1
+      ? (TOP_CLEARANCE + OUTFIELD_FLOOR) / 2
+      : OUTFIELD_FLOOR - (i * (OUTFIELD_FLOOR - TOP_CLEARANCE)) / (outfield.length - 1);
+  });
+  if (gkAt !== -1) {
+    const backLine = outfield.length ? Math.max(...outfield.map(k => tops[k])) : OUTFIELD_FLOOR;
+    tops.gk = Math.min(94, backLine + GK_GAP);
+  }
+  return keys.map(k => tops[k]);
 }
 
-function PitchFrame({ fixedHeight, children }) {
+// The halfway line + box hints only mean anything against the starters
+// pitch's real geometry (GK-bottom to FWD-top) — in bands mode the same
+// frame holds position groups stacked top-to-bottom with no pitch
+// orientation at all, so the markings would just land arbitrarily across
+// band labels rather than describing anything. Shown only when an XI
+// (and so a real pitch reading) is known.
+function PitchFrame({ pitchMode, children }) {
   return (
-    <div className={`relative border border-ink rounded-md mb-6 ${fixedHeight ? 'h-[300px]' : 'py-1'}`}>
-      <div aria-hidden className="absolute inset-x-0 top-1/2 h-px bg-rule -translate-y-1/2" />
-      <div aria-hidden className="absolute inset-x-[30%] top-0 h-[26px] border border-rule border-t-0" />
-      <div aria-hidden className="absolute inset-x-[30%] bottom-0 h-[26px] border border-rule border-b-0" />
+    <div className={`relative border border-ink rounded-md mb-6 ${pitchMode ? 'h-[300px]' : 'py-1'}`}>
+      {pitchMode && (
+        <>
+          <div aria-hidden data-testid="pitch-halfway"
+            className="absolute inset-x-0 top-1/2 h-px bg-rule -translate-y-1/2" />
+          <div aria-hidden data-testid="pitch-box-top"
+            className="absolute inset-x-[30%] top-0 h-[26px] border border-rule border-t-0" />
+          <div aria-hidden data-testid="pitch-box-bottom"
+            className="absolute inset-x-[30%] bottom-0 h-[26px] border border-rule border-b-0" />
+        </>
+      )}
       {children}
     </div>
   );
 }
 
+// The shirt number is the button's own visual content but the svg beneath
+// it is aria-hidden (a decorative icon, not text) and an explicit
+// aria-label on the button overrides descendant content anyway — so
+// without this, the number never reaches the accessibility tree at all.
+// Folding it into the label ("9 · Kasper Høgh") is the cheap fix: no new
+// hidden text, no change to the SVG, still one accessible name per shirt.
 function ShirtUnit({ player, colour, size, onOpenPlayer, className = '' }) {
   return (
-    <button type="button" onClick={() => onOpenPlayer(player.id)} aria-label={player.name}
+    <button type="button" onClick={() => onOpenPlayer(player.id)}
+      aria-label={`${player.shirt ?? '—'} · ${player.name}`}
       className={`flex flex-col items-center gap-1 ${className}`}>
       <Shirt colour={colour} number={player.shirt} size={size} />
       <span className="font-sans text-[8.5px] text-muted text-center truncate max-w-[60px]">
@@ -143,18 +167,26 @@ export default function SquadBoard({ players, starters, teamColour, opponentShor
   const starterIds = new Set((starters ?? []).map(p => p.id));
   const rest = players.filter(p => !starterIds.has(p.id)).slice().sort(byShirtNumber);
   const groups = hasXI ? groupByBucket(starters) : groupByBucket(players);
+  // No numeral formation (e.g. "4-3-3"): the buckets are the squad's
+  // nominal listed positions, not this match's actual roles, and ESPN's
+  // lineup slots are a fixed-size template regardless of shape — real
+  // matches came back reading as "6-3-1", nonsense for most of the clubs
+  // covered. The pitch's row-per-bucket layout is still honest (it's
+  // literally who started, grouped by their normal position); it just
+  // isn't a formation claim.
+  const tops = hasXI ? rowTops(groups.map(g => g.key)) : [];
 
   return (
     <div>
       {hasXI && (
         <p className="font-sans text-[10px] text-muted mb-2">
-          Last match · {formation(starters)}{opponentShortName ? ` v ${opponentShortName}` : ''}
+          Last match{opponentShortName ? ` v ${opponentShortName}` : ''}
         </p>
       )}
-      <PitchFrame fixedHeight={hasXI}>
+      <PitchFrame pitchMode={hasXI}>
         {hasXI
           ? groups.map((g, i) => (
-              <PitchRow key={g.key} group={g} top={rowTop(i, groups.length)}
+              <PitchRow key={g.key} group={g} top={tops[i]}
                 colour={teamColour} onOpenPlayer={onOpenPlayer} />
             ))
           : groups.map((g, i) => (
