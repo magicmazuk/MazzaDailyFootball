@@ -13,6 +13,7 @@ const outfieldAthlete = {
   displayHeight: "6' 1\"",
   dateOfBirth: '2000-12-06T08:00Z',
   birthPlace: {}, // the live feed returns an empty object here, not null
+  defaultLeague: { $ref: 'http://sports.core.api.espn.com/v2/sports/soccer/leagues/sco.1?lang=en&region=us' },
 };
 
 const outfieldStats = {
@@ -62,7 +63,22 @@ test('adaptAthlete: maps the probed outfield-player shape, with an empty birthPl
     heightDisplay: "6' 1\"",
     birthDate: '2000-12-06T08:00Z',
     birthPlace: null,
+    defaultLeagueCode: 'sco.1',
   });
+});
+
+// Production hotfix (Aug 2026): defaultLeague.$ref carries the player's
+// domestic league code — this is what lets usePlayer route the
+// statistics fetch correctly even when reached via a UEFA/cup comp.
+test('adaptAthlete: extracts defaultLeagueCode from defaultLeague.$ref', () => {
+  expect(adaptAthlete({
+    defaultLeague: { $ref: 'http://sports.core.api.espn.com/v2/sports/soccer/leagues/eng.1?lang=en&region=us' },
+  }).defaultLeagueCode).toBe('eng.1');
+});
+
+test('adaptAthlete: defaultLeagueCode is null when defaultLeague is absent', () => {
+  expect(adaptAthlete({}).defaultLeagueCode).toBeNull();
+  expect(adaptAthlete({ defaultLeague: {} }).defaultLeagueCode).toBeNull();
 });
 
 test('adaptAthlete: birthPlace joins city/state/country when present', () => {
@@ -76,6 +92,7 @@ test('adaptAthlete: null-safe for a missing/empty payload, name falls back to Un
   expect(adaptAthlete({})).toEqual({
     id: null, name: 'Unknown', position: null, shirt: null, age: null,
     nationality: null, heightDisplay: null, birthDate: null, birthPlace: null,
+    defaultLeagueCode: null,
   });
   expect(adaptAthlete(undefined)).toEqual(adaptAthlete({}));
 });

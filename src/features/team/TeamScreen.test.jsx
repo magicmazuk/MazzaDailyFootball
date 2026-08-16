@@ -130,6 +130,43 @@ test('a squad row is a whole-row link to the player page, carrying the club name
   expect(link).toHaveAttribute('href', '/player/sco.1/p1');
 });
 
+// --- home-league hotfix (Aug 2026): useSquad resolves squads under a
+// fallback league and reports resolvedCompId; the row link and the
+// "still empty after resolving" state both key off that. ---
+
+test('a squad row links to the player page under the resolved league, not the route comp, when they differ', () => {
+  const celtic = side('256', 'Celtic');
+  stubSeasons({
+    'uefa.champions': [fx('f1', 'uefa.champions', 'league-phase', '2026-09-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: { players: [{ id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' }], resolvedCompId: 'sco.1' },
+  }));
+
+  renderAt('uefa.champions', '256');
+
+  const link = screen.getByRole('link', { name: /Kasper Høgh/ });
+  expect(link).toHaveAttribute('href', '/player/sco.1/p1');
+});
+
+test('an empty squad (resolved through every fallback, still zero players) shows the distinct unavailable line', () => {
+  const celtic = side('256', 'Celtic');
+  stubSeasons({
+    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: { players: [], resolvedCompId: null },
+  }));
+
+  renderAt('sco.1', '256');
+
+  expect(screen.getByText('Squad details unavailable.')).toBeInTheDocument();
+  // Distinct from the BBC hasSquads:false line, which never applies here.
+  expect(screen.queryByText(/aren't published for/)).not.toBeInTheDocument();
+});
+
 test('a club with no phase fixtures at all renders the page normally, no replay link', () => {
   const celtic = side('256', 'Celtic');
   stubSeasons({

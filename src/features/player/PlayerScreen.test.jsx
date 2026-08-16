@@ -135,3 +135,23 @@ test('an unknown competition id shows the honest message', () => {
   renderAt('does-not-exist', '272624');
   expect(screen.getByText('Unknown competition.')).toBeInTheDocument();
 });
+
+// --- home-league hotfix (Aug 2026): a stats-only failure must not blank
+// the page, and the unavailable line is gated on bio alone, not isError ---
+
+test('a statistics-only failure (stats null, bio present, isError false) still renders the bio and no stat sections', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: null, isLoading: false, isError: false });
+  renderAt('uefa.champions', '272624');
+
+  expect(screen.getByText('Kasper Høgh')).toBeInTheDocument();
+  expect(screen.queryByText('Attacking')).not.toBeInTheDocument();
+  expect(screen.queryByText('Keeper')).not.toBeInTheDocument();
+  expect(screen.queryByText('Discipline & defence')).not.toBeInTheDocument();
+  expect(screen.queryByText('Rating')).not.toBeInTheDocument();
+});
+
+test('a null bio shows the unavailable line even when isError is false — gated on bio alone', () => {
+  usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: false, isError: false });
+  renderAt('sco.1', '272624');
+  expect(screen.getByText('Player unavailable right now.')).toBeInTheDocument();
+});

@@ -268,15 +268,39 @@ export function teamsQuery(comp) {
 export const useTeams = comp => useQuery(teamsQuery(comp));
 export const useAllTeams = comps => useQueries({ queries: comps.map(teamsQuery) });
 
+// Production regression (hotfix, Aug 2026): ESPN only populates a
+// team's roster (athletes[]) under the club's DOMESTIC league grouping —
+// fetched under a UEFA/cup comp, teams/{id}?enable=roster 200s with an
+// empty athletes array. European qualifying week makes that the common
+// navigation context, so useSquad tries the route comp first, then falls
+// back through the three big domestic groupings (skipping whichever one
+// is already the route comp) until one returns a non-empty squad — all
+// legs are edge-cached upstream, so the fallback is cheap. If every leg
+// comes back empty this resolves successfully with players: [], never a
+// query error — TeamScreen renders a distinct "unavailable" line for
+// that rather than treating it as a failed fetch.
+const SQUAD_FALLBACK_LEAGUES = ['sco.1', 'sco.2', 'eng.1'];
+
 export function useSquad(comp, teamId) {
   return useQuery({
-    queryKey: ['squad', comp.id, teamId],
+    queryKey: ['squad', teamId],
     enabled: !!comp?.hasSquads && !!teamId,
     staleTime: 24 * HOUR,
     queryFn: async () => {
-      const { data, asOf } = await getJson(
-        espnUrl(`${SOCCER}/${comp.id}/teams/${teamId}`, { enable: 'roster' }));
-      return { players: adaptSquad(data), asOf };
+      const candidates = [comp.id, ...SQUAD_FALLBACK_LEAGUES.filter(id => id !== comp.id)];
+      let lastAsOf = null;
+      for (const leagueId of candidates) {
+        try {
+          const { data, asOf } = await getJson(
+            espnUrl(`${SOCCER}/${leagueId}/teams/${teamId}`, { enable: 'roster' }));
+          lastAsOf = asOf ?? lastAsOf;
+          const players = adaptSquad(data);
+          if (players.length > 0) return { players, asOf, resolvedCompId: leagueId };
+        } catch {
+          // this league grouping has no roster for this team — try the next
+        }
+      }
+      return { players: [], asOf: lastAsOf, resolvedCompId: null };
     },
   });
 }
@@ -302,31 +326,45 @@ export function useMatchDetail(comp, eventId, isLive) {
 // season/type live in the path rather than as query params. BBC comps
 // carry no player data at all — enabled is false for them, and callers
 // (T2) must not offer player links on a BBC-source competition.
+//
+// Production regression (hotfix, Aug 2026): ESPN only populates a
+// player's season statistics under their club's DOMESTIC league
+// grouping — fetched under a UEFA/cup comp, the statistics leg 404s
+// even though the bio itself fetches fine under any grouping. So bio
+// is always fetched under the ROUTE comp (as before), but the stats
+// query waits for bio to resolve and then fetches under
+// bio.defaultLeagueCode (extracted from the bio payload) when present,
+// falling back to the route comp otherwise. isError reflects the
+// ATHLETE fetch only — a stats-only failure must never blank the page,
+// since every stat section already null-renders when stats is absent.
 export function usePlayer(comp, playerId) {
-  const enabled = comp?.source === 'espn' && !!playerId;
-  const base = `/v2/sports/soccer/leagues/${comp?.id}/seasons/${SEASON.espnYear}`;
+  const bioEnabled = comp?.source === 'espn' && !!playerId;
+  const routeBase = `/v2/sports/soccer/leagues/${comp?.id}/seasons/${SEASON.espnYear}`;
   const athlete = useQuery({
     queryKey: ['player', comp?.id, playerId],
-    enabled,
+    enabled: bioEnabled,
     staleTime: 24 * HOUR,
     queryFn: async () => {
-      const { data } = await getJson(espnUrl(`${base}/athletes/${playerId}`));
+      const { data } = await getJson(espnUrl(`${routeBase}/athletes/${playerId}`));
       return adaptAthlete(data);
     },
   });
+  const bio = athlete.data ?? null;
+  const statsLeagueId = bio?.defaultLeagueCode ?? comp?.id;
+  const statsBase = `/v2/sports/soccer/leagues/${statsLeagueId}/seasons/${SEASON.espnYear}`;
   const stats = useQuery({
-    queryKey: ['playerStats', comp?.id, playerId],
-    enabled,
+    queryKey: ['playerStats', statsLeagueId, playerId],
+    enabled: bioEnabled && !!bio,
     staleTime: 10 * MIN,
     queryFn: async () => {
-      const { data } = await getJson(espnUrl(`${base}/types/1/athletes/${playerId}/statistics`));
+      const { data } = await getJson(espnUrl(`${statsBase}/types/1/athletes/${playerId}/statistics`));
       return adaptPlayerStats(data);
     },
   });
   return {
-    bio: athlete.data ?? null,
+    bio,
     stats: stats.data ?? null,
     isLoading: athlete.isLoading || stats.isLoading,
-    isError: athlete.isError || stats.isError,
+    isError: athlete.isError,
   };
 }

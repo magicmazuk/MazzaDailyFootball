@@ -16,6 +16,7 @@ export function adaptAthlete(json) {
     heightDisplay: json?.displayHeight ?? null,
     birthDate: json?.dateOfBirth ?? null,
     birthPlace: formatBirthPlace(json?.birthPlace),
+    defaultLeagueCode: extractLeagueCode(json?.defaultLeague?.$ref),
   };
 }
 
@@ -23,6 +24,18 @@ function formatBirthPlace(bp) {
   if (!bp) return null;
   const parts = [bp.city, bp.state, bp.country].filter(Boolean);
   return parts.length ? parts.join(', ') : null;
+}
+
+// Production regression (hotfix, Aug 2026): ESPN only populates a
+// player's season statistics (and, separately, a team's roster) under
+// the CLUB'S DOMESTIC league grouping — fetch either under a UEFA/cup
+// comp and the statistics leg 404s. defaultLeague.$ref carries that
+// domestic league's code, e.g. ".../leagues/sco.1?lang=en&region=us" —
+// extracted here so usePlayer can route the statistics fetch there
+// regardless of which comp the player page was reached through.
+function extractLeagueCode(ref) {
+  const m = /leagues\/([a-z0-9._]+)/.exec(ref ?? '');
+  return m ? m[1] : null;
 }
 
 // position is the adapted bio's plain-string position (adaptAthlete's

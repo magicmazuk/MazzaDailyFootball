@@ -1,5 +1,15 @@
+import { createElement } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, expect, test, vi } from 'vitest';
-import { seasonFixturesQuery, todayWindowQuery } from './queries.js';
+import { seasonFixturesQuery, todayWindowQuery, usePlayer, useSquad } from './queries.js';
+
+// No JSX in this file — the QueryClientProvider wrapper is built with
+// createElement instead (matches src/features/match/video.test.js).
+function wrapper({ children }) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return createElement(QueryClientProvider, { client }, children);
+}
 
 const comp = { id: 'scottish-league-one', source: 'bbc' };
 
@@ -332,4 +342,136 @@ test('a plain ESPN comp without an espnQualifier makes no second scoreboard fetc
   await seasonFixturesQuery(plain).queryFn();
   expect(calls).toHaveLength(1);
   expect(calls[0]).toContain('/scoreboard');
+});
+
+// --- usePlayer: home-league hotfix (spec §13.16 regression, Aug 2026) ---
+// ESPN only populates a player's statistics under their club's domestic
+// league grouping; a UEFA/cup comp 404s on the statistics leg even
+// though the bio itself fetches fine there. See src/data/queries.js.
+
+test('usePlayer: a bio carrying a defaultLeague $ref routes the statistics fetch there, even when the route comp is uefa.champions', async () => {
+  const bioPayload = {
+    id: '272624', displayName: 'Kasper Høgh',
+    defaultLeague: { $ref: 'http://sports.core.api.espn.com/v2/sports/soccer/leagues/sco.1?lang=en&region=us' },
+  };
+  const statsPayload = { splits: { categories: [{ name: 'general', stats: [{ name: 'appearances', value: 2 }] }] } };
+  const fetchSpy = vi.fn(async url => (url.includes('/statistics')
+    ? new Response(JSON.stringify(statsPayload), { status: 200 })
+    : new Response(JSON.stringify(bioPayload), { status: 200 })));
+  vi.stubGlobal('fetch', fetchSpy);
+
+  const comp = { id: 'uefa.champions', source: 'espn' };
+  const { result } = renderHook(() => usePlayer(comp, '272624'), { wrapper });
+
+  await waitFor(() => expect(result.current.stats).not.toBeNull());
+
+  const urls = fetchSpy.mock.calls.map(c => c[0]);
+  const statsUrl = urls.find(u => u.includes('/statistics'));
+  const bioUrl = urls.find(u => !u.includes('/statistics'));
+  expect(statsUrl).toContain('/v2/sports/soccer/leagues/sco.1/seasons/'); // resolved to the domestic league
+  expect(statsUrl).not.toContain('/leagues/uefa.champions/');
+  expect(bioUrl).toContain('/v2/sports/soccer/leagues/uefa.champions/seasons/'); // bio still under the route comp
+  expect(result.current.stats.appearances).toBe(2);
+});
+
+test('usePlayer: a statistics 404 leaves stats null but bio populated, and isError stays false', async () => {
+  const bioPayload = { id: '272624', displayName: 'Kasper Høgh' }; // no defaultLeague -> falls back to comp.id
+  vi.stubGlobal('fetch', vi.fn(async url => (url.includes('/statistics')
+    ? new Response('not found', { status: 404 })
+    : new Response(JSON.stringify(bioPayload), { status: 200 }))));
+
+  const comp = { id: 'sco.1', source: 'espn' };
+  const { result } = renderHook(() => usePlayer(comp, '272624'), { wrapper });
+
+  await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+  expect(result.current.bio?.name).toBe('Kasper Høgh');
+  expect(result.current.stats).toBeNull();
+  expect(result.current.isError).toBe(false);
+});
+
+test('usePlayer: an athlete-bio failure sets isError true, bio stays null, and statistics is never fetched', async () => {
+  const fetchSpy = vi.fn(async url => (url.includes('/statistics')
+    ? Promise.reject(new Error('statistics should never be fetched when bio fails'))
+    : new Response('server error', { status: 500 })));
+  vi.stubGlobal('fetch', fetchSpy);
+
+  const comp = { id: 'sco.1', source: 'espn' };
+  const { result } = renderHook(() => usePlayer(comp, '272624'), { wrapper });
+
+  await waitFor(() => expect(result.current.isError).toBe(true));
+
+  expect(result.current.bio).toBeNull();
+  expect(fetchSpy.mock.calls.some(c => c[0].includes('/statistics'))).toBe(false);
+});
+
+// --- useSquad: home-league hotfix — teams/{id}?enable=roster returns
+// an empty athletes[] under a UEFA/cup comp; fall back through the
+// domestic groupings until one is non-empty (or exhaust them). ---
+
+const rosterWithAthletes = count => JSON.stringify({
+  team: { athletes: Array.from({ length: count }, (_, i) => ({ id: String(i + 1), displayName: `Player ${i + 1}` })) },
+});
+const emptyRoster = JSON.stringify({ team: { athletes: [] } });
+
+test('useSquad: a uefa.champions route falls back to sco.1 and resolves the 27-player squad found there', async () => {
+  const calls = [];
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    calls.push(url);
+    if (url.includes('/uefa.champions/teams/256')) return new Response(emptyRoster, { status: 200 });
+    if (url.includes('/sco.1/teams/256')) return new Response(rosterWithAthletes(27), { status: 200 });
+    throw new Error(`unexpected url ${url}`);
+  }));
+
+  const comp = { id: 'uefa.champions', hasSquads: true };
+  const { result } = renderHook(() => useSquad(comp, '256'), { wrapper });
+
+  await waitFor(() => expect(result.current.data?.players?.length).toBe(27));
+  expect(result.current.data.resolvedCompId).toBe('sco.1');
+  expect(calls.some(u => u.includes('/uefa.champions/teams/256'))).toBe(true);
+  expect(calls.some(u => u.includes('/sco.1/teams/256'))).toBe(true);
+});
+
+test('useSquad: a domestic route (already sco.1) resolves on the first fetch — no fallback calls', async () => {
+  const calls = [];
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    calls.push(url);
+    return new Response(rosterWithAthletes(20), { status: 200 });
+  }));
+
+  const comp = { id: 'sco.1', hasSquads: true };
+  const { result } = renderHook(() => useSquad(comp, '256'), { wrapper });
+
+  await waitFor(() => expect(result.current.data?.players?.length).toBe(20));
+  expect(calls).toHaveLength(1);
+  expect(result.current.data.resolvedCompId).toBe('sco.1');
+});
+
+test('useSquad: an empty athletes array on every leg resolves players: [] — never a query error', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(emptyRoster, { status: 200 })));
+
+  const comp = { id: 'uefa.europa', hasSquads: true };
+  const { result } = renderHook(() => useSquad(comp, '999'), { wrapper });
+
+  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  expect(result.current.data.players).toEqual([]);
+  expect(result.current.data.resolvedCompId).toBeNull();
+  expect(result.current.isError).toBe(false);
+});
+
+test('useSquad: when the route comp is itself a fallback league, it is fetched once, not twice', async () => {
+  const calls = [];
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    calls.push(url);
+    if (url.includes('/eng.1/teams/500')) return new Response(rosterWithAthletes(3), { status: 200 });
+    return new Response(emptyRoster, { status: 200 }); // route (sco.1) and sco.2 both empty
+  }));
+
+  const comp = { id: 'sco.1', hasSquads: true };
+  const { result } = renderHook(() => useSquad(comp, '500'), { wrapper });
+
+  await waitFor(() => expect(result.current.data?.players?.length).toBe(3));
+  expect(calls.filter(u => u.includes('/sco.1/teams/500'))).toHaveLength(1);
+  expect(calls.some(u => u.includes('/sco.2/teams/500'))).toBe(true);
+  expect(result.current.data.resolvedCompId).toBe('eng.1');
 });
