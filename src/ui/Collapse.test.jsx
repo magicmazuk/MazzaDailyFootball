@@ -14,7 +14,7 @@
 // with a LOCAL mock in the one test that needs it, not a global mock —
 // a global ResizeObserver mock would silently move every other test onto
 // the measured-px code path instead of the fallback the guard exists for.
-import { render } from '@testing-library/react';
+import { act, render } from '@testing-library/react';
 import Collapse from './Collapse.jsx';
 
 test('open renders children, height resolves to auto (the no-ResizeObserver fallback path in jsdom)', () => {
@@ -69,4 +69,60 @@ test('observes the inner content on mount and disconnects on unmount (local Resi
   expect(disconnect).toHaveBeenCalledTimes(1);
 
   globalThis.ResizeObserver = original;
+});
+
+// --- review round 1 (HIGH fixes): leaving 'auto' must always pin a real
+// painted px first — via a DIRECT node write, since React batches state
+// writes in one effect into a single commit whose intermediate value never
+// paints. These use a local callback-capturing RO mock; they assert the
+// observable state machine (first fire = measurement only; later fires
+// glide to concrete px), not real paint timing, which only a browser has.
+
+test("the first ResizeObserver fire is pure measurement — an initially-open Collapse stays at 'auto', no self-glide on mount", () => {
+  let roCallback;
+  class CapturingRO {
+    constructor(cb) { roCallback = cb; }
+
+    observe = vi.fn();
+
+    disconnect = vi.fn();
+
+    unobserve = vi.fn();
+  }
+  const original = globalThis.ResizeObserver;
+  globalThis.ResizeObserver = CapturingRO;
+  try {
+    const { container } = render(<Collapse open><p>Content</p></Collapse>);
+    act(() => { roCallback(); });
+    expect(container.firstChild.style.height).toBe('auto');
+  } finally {
+    globalThis.ResizeObserver = original;
+  }
+});
+
+test('a later content-size change while settled open glides to the new measured px (auto is left via the pin-then-glide flip)', () => {
+  let roCallback;
+  class CapturingRO {
+    constructor(cb) { roCallback = cb; }
+
+    observe = vi.fn();
+
+    disconnect = vi.fn();
+
+    unobserve = vi.fn();
+  }
+  const original = globalThis.ResizeObserver;
+  globalThis.ResizeObserver = CapturingRO;
+  try {
+    const { container } = render(<Collapse open><p>Content</p></Collapse>);
+    const inner = container.firstChild.firstChild;
+    Object.defineProperty(inner, 'offsetHeight', { configurable: true, value: 80 });
+    act(() => { roCallback(); }); // first fire: measurement only
+    expect(container.firstChild.style.height).toBe('auto');
+    Object.defineProperty(inner, 'offsetHeight', { configurable: true, value: 200 });
+    act(() => { roCallback(); }); // growth: glides to the new concrete px
+    expect(container.firstChild.style.height).toBe('200px');
+  } finally {
+    globalThis.ResizeObserver = original;
+  }
 });

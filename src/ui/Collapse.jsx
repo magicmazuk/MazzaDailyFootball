@@ -34,16 +34,23 @@ function hasResizeObserver() {
 export default function Collapse({ open, children, className = '' }) {
   const outerRef = useRef(null);
   const innerRef = useRef(null);
-  const lastPxRef = useRef(0); // last measured content height, for the auto->0 close flip
+  const lastPxRef = useRef(0); // last measured content height, for the pin-then-glide flips
+  const roInitializedRef = useRef(false); // RO always fires once on observe — that first fire is a measurement, never a glide
 
   const [height, setHeight] = useState(() => (open ? 'auto' : 0));
+  // Mirror of the last COMMITTED height. The RO callback and close path
+  // need to know it synchronously (to decide whether a pin-then-glide flip
+  // is required) without the stale-closure/updater-fn contortions.
+  const heightRef = useRef(height);
+  const applyHeight = (v) => { heightRef.current = v; setHeight(v); };
 
   // No ResizeObserver in this environment: nothing to measure, nothing to
   // glide from/to. Reflect the open state directly — see header comment.
   useLayoutEffect(() => {
     if (hasResizeObserver()) return undefined;
-    setHeight(open ? 'auto' : 0);
+    applyHeight(open ? 'auto' : 0);
     return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- applyHeight is a stable-by-construction setter pair
   }, [open]);
 
   // Measurement: watch the inner content's height for as long as Collapse
@@ -57,8 +64,36 @@ export default function Collapse({ open, children, className = '' }) {
     if (!inner) return undefined;
     const ro = new ResizeObserver(() => {
       const measured = inner.offsetHeight;
+      const prevPx = lastPxRef.current;
       lastPxRef.current = measured;
-      setHeight((prev) => (prev === 0 ? prev : `${measured}px`));
+      // The first fire is ResizeObserver's mandatory on-observe callback —
+      // pure measurement, never a glide (an initially-open Collapse must
+      // not animate itself on mount).
+      if (!roInitializedRef.current) {
+        roInitializedRef.current = true;
+        return;
+      }
+      const current = heightRef.current;
+      if (current === 0) return; // closed: content changes move nothing
+      if (current === 'auto') {
+        // Settled at 'auto', so the box has ALREADY laid out at the new
+        // size — but RO callbacks run before paint, so there's still time
+        // to pin the OLD px straight onto the node (state can't do it:
+        // React batches the two writes into one commit and the start
+        // value never paints — review round 1, verified empirically),
+        // force a reflow to commit it, then glide to the new value.
+        const outer = outerRef.current;
+        if (outer) {
+          outer.style.height = `${prevPx}px`;
+          // eslint-disable-next-line no-unused-expressions -- forces the reflow that commits the pinned start value
+          outer.offsetHeight;
+        }
+        applyHeight(`${measured}px`);
+      } else {
+        // Mid-glide growth: retarget the running transition — both ends
+        // are already concrete numbers.
+        applyHeight(`${measured}px`);
+      }
     });
     ro.observe(inner);
     return () => ro.disconnect();
@@ -73,15 +108,18 @@ export default function Collapse({ open, children, className = '' }) {
     if (!outer || !inner) return undefined;
 
     if (open) {
+      // Already settled open ('auto') — this is the mount-while-open case
+      // (initial state is 'auto', nothing to glide from) — leave it be.
+      if (heightRef.current === 'auto') return undefined;
       // 0 -> measured px: the transition needs two concrete numbers.
       const measured = inner.offsetHeight;
       lastPxRef.current = measured;
-      setHeight(`${measured}px`);
+      applyHeight(`${measured}px`);
       const onTransitionEnd = (event) => {
         if (event.target === outer && event.propertyName === 'height') {
           // Settle on 'auto': resilience so a growth event this glide
           // somehow missed still can't clip content under overflow-hidden.
-          setHeight('auto');
+          applyHeight('auto');
         }
       };
       outer.addEventListener('transitionend', onTransitionEnd);
@@ -89,14 +127,20 @@ export default function Collapse({ open, children, className = '' }) {
     }
 
     // Closing: 'auto' -> 0 does not transition (no numeric start value to
-    // interpolate from). Pin to the last measured px, force a reflow so
-    // the browser commits that as a real starting value, then drop to 0
-    // so the glide has somewhere concrete to animate from.
-    setHeight(`${lastPxRef.current}px`);
-    // eslint-disable-next-line no-unused-expressions -- reading offsetHeight forces the synchronous reflow the comment above describes
-    outer.offsetHeight;
-    setHeight(0);
+    // interpolate from). Pin the last measured px DIRECTLY on the node —
+    // not through state, which React would batch with the 0 below into a
+    // single commit whose intermediate value never paints (review round 1,
+    // verified empirically against this repo's React 19) — force a reflow
+    // to commit it as the real starting value, then drop to 0 through
+    // state so the glide has somewhere concrete to animate from.
+    if (heightRef.current === 'auto') {
+      outer.style.height = `${lastPxRef.current}px`;
+      // eslint-disable-next-line no-unused-expressions -- forces the reflow that commits the pinned start value
+      outer.offsetHeight;
+    }
+    applyHeight(0);
     return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- applyHeight is a stable-by-construction setter pair
   }, [open]);
 
   return (
