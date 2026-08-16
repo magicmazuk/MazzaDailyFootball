@@ -7,7 +7,6 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { vi } from 'vitest'; // vi.mock() hoisting needs vi imported this way, not the ambient global
 import { usePrefs, CELTIC } from '../../store/prefs.js';
-import { SEASON } from '../../domain/competitions.js';
 
 // PlayerSheet (mounted at TeamScreen's root, sheet-first consistency,
 // Aug 2026) fetches via usePlayer internally — mocked here the same way
@@ -208,15 +207,11 @@ test('a squad row opens the sheet under the resolved league, not the route comp,
 // descriptor lets it work even though the discovered slug has no registry
 // entry. Never for a domestic resolution (discovered false/undefined). ---
 
-// Season currency (review round 2, MEDIUM fix): the full sentence also
-// requires recordSeasonYear === SEASON.espnYear — useSquad's read of the
-// resolving response's defaultLeague.season.year, matched against the
-// app's current season. Today's real ESPN feed never actually sets that
-// field (live-probed — see task-1-report.md), so this "verified" scenario
-// is currently hypothetical/future-proofing rather than reachable with
-// live data; the Pafos-regression test right after this one is the case
-// that matters in production today.
-test('a discovered foreign club with a season-verified record renders the scout line with the full record above the squad section', () => {
+// Season honesty (review round 2, final resolution): ESPN never stamps
+// the record with a season (live-probed), so the copy claims only what
+// the data provably is — the club's most recent `played` league games —
+// rather than asserting "this season" or hiding the record entirely.
+test('a discovered foreign club renders the scout line as their last-N record above the squad section', () => {
   const opponent = side('4411', 'Sturm Graz');
   stubSeasons({
     'uefa.champions': [
@@ -228,13 +223,13 @@ test('a discovered foreign club with a season-verified record renders the scout 
     data: {
       players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
       resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
-      record: { played: 3, wins: 3, draws: 0, losses: 0, points: 9 }, recordSeasonYear: SEASON.espnYear,
+      record: { played: 3, wins: 3, draws: 0, losses: 0, points: 9 }, recordSeasonYear: null,
     },
   }));
 
   renderAt('uefa.champions', '4411');
 
-  expect(screen.getByText('Won 3 of 3 in the Austrian Bundesliga this season · 9 points')).toBeInTheDocument();
+  expect(screen.getByText('Won 3 of their last 3 in the Austrian Bundesliga · 9 points')).toBeInTheDocument();
 });
 
 // --- the Pafos regression (review round 2, MEDIUM fix): a full, valid,
@@ -264,8 +259,8 @@ test('a discovered foreign club with a full record but no verified season (today
 
   renderAt('uefa.champions', '22281');
 
-  expect(screen.getByText('They play in the Cypriot First Division.')).toBeInTheDocument();
-  expect(screen.queryByText(/^Won /)).not.toBeInTheDocument();
+  expect(screen.getByText('Won 18 of their last 36 in the Cypriot First Division · 62 points')).toBeInTheDocument();
+  expect(screen.queryByText(/this season/)).not.toBeInTheDocument();
 });
 
 test('a discovered foreign club with a full record whose recordSeasonYear doesn\'t match the current season also falls back to the plain league line', () => {
@@ -280,20 +275,19 @@ test('a discovered foreign club with a full record whose recordSeasonYear doesn\
     data: {
       players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
       resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
-      record: { played: 3, wins: 3, draws: 0, losses: 0, points: 9 }, recordSeasonYear: SEASON.espnYear - 1,
+      record: { played: 3, wins: 3, draws: 0, losses: 0, points: 9 }, recordSeasonYear: 2019,
     },
   }));
 
   renderAt('uefa.champions', '4411');
 
-  expect(screen.getByText('They play in the Austrian Bundesliga.')).toBeInTheDocument();
-  expect(screen.queryByText(/^Won /)).not.toBeInTheDocument();
+  expect(screen.getByText('Won 3 of their last 3 in the Austrian Bundesliga · 9 points')).toBeInTheDocument();
 });
 
 // --- pluralisation (review round 2, LOW fix): "· 1 points" read wrong
 // for a club sitting on exactly one point. ---
 
-test('a season-verified record of exactly 1 point uses the singular "1 point", not "1 points"', () => {
+test('a record of exactly 1 point uses the singular "1 point", not "1 points"', () => {
   const opponent = side('4411', 'Sturm Graz');
   stubSeasons({
     'uefa.champions': [
@@ -305,13 +299,13 @@ test('a season-verified record of exactly 1 point uses the singular "1 point", n
     data: {
       players: [{ id: 'p1', name: 'Foreign Player', shirt: '9', position: 'Forward' }],
       resolvedCompId: 'aut.1', discovered: true, resolvedLeagueName: 'Austrian Bundesliga',
-      record: { played: 3, wins: 0, draws: 1, losses: 2, points: 1 }, recordSeasonYear: SEASON.espnYear,
+      record: { played: 3, wins: 0, draws: 1, losses: 2, points: 1 }, recordSeasonYear: null,
     },
   }));
 
   renderAt('uefa.champions', '4411');
 
-  expect(screen.getByText('Won 0 of 3 in the Austrian Bundesliga this season · 1 point')).toBeInTheDocument();
+  expect(screen.getByText('Won 0 of their last 3 in the Austrian Bundesliga · 1 point')).toBeInTheDocument();
   expect(screen.queryByText(/1 points/)).not.toBeInTheDocument();
 });
 
