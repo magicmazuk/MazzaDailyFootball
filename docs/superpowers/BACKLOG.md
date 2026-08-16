@@ -94,3 +94,10 @@ None block usage; candidates for a future 1.2 pass.
   (session-scoped). Distinguish clean-200-empty from errors; let the last leg's error throw.
 - Squad fallback list is deliberately Scotland/England only — foreign UEFA opponents still
   have no squads (pre-existing; needs per-club domestic-league discovery to generalise).
+
+## From the two-leg hotfix review (2026-08-16)
+
+- Fast-follow: unrevealedDraws' ≥2-ties gate counts raw legs; a single-pairing two-leg round
+  would slip through — change to dedupePairings(...).length < 2.
+- The bowl/rollcall threshold was never actually broken by duplicates (distinctClubCount
+  already Set-dedupes); pre-fix bowl at 14 distinct clubs was correct behaviour.

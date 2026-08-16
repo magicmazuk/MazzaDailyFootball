@@ -7,7 +7,7 @@ import { Link, useParams } from 'react-router-dom';
 import { byId } from '../../domain/competitions.js';
 import { prettifyRound } from '../../domain/round.js';
 import { fallbackRoundLabel } from '../../domain/field.js';
-import { phaseTieIds, tieId } from '../../domain/draws.js';
+import { dedupePairings, phaseTieIds, roundTieIds, tieId } from '../../domain/draws.js';
 import { useSeasonFixtures } from '../../data/queries.js';
 import { usePrefs } from '../../store/prefs.js';
 import Crest from '../../ui/Crest.jsx';
@@ -305,7 +305,7 @@ function Controls({ complete, onRevealRest, onReset, compId }) {
   );
 }
 
-function Ceremony({ comp, compId, round, ties, alreadySeen, markTiesSeen, followedIds, subjectClub }) {
+function Ceremony({ comp, compId, round, ties, roundFixtures, alreadySeen, markTiesSeen, followedIds, subjectClub }) {
   // A subject club (opponents mode, spec §13.15) forces 'opponents' rather
   // than the bowl/rollcall size threshold — there is no vessel-size
   // question here, only "this club's own campaign".
@@ -359,18 +359,24 @@ function Ceremony({ comp, compId, round, ties, alreadySeen, markTiesSeen, follow
     [ties, compId, round],
   );
 
-  // Seen-marking (spec §8.5, §13.15): fire exactly once, on reaching
-  // complete, by taps or by Reveal the rest. An already-seen round on
-  // arrival is already marked, so the ref starts true and this never fires
-  // again for it. Opponents mode reuses phaseTieIds (draws.js) — the same
-  // ids unrevealedPhaseDraws/TodayScreen key off — rather than re-deriving
-  // them ad hoc.
+  // Seen-marking (spec §8.5, §13.15; hotfix-two-leg-draw): fire exactly
+  // once, on reaching complete, by taps or by Reveal the rest. An
+  // already-seen round on arrival is already marked, so the ref starts true
+  // and this never fires again for it. Opponents mode reuses phaseTieIds
+  // (draws.js) — the same ids unrevealedPhaseDraws/TodayScreen key off —
+  // rather than re-deriving them ad hoc. The bowl/rollcall (round-wide)
+  // path marks via roundTieIds(compId, roundFixtures) — EVERY fixture in
+  // the round, both legs of a two-legged pairing — not ties.map(...), since
+  // `ties` here is the deduped, one-representative-per-pairing list the
+  // ceremony draws from; marking only the representatives would leave a
+  // two-legged round's OTHER legs permanently unseen, misreading as a
+  // partially-seen round to unrevealedDraws forever after.
   useEffect(() => {
     if (complete && !seenMarkedRef.current) {
       seenMarkedRef.current = true;
-      markTiesSeen(mode === 'opponents' ? phaseTieIds(comp, ties) : ties.map(t => tieId(compId, t.id)));
+      markTiesSeen(mode === 'opponents' ? phaseTieIds(comp, ties) : roundTieIds(compId, roundFixtures));
     }
-  }, [complete, ties, compId, comp, mode, markTiesSeen]);
+  }, [complete, ties, roundFixtures, compId, comp, mode, markTiesSeen]);
 
   // Drive TICK from real animation timeouts, at the validated pacing. The
   // reducer never reads a clock — this is the only place time lives.
@@ -455,12 +461,16 @@ export default function DrawScreen() {
 
   // Opponents mode scopes ties to just the subject club's own fixtures in
   // the round (its campaign), not the whole round — unlike the bowl/
-  // rollcall path, which draws every tie in the round.
+  // rollcall path, which draws every PAIRING in the round (hotfix-two-leg-
+  // draw: a two-legged round publishes one FIXTURE per leg, but a draw
+  // ceremony draws pairings — dedupePairings collapses same-pairing legs to
+  // their earliest-kickoff representative; a no-op for single-leg rounds).
   const ties = useMemo(() => {
-    const scoped = teamId
-      ? roundFixtures.filter(f => f.home?.teamId === teamId || f.away?.teamId === teamId)
-      : roundFixtures;
-    return scoped.slice().sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
+    if (teamId) {
+      const scoped = roundFixtures.filter(f => f.home?.teamId === teamId || f.away?.teamId === teamId);
+      return scoped.slice().sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
+    }
+    return dedupePairings(roundFixtures);
   }, [roundFixtures, teamId]);
 
   // Subject club resolution (task-2 brief): from any of the round
@@ -503,7 +513,7 @@ export default function DrawScreen() {
 
   return (
     <Ceremony key={`${compId}:${round}:${teamId ?? ''}`} comp={comp} compId={compId} round={round}
-      ties={ties} alreadySeen={alreadySeen} markTiesSeen={markTiesSeen} followedIds={followedIds}
-      subjectClub={subjectClub} />
+      ties={ties} roundFixtures={roundFixtures} alreadySeen={alreadySeen} markTiesSeen={markTiesSeen}
+      followedIds={followedIds} subjectClub={subjectClub} />
   );
 }
