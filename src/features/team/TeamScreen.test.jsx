@@ -134,7 +134,7 @@ test('a club with qualifying phase fixtures in two comps gets one replay link ea
 
 // --- squad rows open the player sheet (sheet-first consistency, Aug 2026):
 // every player tap opens PlayerSheet; the full page is reached only via the
-// sheet's "Full profile →" link (or a direct URL). ---
+// sheet's expanded "Open as page →" link (or a direct URL). ---
 
 test('a squad row is a button (not a link) that opens the player sheet', async () => {
   const celtic = side('256', 'Celtic');
@@ -158,7 +158,8 @@ test('a squad row is a button (not a link) that opens the player sheet', async (
 
   await userEvent.click(row);
 
-  expect(screen.getByRole('link', { name: 'Full profile →' })).toHaveAttribute('href', '/player/sco.1/p1');
+  await userEvent.click(screen.getByRole('button', { name: 'Full profile →' }));
+  expect(screen.getByRole('link', { name: 'Open as page →' })).toHaveAttribute('href', '/player/sco.1/p1');
 });
 
 // --- home-league hotfix (Aug 2026): useSquad resolves squads under a
@@ -185,7 +186,8 @@ test('a squad row opens the sheet under the resolved league, not the route comp,
 
   await userEvent.click(screen.getByRole('button', { name: lbl('Kasper Høgh', '9') }));
 
-  expect(screen.getByRole('link', { name: 'Full profile →' })).toHaveAttribute('href', '/player/sco.1/p1');
+  await userEvent.click(screen.getByRole('button', { name: 'Full profile →' }));
+  expect(screen.getByRole('link', { name: 'Open as page →' })).toHaveAttribute('href', '/player/sco.1/p1');
 });
 
 test('an empty squad (resolved through every fallback, still zero players) shows the distinct unavailable line', () => {
