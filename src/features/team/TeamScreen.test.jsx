@@ -2,10 +2,10 @@
 // §13.15) — the pure grouping logic lives in teamFixtures.js
 // (phaseReplayGroups), tested directly there; this file only checks
 // TeamScreen renders what that returns, in the Season section header area.
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { beforeEach, expect, test, vi } from 'vitest';
+import { vi } from 'vitest'; // vi.mock() hoisting needs vi imported this way, not the ambient global
 import { usePrefs, CELTIC } from '../../store/prefs.js';
 
 // PlayerSheet (mounted at TeamScreen's root, sheet-first consistency,
@@ -17,12 +17,24 @@ vi.mock('../../data/queries.js', () => ({
   useAllSeasonFixtures: vi.fn(() => []),
   useSquad: vi.fn(() => ({ isLoading: false, isError: false, data: undefined })),
   usePlayer: vi.fn(() => ({ bio: null, stats: null, isLoading: false, isError: false })),
+  // The team sheet's lineup fetch (task 3, squad-visual) — same shape as
+  // MatchRoom's useMatchDetail mock (isLoading/data), defaulting to "no
+  // detail yet" so every existing test (none of which mock it explicitly)
+  // keeps landing on SquadBoard's bands fallback, same as before this hook
+  // existed.
+  useMatchDetail: vi.fn(() => ({ isLoading: false, isError: false, data: undefined })),
 }));
 
-import TeamScreen from './TeamScreen.jsx';
-import { useTeams, useAllSeasonFixtures, useSquad, usePlayer } from '../../data/queries.js';
+import TeamScreen, { matchStarters } from './TeamScreen.jsx';
+import { useTeams, useAllSeasonFixtures, useSquad, usePlayer, useMatchDetail } from '../../data/queries.js';
 
-const side = (teamId, name) => ({ teamId, name, crestUrl: null, monogram: name.slice(0, 2).toUpperCase() });
+// Every shirt button's accessible name is "<number> · <name>" (task 3
+// review — the number was aria-hidden before, so it never reached the a11y
+// tree at all).
+const lbl = (name, shirt) => `${shirt ?? '—'} · ${name}`;
+
+const side = (teamId, name, over = {}) =>
+  ({ teamId, name, crestUrl: null, monogram: name.slice(0, 2).toUpperCase(), colour: null, ...over });
 const fx = (id, compId, round, kickoff, home, away, status = 'scheduled') =>
   ({ id, compId, kickoff, status, minute: null, round, venue: null, home, away });
 
@@ -33,6 +45,7 @@ beforeEach(() => {
   useSquad.mockImplementation(() => ({ isLoading: false, isError: false, data: undefined }));
   useAllSeasonFixtures.mockImplementation(() => []);
   usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: false, isError: false });
+  useMatchDetail.mockImplementation(() => ({ isLoading: false, isError: false, data: undefined }));
 });
 
 // Feeds every one of the 13 registry comps a fixture list (default empty)
@@ -141,7 +154,7 @@ test('a squad row is a button (not a link) that opens the player sheet', async (
   renderAt('sco.1', '256');
 
   expect(screen.queryByRole('link', { name: /Kasper Høgh/ })).not.toBeInTheDocument();
-  const row = screen.getByRole('button', { name: 'Kasper Høgh' });
+  const row = screen.getByRole('button', { name: lbl('Kasper Høgh', '9') });
 
   await userEvent.click(row);
 
@@ -170,7 +183,7 @@ test('a squad row opens the sheet under the resolved league, not the route comp,
 
   renderAt('uefa.champions', '256');
 
-  await userEvent.click(screen.getByRole('button', { name: 'Kasper Høgh' }));
+  await userEvent.click(screen.getByRole('button', { name: lbl('Kasper Høgh', '9') }));
 
   expect(screen.getByRole('link', { name: 'Full profile →' })).toHaveAttribute('href', '/player/sco.1/p1');
 });
@@ -190,6 +203,183 @@ test('an empty squad (resolved through every fallback, still zero players) shows
   expect(screen.getByText('Squad details unavailable.')).toBeInTheDocument();
   // Distinct from the BBC hasSquads:false line, which never applies here.
   expect(screen.queryByText(/aren't published for/)).not.toBeInTheDocument();
+});
+
+// --- the team sheet (squad-visual branch, Aug 2026, task 3): the squad
+// section is now SquadBoard — a pitch when the last match's lineup is
+// known, bands (grouped by position, no player ever dropped) otherwise.
+// Full bucketing/pitch/rail/formation behaviour is unit-tested directly
+// against SquadBoard (SquadBoard.test.jsx); these are wiring checks only:
+// TeamScreen resolves the last fixture's lineup and hands SquadBoard the
+// right props, and every degraded line keeps working underneath it. ---
+
+const mixedSquad = [
+  { id: 'g1', name: 'Keeper One', shirt: '1', position: 'Goalkeeper' },
+  { id: 'd1', name: 'Defender One', shirt: '2', position: 'Defender' },
+  { id: 'd2', name: 'Defender Two', shirt: '3', position: 'D' },
+  { id: 'm1', name: 'Midfielder One', shirt: '8', position: 'Midfielder' },
+  { id: 'f1', name: 'Forward One', shirt: '9', position: 'Forward' },
+  { id: 'f2', name: 'Forward Two', shirt: null, position: 'F' },
+  { id: 'x1', name: 'Mystery Player', shirt: '99', position: null },
+];
+
+test('no lineup available: the squad renders as bands, every player shown, unknown positions never dropped', () => {
+  const celtic = side('256', 'Celtic');
+  stubSeasons({
+    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
+  });
+  useSquad.mockImplementation(() => ({ isLoading: false, isError: false, data: { players: mixedSquad } }));
+
+  renderAt('sco.1', '256');
+
+  for (const p of mixedSquad) {
+    expect(screen.getByRole('button', { name: lbl(p.name, p.shirt) })).toBeInTheDocument();
+  }
+});
+
+test('a squad row is a button with a "<number> · <name>" aria-label and a club-coloured shirt icon', () => {
+  const celtic = side('256', 'Celtic', { colour: '009921' });
+  stubSeasons({
+    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: { players: [{ id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' },
+                       { id: 'p2', name: 'No Number', shirt: null, position: 'Forward' }] },
+  }));
+
+  renderAt('sco.1', '256');
+
+  const row = screen.getByRole('button', { name: lbl('Kasper Høgh', '9') });
+  expect(within(row).getByText('9')).toBeInTheDocument();
+  // the shirt fill is the CLUB's colour (team.colour), same for every row.
+  expect(row.querySelector('[data-testid="shirt-shape"]')).toHaveAttribute('fill', '#009921');
+
+  const blankRow = screen.getByRole('button', { name: lbl('No Number', null) });
+  expect(within(blankRow).getByText('—')).toBeInTheDocument();
+});
+
+test('the squad section renders none of the earlier designs’ leftover markup (v1 tile grid, v2 group testids)', () => {
+  const celtic = side('256', 'Celtic');
+  stubSeasons({
+    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
+  });
+  useSquad.mockImplementation(() => ({ isLoading: false, isError: false, data: { players: mixedSquad } }));
+
+  const { container } = renderAt('sco.1', '256');
+
+  expect(container.querySelector('.grid-cols-4')).not.toBeInTheDocument();
+  expect(container.querySelector('[data-testid^="squad-group-"]')).not.toBeInTheDocument();
+  expect(screen.queryByRole('img', { name: /Squad balance/ })).not.toBeInTheDocument();
+});
+
+// --- the last match's lineup drives the pitch (task 3's data step) ---
+
+test('a resolved lineup for our club\'s side wires starters into SquadBoard\'s pitch, the rest onto the bench rail', () => {
+  const celtic = side('256', 'Celtic');
+  const kilmarnock = side('o1', 'Kilmarnock', { shortName: 'Kilmarnock' });
+  stubSeasons({
+    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, kilmarnock, 'ft')],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      players: [
+        { id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' },
+        { id: 'p2', name: 'Bench Player', shirt: '20', position: 'Defender' },
+      ],
+    },
+  }));
+  useMatchDetail.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      detail: {
+        lineups: [
+          { homeAway: 'home', players: [{ id: 'p1', name: 'Kasper Høgh', starter: true }] },
+          { homeAway: 'away', players: [] },
+        ],
+      },
+    },
+  }));
+
+  renderAt('sco.1', '256');
+
+  // No numeral formation claim (task 3 review) — just the plain caption.
+  expect(screen.getByText('Last match v Kilmarnock')).toBeInTheDocument();
+  expect(screen.getByText('The bench & the rest')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: lbl('Bench Player', '20') })).toBeInTheDocument();
+});
+
+// --- a lineup starter with no squad match is never dropped (task 3 review) ---
+
+test('matchStarters: an unmatched lineup starter is synthesised from the lineup entry, not dropped', () => {
+  const lineupPlayers = [
+    { id: 'p1', name: 'Kasper Høgh', shirt: '9', starter: true },
+    { id: 'espn-777', name: 'New Signing', shirt: '77', starter: true },
+    { id: 'p2', name: 'Bench Player', shirt: '20', starter: false },
+  ];
+  const squadPlayers = [
+    { id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' },
+    { id: 'p2', name: 'Bench Player', shirt: '20', position: 'Defender' },
+  ];
+
+  const starters = matchStarters(lineupPlayers, squadPlayers);
+
+  expect(starters).toHaveLength(2); // the two starters, bench excluded
+  expect(starters.find(p => p.id === 'p1'))
+    .toEqual({ id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' });
+  expect(starters.find(p => p.id === 'espn-777'))
+    .toEqual({ id: 'espn-777', name: 'New Signing', shirt: '77', position: null });
+});
+
+test('an XI with one unmatched starter (a signing the squad endpoint hasn\'t caught up on) still renders all 11 shirts on the pitch', () => {
+  const celtic = side('256', 'Celtic');
+  const kilmarnock = side('o1', 'Kilmarnock', { shortName: 'Kilmarnock' });
+  stubSeasons({
+    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, kilmarnock, 'ft')],
+  });
+  const squadPlayers = Array.from({ length: 10 }, (_, i) => ({
+    id: `p${i + 1}`, name: `Player ${i + 1}`, shirt: String(i + 1),
+    position: i === 0 ? 'Goalkeeper' : 'Defender',
+  }));
+  useSquad.mockImplementation(() => ({ isLoading: false, isError: false, data: { players: squadPlayers } }));
+  useMatchDetail.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: {
+      detail: {
+        lineups: [
+          {
+            homeAway: 'home',
+            players: [
+              ...squadPlayers.map(p => ({ id: p.id, name: p.name, shirt: p.shirt, starter: true })),
+              { id: 'espn-999', name: 'New Signing', shirt: '77', starter: true }, // 11th, no squad match
+            ],
+          },
+          { homeAway: 'away', players: [] },
+        ],
+      },
+    },
+  }));
+
+  renderAt('sco.1', '256');
+
+  const pitchRows = screen.getAllByTestId(/^pitch-row-/);
+  const onPitch = pitchRows.flatMap(r => within(r).getAllByRole('button'));
+  expect(onPitch).toHaveLength(11);
+  expect(screen.getByRole('button', { name: lbl('New Signing', '77') })).toBeInTheDocument();
+});
+
+test('a BBC comp (hasSquads false): the degraded line still renders, unaffected by the lineup wiring', () => {
+  const celtic = side('256', 'Celtic');
+  stubSeasons({
+    'scottish-league-one': [
+      fx('f1', 'scottish-league-one', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1')),
+    ],
+  });
+
+  renderAt('scottish-league-one', '256');
+
+  expect(screen.getByText("Squad details aren't published for Scottish League One.")).toBeInTheDocument();
 });
 
 test('a club with no phase fixtures at all renders the page normally, no replay link', () => {

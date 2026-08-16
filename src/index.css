@@ -6,6 +6,35 @@ body {
   @apply bg-paper text-ink font-serif antialiased;
 }
 
+/* The rail primitive (squad-visual branch, Aug 2026, task 3): a horizontal
+   scroller with no visible scrollbar (either engine) and native momentum +
+   scroll-snap. Edge-fade masks below are toggled by Rail.jsx's maskState()
+   as the four precomputed states the brief calls for. */
+.rail-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+.rail-scroll::-webkit-scrollbar {
+  display: none;
+}
+.rail-item {
+  scroll-snap-align: start;
+}
+.rail-mask-left {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 24px);
+  mask-image: linear-gradient(to right, transparent, black 24px);
+}
+.rail-mask-right {
+  -webkit-mask-image: linear-gradient(to left, transparent, black 24px);
+  mask-image: linear-gradient(to left, transparent, black 24px);
+}
+.rail-mask-both {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent);
+}
+
 /* The draw ceremony (spec §8.3-8.5) — CSS keyframes only, no animation
    libraries. Durations here are decorative and independent of the
    drawEngine.js TIMINGS that gate the reducer's TICKs; they're kept in the

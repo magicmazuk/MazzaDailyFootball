@@ -4,17 +4,45 @@ import { COMPETITIONS, byId } from '../../domain/competitions.js';
 import { formGuide } from '../../domain/form.js';
 import { prettifyRound } from '../../domain/round.js';
 import { fallbackRoundLabel } from '../../domain/field.js';
-import { useAllSeasonFixtures, useSquad, useTeams } from '../../data/queries.js';
+import { useAllSeasonFixtures, useMatchDetail, useSquad, useTeams } from '../../data/queries.js';
 import { usePrefs } from '../../store/prefs.js';
 import Crest from '../../ui/Crest.jsx';
 import FixtureRow from '../../ui/FixtureRow.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
 import CalendarGlyph from '../../ui/CalendarGlyph.jsx';
 import PlayerSheet from '../player/PlayerSheet.jsx';
+import SquadBoard from './SquadBoard.jsx';
 import { teamFixtures, phaseReplayGroups } from './teamFixtures.js';
 
 const WATERMARK_OPACITY = 0.10; // the dial — user may want it stronger/weaker
 const roundLabelFor = round => prettifyRound(round) ?? fallbackRoundLabel(round) ?? round;
+
+// The team sheet (squad-visual branch, Aug 2026, task 3): the squad's
+// position-bucket grouping now lives in SquadBoard, which also owns the
+// starters-known pitch vs bands fallback. This screen's job is just the
+// data step — resolving the last fixture's lineup (when the source
+// publishes one) and matching its starters back to squad players by id.
+function ourLineup(detail, fixture, teamId) {
+  if (!fixture) return null;
+  const homeAway = fixture.home.teamId === teamId ? 'home'
+    : fixture.away.teamId === teamId ? 'away' : null;
+  return detail?.lineups?.find(l => l.homeAway === homeAway) ?? null;
+}
+
+// Starters matched back to the squad list by id for their shirt/position
+// (lineup entries carry id since R2.6) — but a starter the lineup knows
+// about that the squad list doesn't (a summer signing the roster endpoint
+// hasn't caught up on yet, or any other id mismatch) is never silently
+// dropped off the pitch. It's synthesised straight from the lineup entry
+// instead, which already carries id/name/shirt — with no recognisable
+// position, so SquadBoard's bucketing lands it in the trailing 'Squad'
+// row rather than the XI quietly showing ten shirts.
+export function matchStarters(lineupPlayers, squadPlayers) {
+  const bySquadId = new Map(squadPlayers.map(p => [p.id, p]));
+  return (lineupPlayers ?? [])
+    .filter(p => p.starter)
+    .map(p => bySquadId.get(p.id) ?? { id: p.id, name: p.name, shirt: p.shirt, position: null });
+}
 
 function FollowButton({ team }) {
   const { follow, unfollow } = usePrefs();
@@ -46,6 +74,23 @@ export default function TeamScreen() {
 
   const allFixtures = seasons.flatMap(r => r.data?.fixtures ?? []);
   const { all, next, last } = teamFixtures(allFixtures, teamId);
+
+  // The team sheet's data step (task 3): the last fixture's own competition
+  // (not necessarily the route comp — teamFixtures spans every comp) drives
+  // the lineup fetch, same summary endpoint the match room already uses.
+  // A BBC-degraded comp (hasMatchDetail: false) disables the query the same
+  // way MatchScreen disables it for a bbc- event — never a wasted fetch.
+  const lastComp = last ? byId(last.compId) : null;
+  const lineupComp = lastComp?.hasMatchDetail ? lastComp : { id: 'none', hasMatchDetail: false };
+  const matchDetail = useMatchDetail(lineupComp, last?.id, false);
+  const lineup = ourLineup(matchDetail.data?.detail, last, teamId);
+  // null (not []) when there's no lineup yet — SquadBoard treats that, and
+  // only that, as "fall back to the bands".
+  const starters = lineup && squad.data?.players
+    ? matchStarters(lineup.players, squad.data.players)
+    : null;
+  const opponentSide = last ? (last.home.teamId === teamId ? last.away : last.home) : null;
+
   // Replay-the-draw links (spec §13.15): browsable for ANY club with 2+
   // phase-round fixtures in a comp, any seen-state — followed-ness is
   // irrelevant here, unlike the Today invitation.
@@ -98,20 +143,9 @@ export default function TeamScreen() {
               Squad details aren't published for {comp.name}.
             </p>
           )}
-          {comp?.hasSquads && squad.data && squad.data.players.length > 0 && (
-            <div>
-              {squad.data.players.map(p => (
-                <button key={p.id} type="button" onClick={() => setSheetPlayerId(p.id)}
-                  aria-label={`${p.name}`}
-                  className="flex items-baseline gap-3 py-2 border-b border-rule/60 text-left">
-                  <span className="w-6 font-sans text-[11px] text-muted tabular-nums text-right">
-                    {p.shirt ?? '—'}
-                  </span>
-                  <span className="flex-1 text-[14.5px] truncate">{p.name}</span>
-                  <span className="font-sans text-[10px] uppercase text-muted">{p.position ?? ''}</span>
-                </button>
-              ))}
-            </div>
+          {comp?.hasSquads && squad.data?.players?.length > 0 && (
+            <SquadBoard players={squad.data.players} starters={starters} teamColour={team.colour}
+              opponentShortName={opponentSide?.shortName ?? null} onOpenPlayer={setSheetPlayerId} />
           )}
           {/* Resolved (possibly via the domestic-league fallback, spec hotfix Aug 2026) but
               still nothing — distinct from the hasSquads:false "not published" line above. */}
