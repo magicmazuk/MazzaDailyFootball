@@ -236,8 +236,12 @@ function adaptHeadToHead(json) {
       const num = c => (c?.score != null && c.score !== '' ? Number(c.score) : null);
       return {
         date: e.date ?? null,
-        homeName: home?.team?.displayName ?? null,
-        awayName: away?.team?.displayName ?? null,
+        // Mirrors adaptScoreboard's side() name chain exactly — the drawer's
+        // balance bar matches meetings to this fixture's sides BY NAME, so
+        // an unmirrored fallback here would silently drop a meeting from
+        // the tally whenever ESPN omits displayName (v1.4 review, Low).
+        homeName: home?.team?.displayName ?? home?.team?.name ?? null,
+        awayName: away?.team?.displayName ?? away?.team?.name ?? null,
         homeScore: num(home),
         awayScore: num(away),
       };
