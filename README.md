@@ -27,6 +27,13 @@ Built for one Celtic fan's morning read; shared in case it's yours too.
   squad hanging on a rail, the club crest watermarking the page.
 - **Match rooms** — lineups in club colours, goals and cards with names, head-to-head history,
   form, standout players, and contextual YouTube highlights after full time.
+- **Fixture drawers** — tap any result and it unfolds in place: a goal timeline across the
+  ninety minutes, scorers by side, attendance. Tap an upcoming fixture for recent meetings and
+  a head-to-head balance bar in club colours.
+- **The papers** — the top Celtic story and the top British football story from BBC Sport,
+  each expandable to five, right on the Today page.
+- **The scout** — tap any European opponent and the app finds their domestic league, their
+  squad, their recent record, and a highlights reel — automatically, for any club.
 - **Player sheets** — tap any player anywhere and their card slides up in place; swipe up for the
   full profile, swipe down and you're exactly where you were.
 - **Calendars** — a general fixture calendar plus one per club, and TV badges (Sky, TNT, BBC,
@@ -63,7 +70,7 @@ prioritised, never exclusive). TV listings are a hand-curated file at
 app never invents a listing.
 
 ```bash
-npm run test:run   # the suite (560+ tests)
+npm run test:run   # the suite (700+ tests)
 npm run build      # production build
 ```
 
