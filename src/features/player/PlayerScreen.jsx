@@ -121,7 +121,11 @@ export function Splits({ bio, stats }) {
   const showMinutes = stats?.minutes != null && stats?.appearances != null && stats.appearances > 0;
 
   return (
-    <>
+    // xfade-in (spec §13.21): the entrance both PlayerScreen's own initial
+    // load AND PlayerSheet's peek->expanded reveal share, since both mount
+    // this exact root — one class covers landing on the full page and
+    // expanding inline without duplicating the fade at each call site.
+    <div className="xfade-in">
       {showAttacking && (
         <section className="mb-8">
           <SectionLabel>Attacking</SectionLabel>
@@ -160,7 +164,7 @@ export function Splits({ bio, stats }) {
 
       {showRating && <RatingGauge rating={stats.rating} />}
       {showMinutes && <MinutesGauge minutes={stats.minutes} of={stats.appearances * 90} />}
-    </>
+    </div>
   );
 }
 

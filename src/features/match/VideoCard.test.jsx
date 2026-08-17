@@ -22,6 +22,14 @@ test('renders a 16:9 iframe embed of the first video, with its title', () => {
   expect(screen.getByText('Kilmarnock 2-1 Celtic highlights')).toBeInTheDocument();
 });
 
+// --- motion (spec §13.21): content landing (a skeleton, or nothing,
+// replaced by the iframe) crossfades in rather than hard-cutting. ---
+
+test('the card root crossfades in (.xfade-in) when it renders', () => {
+  const { container } = render(<VideoCard videos={videos} />);
+  expect(container.querySelector('section')).toHaveClass('xfade-in');
+});
+
 test('dismissing the current video advances to the next one', async () => {
   const user = userEvent.setup();
   const { container } = render(<VideoCard videos={videos} />);

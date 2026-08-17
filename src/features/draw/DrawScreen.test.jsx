@@ -568,3 +568,14 @@ test('an already-seen phase round opens straight into complete, with no re-marki
   expect(screen.getByRole('button', { name: 'Start again' })).toBeInTheDocument();
   expect(markTiesSeen).not.toHaveBeenCalled();
 });
+
+// --- motion (spec §13.21): the draw ceremony's own choreography (§8.3-8.5)
+// is explicitly UNTOUCHED by the rise/skeleton/glide motion system —
+// DrawScreen gets nothing from it, no .rise-in anywhere in its tree. ---
+
+test('the draw ceremony carries no .rise-in class anywhere — its own choreography stays untouched', async () => {
+  stubScoreboard(bowlEvents);
+  const { container } = renderAt('/draw/sco.tennents/fourth-round');
+  await screen.findByText('Tap to draw the first ball');
+  expect(container.querySelectorAll('[class*="rise-in"]')).toHaveLength(0);
+});

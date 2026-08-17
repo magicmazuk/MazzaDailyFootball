@@ -2,6 +2,7 @@
 // its full record in a drawer. The split is drawn as a real event.
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import Collapse from '../../ui/Collapse.jsx';
 import Crest from '../../ui/Crest.jsx';
 import FormGlyphs from '../../ui/FormGlyphs.jsx';
 import { ZONE_META, zoneFor } from './zones.js';
@@ -27,7 +28,7 @@ function Drawer({ row, form }) {
     ['L', row.lost], ['GF', row.goalsFor], ['GA', row.goalsAgainst],
   ];
   return (
-    <div className="bg-drawer -mx-5 px-5 py-4">
+    <div className="bg-drawer -mx-5 px-5 py-4 xfade-in">
       <div className="grid grid-cols-6 gap-x-1 gap-y-2 text-center">
         {cells.map(([k, v]) => (
           <div key={k}>
@@ -58,6 +59,11 @@ function Drawer({ row, form }) {
 
 export default function LeagueTable({ comp, rows, followedIds, formByTeam }) {
   const [openId, setOpenId] = useState(null);
+  // Lazy-ONCE mounting (fix round 1, HIGH): a row's Drawer stays mounted
+  // once it's been opened, even after openId moves to another row, so its
+  // Collapse glides shut around real content — see FixtureRow's fuller
+  // comment on the same fix.
+  const [everOpenedIds, setEverOpenedIds] = useState(() => new Set());
   const usedZones = [...new Set(rows.map(r => zoneFor(comp, r.position)).filter(Boolean))];
   return (
     <div>
@@ -73,7 +79,10 @@ export default function LeagueTable({ comp, rows, followedIds, formByTeam }) {
             </div>
           )}
           <button type="button"
-            onClick={() => setOpenId(openId === row.teamId ? null : row.teamId)}
+            onClick={() => {
+              setOpenId(cur => (cur === row.teamId ? null : row.teamId));
+              setEverOpenedIds(ids => (ids.has(row.teamId) ? ids : new Set(ids).add(row.teamId)));
+            }}
             className="w-full text-left flex items-center gap-3 py-3 border-b border-rule/70">
             <span className="w-0.5 self-stretch rounded-sm -mr-1"
               style={{ background: ZONE_META[zoneFor(comp, row.position)]?.colour ?? 'transparent' }} />
@@ -90,9 +99,14 @@ export default function LeagueTable({ comp, rows, followedIds, formByTeam }) {
             </span>
             <span className="text-[17px] tabular-nums">{row.points}</span>
           </button>
-          {openId === row.teamId && (
-            <Drawer row={{ ...row, compId: comp.id }} form={formByTeam[row.teamId]} />
-          )}
+          {/* No fetch here — the row + form are already props (spec §13.21),
+              so the drawer glides straight open to its content, never a
+              skeleton. */}
+          <Collapse open={openId === row.teamId}>
+            {everOpenedIds.has(row.teamId) && (
+              <Drawer row={{ ...row, compId: comp.id }} form={formByTeam[row.teamId]} />
+            )}
+          </Collapse>
         </div>
       ))}
       {usedZones.length > 0 && (

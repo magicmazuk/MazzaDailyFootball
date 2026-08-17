@@ -107,7 +107,7 @@ function ScoreHeader({ fixture, comp, gameInfo }) {
   // shows a dash, the same as a genuinely missing score, never a phantom 0-0.
   const showScore = fixture.status === 'live' || fixture.status === 'ft';
   return (
-    <header className="mb-8">
+    <header className="mb-8 rise-in rise-in-1">
       {[fixture.home, fixture.away].map(side => (
         <div key={side.teamId} className="flex items-center gap-3 py-1.5">
           <Link to={`/team/${comp.id}/${side.teamId}`}
@@ -144,7 +144,7 @@ function FormBlock({ form, fixture }) {
   const awayForm = form[fixture.away.teamId];
   if (!homeForm?.length || !awayForm?.length) return null;
   return (
-    <section className="mb-8">
+    <section className="mb-8 rise-in rise-in-2">
       <SectionLabel muted>Form coming in</SectionLabel>
       {[[fixture.home, homeForm], [fixture.away, awayForm]].map(([side, guide]) => (
         <div key={side.teamId} className="flex items-center gap-3 py-1.5">
@@ -237,7 +237,7 @@ function TimelineRow({ e, fixture, comp, onOpenPlayer }) {
 function Timeline({ events, fixture, comp, onOpenPlayer }) {
   if (!events?.length) return null;
   return (
-    <section className="mb-8">
+    <section className="mb-8 rise-in rise-in-3">
       <SectionLabel>The match</SectionLabel>
       {[...events].reverse().map((e, i) => (
         <TimelineRow key={i} e={e} fixture={fixture} comp={comp} onOpenPlayer={onOpenPlayer} />
@@ -255,7 +255,7 @@ function Stats({ teamStats, fixture }) {
   if (!keys.length) return null;
   const hp = Number(h.stats.possessionPct ?? 50);
   return (
-    <section className="mb-8">
+    <section className="mb-8 rise-in rise-in-4">
       <SectionLabel muted>Stats</SectionLabel>
       {h.stats.possessionPct != null && (
         <div className="mb-5">
@@ -291,7 +291,7 @@ function Stats({ teamStats, fixture }) {
 function Standouts({ standouts, fixture, comp, onOpenPlayer }) {
   if (fixture.status !== 'ft' || !standouts?.length) return null;
   return (
-    <section className="mb-8">
+    <section className="mb-8 rise-in rise-in-5">
       <SectionLabel muted>Standouts</SectionLabel>
       {standouts.map(s => (
         <div key={s.teamId ?? s.teamName} className="mb-4 last:mb-0">
@@ -319,7 +319,7 @@ function Lineups({ lineups, fixture, comp, onOpenPlayer }) {
   const title = ha => (ha === 'home' ? fixture.home.name : fixture.away.name);
   const sideColour = ha => (ha === 'home' ? fixture.home.colour : fixture.away.colour) ?? null;
   return (
-    <section className="mb-8">
+    <section className="mb-8 rise-in rise-in-5">
       <SectionLabel muted>Lineups</SectionLabel>
       {lineups.map(l => (
         <div key={l.homeAway} className="mb-5">
@@ -344,7 +344,7 @@ function Lineups({ lineups, fixture, comp, onOpenPlayer }) {
 function HeadToHead({ headToHead }) {
   if (!headToHead?.meetings?.length) return null;
   return (
-    <section className="mb-8">
+    <section className="mb-8 rise-in rise-in-5">
       <SectionLabel muted>Head to head</SectionLabel>
       {headToHead.summary && (
         <p className="font-sans text-[10px] text-muted mb-3">{headToHead.summary}</p>
@@ -371,7 +371,7 @@ function HeadToHead({ headToHead }) {
 function Siblings({ siblings, fixture, followedIds }) {
   if (!siblings?.length) return null;
   return (
-    <section className="mb-8">
+    <section className="mb-8 rise-in rise-in-5">
       <SectionLabel muted>{fixture.round != null ? 'In this round' : 'That day'}</SectionLabel>
       {siblings.map(f => (
         <FixtureRow key={f.id} fixture={f} showContext={false} followedIds={followedIds} />

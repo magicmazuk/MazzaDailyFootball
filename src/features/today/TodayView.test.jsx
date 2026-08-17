@@ -287,3 +287,83 @@ test('The papers section sits after Earlier today and before On TV', () => {
   // eslint-disable-next-line no-bitwise
   expect(papersHeading.compareDocumentPosition(onTvHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
+
+// --- motion (spec §13.21): each top-level section rises in on mount, one
+// static delay class per named slot regardless of which sections happen to
+// be present ("no coordination needed beyond the static classes") — capped
+// at rise-in-5, which past the fifth named section (On TV, Quick view)
+// holds rather than going un-staggered or inventing a rise-in-6/7 that
+// doesn't exist. ---
+
+// Every section label below is an <h2> (SectionLabel) — queried by heading
+// role rather than text, since "Live" also appears as StatusWord's own
+// live-indicator text inside a fixture row in the same render.
+function riseSection(label) {
+  return screen.getByRole('heading', { name: label }).closest('[class*="rise-in"]');
+}
+
+test('sections carry .rise-in with staggered delay classes in DOM order, capped at rise-in-5', () => {
+  const onTvFixture = {
+    id: 'tv1', compId: 'eng.1', kickoff: '2026-08-21T19:00:00Z', status: 'scheduled',
+    tv: ['Sky Sports'], home: side('1', 'Home'), away: side('2', 'Away'),
+  };
+  const tableRow = { teamId: 't1', name: 'Team One', crestUrl: null, monogram: 'T1', position: 1, points: 10 };
+
+  render(
+    <MemoryRouter>
+      <TodayView
+        date={new Date('2026-08-22T15:00:00Z')}
+        followedIds={new Set()}
+        partition={{
+          yours: [fx('1', 'Celtic', 'St Johnstone')],
+          live: [fx('2', 'Hibernian', 'Hearts', 'live')],
+          later: [fx('3', 'Motherwell', 'Livingston')],
+          earlier: [fx('4', 'Falkirk', 'Ayr United')],
+          yesterday: [],
+        }}
+        onTv={[onTvFixture]}
+        quickTables={[{ comp: byId('sco.1'), rows: [tableRow] }]}
+      />
+    </MemoryRouter>,
+  );
+
+  const yourClubs = riseSection('★ Your clubs');
+  const live = riseSection('Live');
+  const later = riseSection('Later today');
+  const earlier = riseSection('Earlier today');
+  const papers = riseSection('The papers');
+  const onTv = riseSection('On TV');
+  const quickView = riseSection('Quick view');
+
+  expect(yourClubs).toHaveClass('rise-in', 'rise-in-1');
+  expect(live).toHaveClass('rise-in', 'rise-in-2');
+  expect(later).toHaveClass('rise-in', 'rise-in-3');
+  expect(earlier).toHaveClass('rise-in', 'rise-in-4');
+  expect(papers).toHaveClass('rise-in', 'rise-in-5');
+  expect(onTv).toHaveClass('rise-in', 'rise-in-5');
+  expect(quickView).toHaveClass('rise-in', 'rise-in-5');
+
+  // eslint-disable-next-line no-bitwise
+  expect(yourClubs.compareDocumentPosition(live) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // eslint-disable-next-line no-bitwise
+  expect(live.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // eslint-disable-next-line no-bitwise
+  expect(later.compareDocumentPosition(earlier) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // eslint-disable-next-line no-bitwise
+  expect(earlier.compareDocumentPosition(papers) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // eslint-disable-next-line no-bitwise
+  expect(papers.compareDocumentPosition(onTv) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // eslint-disable-next-line no-bitwise
+  expect(onTv.compareDocumentPosition(quickView) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test('"Yesterday" carries no rise-in class — it is not one of the named arrival sections', () => {
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-22T15:00:00Z')} followedIds={new Set()}
+        partition={{ yours: [], live: [], later: [], earlier: [], yesterday: [fx('2', 'Falkirk', 'Hearts')] }} />
+    </MemoryRouter>,
+  );
+  const yesterday = screen.getByText('Yesterday').closest('section');
+  expect(yesterday.className).not.toMatch(/rise-in/);
+});

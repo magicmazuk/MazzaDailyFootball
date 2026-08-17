@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { expect, test, vi } from 'vitest';
@@ -116,15 +116,26 @@ test('the handle button expands the sheet, revealing the full Splits content', a
   expect(screen.getByRole('button', { name: 'Collapse' })).toBeInTheDocument();
 });
 
-test('clicking the handle again collapses back to the peek — Splits gone, headline numbers still there', async () => {
+test('clicking the handle again collapses back to the peek — Splits stay mounted (clipped), headline numbers still there', async () => {
   usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
-  render(<MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>);
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
   await userEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
   expect(screen.getByText('Attacking')).toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Collapse' }));
-  expect(screen.queryByText('Attacking')).not.toBeInTheDocument();
-  expect(screen.getByText('Goals')).toBeInTheDocument();
-  expect(screen.getByText('3')).toBeInTheDocument();
+  // Content stays mounted (clipped to height 0 by Collapse) rather than
+  // unmounting, so the close glide has real content to shut around
+  // instead of an already-empty box (fix round 1, HIGH).
+  expect(screen.getByText('Attacking')).toBeInTheDocument();
+  expect(container.querySelector('.collapse-glide').style.height).toBe('0px');
+  // Splits' own stats (e.g. a "3" for fouls committed) stay in the DOM
+  // too now that it's clipped rather than unmounted, so scope the
+  // headline check to the Headline grid rather than a bare getByText('3'),
+  // which would now be ambiguous.
+  const headline = container.querySelector('.grid-cols-3');
+  expect(within(headline).getByText('Goals')).toBeInTheDocument();
+  expect(within(headline).getByText('3')).toBeInTheDocument();
 });
 
 test('an upward swipe of 40px+ on the sheet expands it from the peek', () => {
@@ -150,7 +161,11 @@ test('a downward swipe of 40px+ while expanded and scrolled to top collapses bac
 
   fireEvent.touchStart(el, { touches: [{ clientX: 10, clientY: 200 }] });
   fireEvent.touchEnd(el, { changedTouches: [{ clientX: 10, clientY: 340 }] });
-  expect(screen.queryByText('Attacking')).not.toBeInTheDocument();
+  // Content stays mounted (clipped to height 0 by Collapse) rather than
+  // unmounting, so the close glide has real content to shut around
+  // instead of an already-empty box (fix round 1, HIGH).
+  expect(screen.getByText('Attacking')).toBeInTheDocument();
+  expect(container.querySelector('.collapse-glide').style.height).toBe('0px');
   expect(onClose).not.toHaveBeenCalled();
 });
 
@@ -216,10 +231,52 @@ test('"Open as page →" renders as a Link with the player route href once expan
   expect(onClose).toHaveBeenCalled();
 });
 
-test('open with no bio while the query is still fetching shows a muted "Loading player…" line', () => {
+// --- motion (spec §13.21): the sheet opens at a stable size — a shaped
+// skeleton (2 name/sys-line bars + 3 headline-number blocks, same grid
+// Headline itself uses) stands in for the old thin "Loading player…" strip
+// that jumped once bio landed. ---
+
+test('open with no bio while the query is still fetching shows a skeleton (2 lines + 3 headline blocks), not "Loading player…"', () => {
   usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: true, isError: false });
-  render(<MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>);
-  expect(screen.getByText('Loading player…')).toBeInTheDocument();
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
+  expect(screen.queryByText('Loading player…')).not.toBeInTheDocument();
+  const bars = container.querySelectorAll('.skeleton-pulse');
+  expect(bars).toHaveLength(5); // 2 name/sys-line bars + 3 headline blocks
+  bars.forEach(bar => expect(bar.closest('[aria-hidden="true"]')).toBeTruthy());
+});
+
+test('bio content carries the entrance crossfade (.xfade-in) once loaded', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
+  const xfade = container.querySelector('.xfade-in');
+  expect(xfade).toBeInTheDocument();
+  expect(within(xfade).getByText('Kasper Høgh')).toBeInTheDocument();
+});
+
+// --- peek <-> expanded (retires the parked v1.0 finding, spec §13.21): the
+// old h-auto -> h-[88vh] class jump never interpolated. The expanded
+// region's height is now driven by Collapse's measured-height glide. ---
+
+test('the expanded region is driven by the Collapse glide mechanism (.collapse-glide), present even while collapsed', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
+  expect(container.querySelector('.collapse-glide')).toBeInTheDocument();
+});
+
+test('expanding no longer jumps the sheet to a fixed h-[88vh] class', async () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
+  expect(screen.getByText('Attacking')).toBeInTheDocument();
+  expect(sheetEl(container).className).not.toMatch(/h-\[88vh\]/);
 });
 
 test('usePlayer isError shows "Player information unavailable."', () => {
@@ -228,9 +285,9 @@ test('usePlayer isError shows "Player information unavailable."', () => {
   expect(screen.getByText('Player information unavailable.')).toBeInTheDocument();
 });
 
-test('changing playerId resets expanded back to the peek', async () => {
+test('changing playerId resets expanded (and everExpanded) back to the peek — a new player\'s sheet has no Splits mounted at all, not just clipped', async () => {
   usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
-  const { rerender } = render(
+  const { rerender, container } = render(
     <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
   );
   await userEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
@@ -239,7 +296,13 @@ test('changing playerId resets expanded back to the peek', async () => {
   const otherBio = { ...outfieldBio, id: '999', name: 'Someone Else' };
   usePlayer.mockReturnValue({ bio: otherBio, stats: outfieldStats, isLoading: false, isError: false });
   rerender(<MemoryRouter><PlayerSheet comp={comp} playerId="999" onClose={() => {}} /></MemoryRouter>);
+  // Unlike a same-player collapse (fix round 1, HIGH — which now keeps
+  // Splits mounted-but-clipped), a playerId change resets everExpanded
+  // too, so the old player's Splits are genuinely gone from the DOM, not
+  // just clipped to height 0 — the Collapse for the new player mounts
+  // nothing until it's expanded again.
   expect(screen.queryByText('Attacking')).not.toBeInTheDocument();
+  expect(container.querySelector('.collapse-glide').firstChild).toBeEmptyDOMElement();
   expect(screen.getByRole('button', { name: 'Expand profile' })).toBeInTheDocument();
 });
 

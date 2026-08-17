@@ -56,32 +56,39 @@ export default function CalendarScreen() {
 
   return (
     <main>
-      <p className="font-sans text-[10px] uppercase tracking-[.22em] text-muted">Calendar</p>
-      {club && (
-        <Link to={`/team/${clubCompId}/${teamId}`}
-          className="flex items-center gap-2.5 mt-1 w-fit">
-          <Crest side={club} size={22} />
-          <h1 className="text-[22px]">{club.name}</h1>
-        </Link>
-      )}
-      {!club && <h1 className="text-[27px]">Fixtures</h1>}
-
-      <div className="flex items-baseline justify-between mt-5 mb-4">
-        <button type="button" aria-label="Previous month"
-          onClick={() => pageMonth(-1)}
-          className="font-serif text-[19px] px-2 text-muted">‹</button>
-        <h2 className="text-[19px]">{MONTH_TITLE(ym.year, ym.month)}</h2>
-        <button type="button" aria-label="Next month"
-          onClick={() => pageMonth(1)}
-          className="font-serif text-[19px] px-2 text-muted">›</button>
+      {/* Motion (spec §13.21): header (club link or the plain title), the
+          month nav + grid, and the selected-day fixture list each rise in
+          on mount, one static delay class per slot. */}
+      <div className="rise-in rise-in-1">
+        <p className="font-sans text-[10px] uppercase tracking-[.22em] text-muted">Calendar</p>
+        {club && (
+          <Link to={`/team/${clubCompId}/${teamId}`}
+            className="flex items-center gap-2.5 mt-1 w-fit">
+            <Crest side={club} size={22} />
+            <h1 className="text-[22px]">{club.name}</h1>
+          </Link>
+        )}
+        {!club && <h1 className="text-[27px]">Fixtures</h1>}
       </div>
 
-      <MonthGrid weeks={weeks} monthIndex={ym.month} byDay={byDay}
-        followedIds={followedIds} clubId={teamId ?? null}
-        selectedKey={selectedKey} onSelectDay={setSelectedKey} todayKey={dayKey(now)} />
+      <div className="rise-in rise-in-2">
+        <div className="flex items-baseline justify-between mt-5 mb-4">
+          <button type="button" aria-label="Previous month"
+            onClick={() => pageMonth(-1)}
+            className="font-serif text-[19px] px-2 text-muted">‹</button>
+          <h2 className="text-[19px]">{MONTH_TITLE(ym.year, ym.month)}</h2>
+          <button type="button" aria-label="Next month"
+            onClick={() => pageMonth(1)}
+            className="font-serif text-[19px] px-2 text-muted">›</button>
+        </div>
+
+        <MonthGrid weeks={weeks} monthIndex={ym.month} byDay={byDay}
+          followedIds={followedIds} clubId={teamId ?? null}
+          selectedKey={selectedKey} onSelectDay={setSelectedKey} todayKey={dayKey(now)} />
+      </div>
 
       {selectedDate && (
-        <section className="mt-7">
+        <section className="mt-7 rise-in rise-in-3">
           <p className="font-sans text-[10px] font-semibold uppercase tracking-[.2em] text-accent
                         pb-2 mb-1 border-b border-ink">
             {selectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}

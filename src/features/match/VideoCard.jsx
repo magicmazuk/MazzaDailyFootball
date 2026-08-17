@@ -23,7 +23,11 @@ export default function VideoCard({ videos, exhaustedLine }) {
   }
   const video = videos[index];
   return (
-    <section className="mb-8 relative">
+    // xfade-in: content landing (skeleton -> iframe, spec §13.21). Section
+    // carries no other transform, so it's safe for the crossfade to own
+    // opacity here — it doesn't replay on a dismiss re-render (same DOM
+    // node, same class string; only the src/title swap underneath it).
+    <section className="mb-8 relative xfade-in">
       <SectionLabel muted>Video</SectionLabel>
       <button type="button" aria-label="Dismiss video" onClick={() => setIndex(i => i + 1)}
         className="absolute top-0 right-0 font-sans text-[12px] text-muted leading-none">

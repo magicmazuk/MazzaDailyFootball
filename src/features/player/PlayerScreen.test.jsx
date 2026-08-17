@@ -214,3 +214,14 @@ test('the exported Splits component renders the keeper section standalone', () =
   expect(screen.getByText('Rating')).toBeInTheDocument();
   expect(screen.getByText('6.8')).toBeInTheDocument();
 });
+
+// --- motion (spec §13.21): Splits is the entrance PlayerSheet's expanded
+// region reveals as it mounts (peek -> expanded), so the root it shares
+// with the full page crossfades in rather than hard-cutting into place. ---
+
+test('the Splits root carries the entrance crossfade (.xfade-in)', () => {
+  const { container } = render(
+    <Splits bio={outfieldBio} stats={outfieldStats} comp={{ id: 'sco.1', name: 'Scottish Premiership' }} />,
+  );
+  expect(container.firstChild).toHaveClass('xfade-in');
+});

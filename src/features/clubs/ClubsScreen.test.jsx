@@ -51,3 +51,16 @@ test('search result name links to the team page', async () => {
   const link = await screen.findByRole('link', { name: /Falkirk/ });
   expect(link).toHaveAttribute('href', '/team/sco.1/254');
 });
+
+// --- motion (spec §13.21): the page's three sections — Following, Find a
+// club, Competitions shown — rise in on mount, one static delay class each. ---
+
+test('the three sections carry staggered .rise-in classes in DOM order', () => {
+  render(<MemoryRouter><ClubsScreen /></MemoryRouter>);
+  const following = screen.getByText('★ Following').closest('section');
+  const findAClub = screen.getByText('Find a club').closest('section');
+  const compsShown = screen.getByText('Competitions shown').closest('section');
+  expect(following).toHaveClass('rise-in', 'rise-in-1');
+  expect(findAClub).toHaveClass('rise-in', 'rise-in-2');
+  expect(compsShown).toHaveClass('rise-in', 'rise-in-3');
+});

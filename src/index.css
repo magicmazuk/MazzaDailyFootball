@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The house ease (spec §13.21): one bezier for every intentional motion in
+   the app — no bounce, no scale, no spring, a broadsheet page settles, it
+   doesn't jiggle. Defined outside the reduced-motion media query below
+   because components reference the variable either way; it's simply unused
+   by anything when the query's classes are no-ops. */
+:root {
+  --ease-house: cubic-bezier(0.3, 0.9, 0.3, 1);
+}
+
 body {
   @apply bg-paper text-ink font-serif antialiased;
 }
@@ -116,4 +125,59 @@ body {
 @keyframes draw-side-land {
   0% { transform: translateY(-10px) scale(.85); opacity: 0; }
   100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* The motion system (spec §13.21, task 1 of the elegance branch): the ONE
+   entrance/loading/glide language every later screen adopts. Everything
+   below lives inside a single prefers-reduced-motion:no-preference guard —
+   zero per-component logic — so a reduced-motion user gets every final
+   state instantly: outside this query none of these classes declare any
+   animation/transition at all, so they're no-ops (the draw ceremony above
+   is deliberately untouched — it's §8 performance, not chrome, and keeps
+   its own choreography regardless of this preference). */
+@media (prefers-reduced-motion: no-preference) {
+  /* The rise: a section's one-time mount entrance. Animates on MOUNT only —
+     callers must key/gate this so a refetch re-render never replays it;
+     that discipline lives at the call site, not in this class. Stagger
+     helpers add 40ms of delay per step, capped at rise-in-5 (200ms). */
+  .rise-in {
+    animation: rise-in 240ms var(--ease-house) both;
+  }
+  @keyframes rise-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .rise-in-1 { animation-delay: 40ms; }
+  .rise-in-2 { animation-delay: 80ms; }
+  .rise-in-3 { animation-delay: 120ms; }
+  .rise-in-4 { animation-delay: 160ms; }
+  .rise-in-5 { animation-delay: 200ms; }
+
+  /* The skeleton: a gentle opacity breathe for drawer-tone placeholder
+     bars/blocks (src/ui/Skeleton.jsx) while a genuine fetch is in flight. */
+  .skeleton-pulse {
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes skeleton-pulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+  }
+
+  /* The crossfade: loaded content replacing a skeleton. */
+  .xfade-in {
+    animation: xfade-in 160ms var(--ease-house) both;
+  }
+  @keyframes xfade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* The glide: src/ui/Collapse.jsx's outer element transitions `height`
+     via this class alone (not an inline transition) precisely so this
+     media query is the single place that can kill it for reduced-motion
+     users — Collapse's own JS still runs (measuring, flipping px<->auto)
+     but with no transition declared, every height change lands instantly. */
+  .collapse-glide {
+    transition: height 280ms var(--ease-house);
+  }
 }

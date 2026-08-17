@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, test, vi } from 'vitest';
@@ -187,7 +187,7 @@ test('FixtureRow: a ft espn row toggles a drawer with scorers and attendance, an
       gameInfo: { attendance: 58876 },
     } },
   });
-  render(
+  const { container } = render(
     <MemoryRouter>
       <FixtureRow fixture={fixture('ft')} followedIds={new Set()} />
     </MemoryRouter>,
@@ -206,9 +206,12 @@ test('FixtureRow: a ft espn row toggles a drawer with scorers and attendance, an
   expect(drawer.textContent).toContain('(pen)');
   expect(drawer.textContent).toContain('Attendance 58,876');
 
-  // tap again closes it
+  // tap again closes it — content stays mounted (clipped to height 0 by
+  // Collapse) rather than unmounting, so the close glide has real content
+  // to shut around instead of an already-empty box (fix round 1, HIGH).
   await user.click(screen.getByRole('button', { expanded: true }));
-  expect(screen.queryByRole('link', { name: 'Full detail →' })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Full detail →' })).toBeInTheDocument();
+  expect(container.querySelector('.collapse-glide').style.height).toBe('0px');
 });
 
 test('FixtureRow: an own goal stays under its event teamId — ESPN already credits the benefiting side', async () => {
@@ -281,17 +284,46 @@ test('FixtureRow: a sched espn row with no head-to-head history says so, and sti
   expect(screen.getByRole('link', { name: 'Full detail →' })).toBeInTheDocument();
 });
 
-test('FixtureRow: the drawer shows a muted loading line while useMatchDetail is pending, with no link yet', async () => {
+test('FixtureRow: the drawer shows skeleton lines (aria-hidden) while useMatchDetail is pending, not the old fetching text, with no link yet', async () => {
   const user = userEvent.setup();
   useMatchDetail.mockReturnValue({ isLoading: true, isError: false, data: undefined });
-  render(
+  const { container } = render(
     <MemoryRouter>
       <FixtureRow fixture={fixture('ft')} followedIds={new Set()} />
     </MemoryRouter>,
   );
   await user.click(screen.getByRole('button', { expanded: false }));
-  expect(screen.getByText('Fetching the detail…')).toBeInTheDocument();
+  expect(screen.queryByText('Fetching the detail…')).not.toBeInTheDocument();
+  const skeleton = container.querySelectorAll('.skeleton-pulse');
+  expect(skeleton).toHaveLength(3);
+  skeleton.forEach(bar => expect(bar.closest('[aria-hidden="true"]')).toBeTruthy());
   expect(screen.queryByRole('link')).not.toBeInTheDocument();
+});
+
+// --- the Collapse wrapper (spec §13.21): the drawer's open/close is now
+// driven by Collapse's measured-height glide, not a plain mount/unmount —
+// this is the reported defect's fix ("content loading and then jutting
+// into place"). Collapse's own open/close/lazy-mount contract is tested
+// directly in Collapse.test.jsx; these only check FixtureRow wires it in
+// (the drawer content lives inside the collapse-glide element) and that
+// content landing crossfades in rather than hard-cutting. ---
+
+test('FixtureRow: the open drawer sits inside a Collapse (collapse-glide), and landed content crossfades in (.xfade-in)', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { headToHead: { meetings: [] } } },
+  });
+  const { container } = render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('scheduled')} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  const collapse = container.querySelector('.collapse-glide');
+  expect(collapse).toBeInTheDocument();
+  expect(within(collapse).getByText('No recent meetings.')).toBeInTheDocument();
+  expect(collapse.querySelector('.xfade-in')).toBeInTheDocument();
 });
 
 test('FixtureRow: the drawer shows a muted "unavailable" line on a failed fetch, with no link', async () => {

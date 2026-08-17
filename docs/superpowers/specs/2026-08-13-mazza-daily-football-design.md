@@ -755,3 +755,27 @@ if they are a good team" — and find nothing. Fix, verified against the live fe
    is searched until tapped (zero quota when unused); on tap, a search for recent highlights of
    the club plays inline with the match-room VideoCard's dismiss-to-next behaviour. Foreign
    (discovered-league) clubs only — you don't need a scouting film for Celtic.
+
+## 13.21 The elegance (v1.3) — the motion system
+
+User brief: the minimal look reads as a high-class product; the next tier of premium is HOW
+things arrive. Observed defect: accordions open by loading first, then "jutting into place".
+Everything that appears on screen now arrives through ONE motion language:
+
+- **The house ease**: cubic-bezier(0.3, 0.9, 0.3, 1) (already the sheet's), everywhere. No
+  bounce, no scale, no spring — a broadsheet page settles, it doesn't jiggle.
+- **The rise**: elements enter with opacity 0→1 + translateY(6px)→0, 240ms. Screen sections
+  stagger 40ms apart (cap 5). Animates on MOUNT only — a refetch re-render must never replay it.
+- **The glide (accordions)**: a drawer opens IMMEDIATELY at tap — skeleton inside if data isn't
+  there yet — and its height animates smoothly (measured, ResizeObserver-driven) both on open/
+  close AND when arriving content changes the height. No jutting, ever.
+- **The skeleton**: hairline-tone (#E5DFD3) placeholder bars — visibly darker than both the paper and the drawer surfaces they sit on in the shape of the coming content
+  (2-3 hairline-height lines), gently pulsing opacity 0.55↔1, 1.6s. Replaced by a 160ms
+  crossfade when content lands. Skeletons appear ONLY during genuine fetches — cached content
+  renders instantly with no placeholder flash.
+- **The sheet**: opens with the existing slide; peek↔expanded now animates measured heights
+  (retiring the v1.0 parked finding that h-auto→88vh never interpolated); its content follows
+  the same skeleton/crossfade rules.
+- **Reduced motion**: every rule above collapses to instant state changes under
+  prefers-reduced-motion — one global CSS guard, not per-component opt-ins.
+- The draw ceremony's own choreography (§8.3-8.5) is UNTOUCHED — it is performance, not chrome.

@@ -129,8 +129,13 @@ export default function CompetitionScreen() {
           </button>
         ))}
       </div>
+      {/* Motion (spec §13.21): whichever tab is active is the page's one
+          content block — a fresh mount every time the reader switches tabs
+          (this component instance never remounts on that switch), so it
+          rises in the same static rise-in-1 slot regardless of which tab
+          that happens to be, rather than each tab claiming its own number. */}
       {active === 'Overview' && (
-        <>
+        <div className="rise-in rise-in-1">
           {comp.blurb && (
             <p className="font-serif text-[15.5px] leading-relaxed max-w-[60ch] pb-5 mb-6 border-b border-rule">
               {comp.blurb}
@@ -145,17 +150,25 @@ export default function CompetitionScreen() {
               Replay the {replayRound.label} draw
             </Link>
           )}
-        </>
+        </div>
       )}
-      {active === 'Table' && (table.data
-        ? <LeagueTable comp={comp} rows={table.data.rows}
-            followedIds={followedIds} formByTeam={formByTeam} />
-        : <p className="text-muted">{table.isError ? 'Table unavailable.' : 'Loading table…'}</p>)}
+      {active === 'Table' && (
+        <div className="rise-in rise-in-1">
+          {table.data
+            ? <LeagueTable comp={comp} rows={table.data.rows}
+                followedIds={followedIds} formByTeam={formByTeam} />
+            : <p className="text-muted">{table.isError ? 'Table unavailable.' : 'Loading table…'}</p>}
+        </div>
+      )}
       {active === 'Fixtures' && (
-        <GroupedFixtures fixtures={upcoming} reverse={false} followedIds={followedIds} />
+        <div className="rise-in rise-in-1">
+          <GroupedFixtures fixtures={upcoming} reverse={false} followedIds={followedIds} />
+        </div>
       )}
       {active === 'Results' && (
-        <GroupedFixtures fixtures={results} reverse followedIds={followedIds} />
+        <div className="rise-in rise-in-1">
+          <GroupedFixtures fixtures={results} reverse followedIds={followedIds} />
+        </div>
       )}
     </main>
   );

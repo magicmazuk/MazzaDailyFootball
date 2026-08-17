@@ -3,7 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { byId } from '../domain/competitions.js';
 import { prettifyRound } from '../domain/round.js';
 import { useMatchDetail } from '../data/queries.js';
+import Collapse from './Collapse.jsx';
 import Crest from './Crest.jsx';
+import { SkeletonLines } from './Skeleton.jsx';
 import StatusWord from './StatusWord.jsx';
 import TvBadge from './TvBadge.jsx';
 
@@ -193,19 +195,25 @@ function UpcomingDrawer({ detail, fixture, comp }) {
 // page as a tapped table row. Mounted only while its row is open, so the
 // summary fetch behind useMatchDetail never fires until the first tap.
 function FixtureDrawer({ comp, fixture }) {
+  // isLoading (never isFetching): React Query v5 defines isLoading as
+  // isPending && isFetching — true only while there's no cached data yet.
+  // What actually keeps a re-opened drawer skeleton-free is cache
+  // PRESENCE, not staleTime: isPending flips false the instant this query
+  // has ever resolved, so a stale-but-cached reopen still refetches in the
+  // background (isFetching true) but isLoading stays false throughout.
   const { data, isLoading, isError } = useMatchDetail(comp, fixture.id, false);
   return (
     <div className="bg-drawer -mx-5 px-5 py-4">
-      {isLoading && (
-        <p className="font-sans text-[11px] text-muted">Fetching the detail…</p>
-      )}
+      {isLoading && <SkeletonLines lines={3} />}
       {!isLoading && isError && (
         <p className="font-sans text-[11px] text-muted">Match detail unavailable.</p>
       )}
       {!isLoading && !isError && (
-        fixture.status === 'ft'
-          ? <ResultDrawer detail={data?.detail ?? {}} fixture={fixture} comp={comp} />
-          : <UpcomingDrawer detail={data?.detail ?? {}} fixture={fixture} comp={comp} />
+        <div className="xfade-in">
+          {fixture.status === 'ft'
+            ? <ResultDrawer detail={data?.detail ?? {}} fixture={fixture} comp={comp} />
+            : <UpcomingDrawer detail={data?.detail ?? {}} fixture={fixture} comp={comp} />}
+        </div>
       )}
     </div>
   );
@@ -213,6 +221,16 @@ function FixtureDrawer({ comp, fixture }) {
 
 export default function FixtureRow({ fixture, followedIds = new Set(), showContext = true }) {
   const [open, setOpen] = useState(false);
+  // Lazy-ONCE mounting (fix round 1, HIGH): nothing mounts before the
+  // first tap (useMatchDetail still never fires before then), but once
+  // opened, FixtureDrawer STAYS mounted so a later close glides shut
+  // around real content instead of an already-empty box — the
+  // `open && <FixtureDrawer/>` gate used to unmount it in the SAME commit
+  // that flipped `open` false, and Collapse's close choreography (a layout
+  // effect, which runs AFTER that DOM mutation) pinned and glided an empty
+  // div. useMatchDetail is cached/idle once mounted, so staying mounted
+  // after close costs nothing extra.
+  const [everOpened, setEverOpened] = useState(false);
   const dim = fixture.status === 'postponed' || fixture.status === 'canceled';
   // ESPN reports score:"0" before kickoff — never render a score for a
   // fixture that hasn't started or finished, or every scheduled match
@@ -243,11 +261,14 @@ export default function FixtureRow({ fixture, followedIds = new Set(), showConte
 
   return (
     <div>
-      <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)}
+      <button type="button" aria-expanded={open}
+        onClick={() => { setOpen(o => !o); setEverOpened(true); }}
         className="w-full text-left block py-3 border-b border-rule/70">
         {body}
       </button>
-      {open && <FixtureDrawer comp={comp} fixture={fixture} />}
+      <Collapse open={open}>
+        {everOpened && <FixtureDrawer comp={comp} fixture={fixture} />}
+      </Collapse>
     </div>
   );
 }

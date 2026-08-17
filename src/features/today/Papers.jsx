@@ -5,7 +5,9 @@
 import { useState } from 'react';
 import { useNews } from '../../data/queries.js';
 import { timeAgo } from '../../data/news.js';
+import Collapse from '../../ui/Collapse.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
+import { SkeletonLines } from '../../ui/Skeleton.jsx';
 
 // 2-line standfirst clamp — no Tailwind line-clamp plugin installed here,
 // so this is the same plain CSS box-clamp technique FieldBoard uses.
@@ -62,6 +64,17 @@ function CompactRow({ item }) {
 
 function Block({ label, feed }) {
   const [revealed, setRevealed] = useState(false);
+  // Lazy-ONCE mounting (fix round 1, HIGH): the revealed rows stay mounted
+  // once shown, even after "− fewer" closes them, so the Collapse glides
+  // shut around real content — see FixtureRow's fuller comment on the
+  // same fix.
+  const [everRevealed, setEverRevealed] = useState(false);
+  // isLoading (never isFetching): React Query v5 defines isLoading as
+  // isPending && isFetching — true only while there's no cached data yet.
+  // What actually keeps a re-visit skeleton-free is cache PRESENCE, not
+  // staleTime: isPending flips false the instant this query has ever
+  // resolved, so a stale-but-cached re-visit still refetches in the
+  // background (isFetching true) but isLoading stays false throughout.
   const { data, isLoading } = useNews(feed);
   const items = data?.items ?? [];
   const [top, ...rest] = items;
@@ -72,26 +85,29 @@ function Block({ label, feed }) {
   return (
     <div>
       <p className="font-sans text-[9px] uppercase tracking-[.14em] text-muted mb-3">{label}</p>
-      {isLoading && <p className="text-muted">Fetching the papers…</p>}
+      {isLoading && <SkeletonLines lines={2} widths={['92%', '55%']} />}
       {!isLoading && !top && <p className="text-muted">The papers haven&apos;t arrived.</p>}
       {!isLoading && top && (
-        <>
+        <div className="xfade-in">
           <TopStory item={top} />
           {rest.length > 0 && (
             <div className="mt-4">
-              <button type="button" onClick={() => setRevealed(r => !r)}
+              <button type="button"
+                onClick={() => { setRevealed(r => !r); setEverRevealed(true); }}
                 aria-expanded={revealed} aria-controls={moreId}
                 className="font-sans text-[10px] uppercase tracking-[.16em] text-accent">
                 {revealed ? '− fewer' : `+ ${rest.length} more`}
               </button>
-              {revealed && (
-                <div id={moreId} className="mt-3 divide-y divide-rule/60">
-                  {rest.map(item => <CompactRow key={item.id} item={item} />)}
-                </div>
-              )}
+              <Collapse open={revealed}>
+                {everRevealed && (
+                  <div id={moreId} className="mt-3 divide-y divide-rule/60">
+                    {rest.map(item => <CompactRow key={item.id} item={item} />)}
+                  </div>
+                )}
+              </Collapse>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
