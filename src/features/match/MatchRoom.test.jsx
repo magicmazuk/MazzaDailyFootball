@@ -12,7 +12,7 @@ vi.mock('../../data/queries.js', () => ({
   usePlayer: vi.fn(() => ({ bio: null, stats: null, isLoading: false, isError: false })),
 }));
 
-import MatchRoom from './MatchRoom.jsx';
+import MatchRoom, { statSplit } from './MatchRoom.jsx';
 import { byId } from '../../domain/competitions.js';
 import { usePlayer } from '../../data/queries.js';
 
@@ -718,4 +718,259 @@ test('a genuine published 0-0 renders the bare axis with no dots — the axis IS
   </MemoryRouter>);
   expect(container.querySelector('[data-testid="match-axis"]')).toBeInTheDocument();
   expect(container.querySelectorAll('[data-testid="goal-dot"]')).toHaveLength(0);
+});
+
+// --- the split rule (S-A, spec §13.24) — the stat rows' hairlines carry the
+// two clubs' proportional shares, meeting at a 1px ink tick; the possession
+// bar joins the same family. 0-0 keeps today's plain rule: no story, no split.
+test('statSplit: home share of the combined count, from ESPN string values', () => {
+  expect(statSplit('15', '6')).toBeCloseTo(71.43, 1);
+  expect(statSplit('12', '14')).toBeCloseTo(46.15, 1);
+});
+
+test('statSplit: 0-0 yields null — the row keeps its plain rule', () => {
+  expect(statSplit('0', '0')).toBeNull();
+});
+
+test('statSplit: a shutout pins the split to the edge — 1-0 is 100, 0-3 is 0', () => {
+  expect(statSplit('1', '0')).toBe(100);
+  expect(statSplit('0', '3')).toBe(0);
+});
+
+test('statSplit: missing or unparseable values yield null, not NaN', () => {
+  expect(statSplit(undefined, '3')).toBeNull();
+  expect(statSplit('abc', '3')).toBeNull();
+});
+
+const splitDetail = {
+  ...detail,
+  teamStats: [
+    { teamId: 'Celtic', name: 'Celtic', stats: { possessionPct: '54', totalShots: '15', redCards: '0', saves: '1' } },
+    { teamId: 'Rangers', name: 'Rangers', stats: { possessionPct: '46', totalShots: '6', redCards: '0', saves: '0' } },
+  ],
+};
+const colourFixture = {
+  ...fixture,
+  home: { ...fixture.home, colour: '009933' },
+  away: { ...fixture.away, colour: '1B458F' },
+};
+
+test('every scoring stat row and the possession bar carry a split rule with the tick at the home share', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={colourFixture} comp={byId('sco.1')} detail={splitDetail} />
+  </MemoryRouter>);
+  // possession (54), shots (71.43), saves (100) — red cards 0-0 gets none.
+  const ticks = screen.getAllByTestId('split-tick');
+  expect(ticks).toHaveLength(3);
+  expect(ticks.map(t => parseFloat(t.style.left))).toEqual([
+    expect.closeTo(54, 1), expect.closeTo(71.43, 1), expect.closeTo(100, 1),
+  ]);
+  // Boundaries ease to 60% ink (SOFT-75 round) — never full black, never gone.
+  ticks.forEach(t => expect(t.className).toContain('bg-ink/60'));
+});
+
+test('a 0-0 stat row keeps the plain hairline and gains no split rule', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={colourFixture} comp={byId('sco.1')} detail={splitDetail} />
+  </MemoryRouter>);
+  const row = screen.getByText('Red cards').closest('div').parentElement;
+  expect(row.querySelector('[data-testid="split-rule"]')).toBeNull();
+  expect(row.className).toContain('border-b');
+});
+
+test('split segments paint the club colours inline', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={colourFixture} comp={byId('sco.1')} detail={splitDetail} />
+  </MemoryRouter>);
+  const home = screen.getAllByTestId('split-home')[0];
+  const away = screen.getAllByTestId('split-away')[0];
+  // The 75% press tone (spec §13.24, SOFT-75): colour sits IN the paper.
+  expect(home.style.background).toMatch(/0\.75/);
+  expect(away.style.background).toMatch(/0\.75/);
+  expect(home.className).not.toContain('bg-muted');
+});
+
+test('a side with no feed colour falls back to the muted tone, same as the goal dots', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={splitDetail} />
+  </MemoryRouter>);
+  expect(screen.getAllByTestId('split-home')[0].className).toContain('bg-muted');
+  expect(screen.getAllByTestId('split-away')[0].className).toContain('bg-muted');
+});
+
+// --- the lineups take the field (spec §13.25, L-B): side-by-side XIs —
+// home ALWAYS the left column regardless of feed order — behind the
+// centre-circle-and-half-way-line mark. All eleven render by default
+// (never an accordion); names keep to one line, truncating with an
+// ellipsis rather than wrapping — the tap is how you reach the full
+// player, so tappability is part of the contract.
+const XI = (prefix, n = 11) => Array.from({ length: n }, (_, i) => ({
+  id: `${prefix}${i + 1}`, name: `${prefix} Player ${i + 1}`, shirt: String(i + 1),
+  starter: true, position: 'MF',
+}));
+
+test('lineup columns sit side by side with home on the left, even when the feed sends away first', () => {
+  const lineupDetail = { ...detail, lineups: [
+    { homeAway: 'away', players: XI('Away') },
+    { homeAway: 'home', players: XI('Home') },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={lineupDetail} />
+  </MemoryRouter>);
+  const home = screen.getByTestId('lineup-col-home');
+  const away = screen.getByTestId('lineup-col-away');
+  expect(home.parentElement).toBe(away.parentElement);
+  expect(home.parentElement.className).toContain('grid-cols-2');
+  expect(home.compareDocumentPosition(away) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(home.textContent).toContain('Home Player 1');
+  expect(away.textContent).toContain('Away Player 11');
+});
+
+test('all eleven starters render per side — substitutes stay out, nothing collapses', () => {
+  const lineupDetail = { ...detail, lineups: [
+    { homeAway: 'home', players: [...XI('Home'), { id: 'sub1', name: 'A Substitute', shirt: '20', starter: false, position: 'FW' }] },
+    { homeAway: 'away', players: XI('Away') },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={lineupDetail} />
+  </MemoryRouter>);
+  expect(screen.getByTestId('lineup-col-home').querySelectorAll('svg').length).toBe(11);
+  expect(screen.getByTestId('lineup-col-away').querySelectorAll('svg').length).toBe(11);
+  expect(screen.queryByText('A Substitute')).not.toBeInTheDocument();
+});
+
+test('lineup names keep to one truncating line and stay tappable', () => {
+  const lineupDetail = { ...detail, lineups: [
+    { homeAway: 'home', players: [{ id: 'p9', name: 'Michael Schjonning-Larsen', shirt: '8', starter: true, position: 'MF' }] },
+    { homeAway: 'away', players: [] },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={lineupDetail} />
+  </MemoryRouter>);
+  const tap = screen.getByRole('button', { name: 'Michael Schjonning-Larsen' });
+  expect(tap.className).toContain('truncate');
+});
+
+test('the pitch mark draws behind the columns — decorative, never interactive', () => {
+  const lineupDetail = { ...detail, lineups: [
+    { homeAway: 'home', players: XI('Home') },
+    { homeAway: 'away', players: XI('Away') },
+  ] };
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={lineupDetail} />
+  </MemoryRouter>);
+  const pitch = container.querySelector('[data-testid="lineup-pitch"]');
+  expect(pitch).toBeInTheDocument();
+  expect(pitch.getAttribute('aria-hidden')).toBe('true');
+  expect(pitch.className).toContain('pointer-events-none');
+  expect(pitch.querySelector('circle')).toBeTruthy();
+});
+
+test('no lineups means no pitch — the mark never draws over an empty section', () => {
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={{ ...detail, lineups: [] }} />
+  </MemoryRouter>);
+  expect(container.querySelector('[data-testid="lineup-pitch"]')).toBeNull();
+});
+
+// --- review round (spec §13.24-25 hardening): the degraded-case law applies
+// to the new graphics too — no split, bar, or column may ever assert data
+// the feed did not publish.
+test('statSplit: empty-string values are unknown, not zero', () => {
+  expect(statSplit('', '3')).toBeNull();
+  expect(statSplit('5', '')).toBeNull();
+});
+
+test('an unparseable or both-zero possession renders no bar — never a fabricated 100% side', () => {
+  const weird = { ...detail, teamStats: [
+    { teamId: 'Celtic', name: 'Celtic', stats: { possessionPct: '58%', totalShots: '14' } },
+    { teamId: 'Rangers', name: 'Rangers', stats: { possessionPct: '', totalShots: '9' } },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={weird} />
+  </MemoryRouter>);
+  expect(screen.queryByText('Possession')).not.toBeInTheDocument();
+});
+
+test('a missing away possession renders no bar — no invented remainder share', () => {
+  const halfPoss = { ...detail, teamStats: [
+    { teamId: 'Celtic', name: 'Celtic', stats: { possessionPct: '54', totalShots: '14' } },
+    { teamId: 'Rangers', name: 'Rangers', stats: { totalShots: '9' } },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={halfPoss} />
+  </MemoryRouter>);
+  expect(screen.queryByText('Possession')).not.toBeInTheDocument();
+});
+
+test('an away-only lineup feed never renders the away XI under the home club', () => {
+  const awayOnly = { ...detail, lineups: [
+    { homeAway: 'away', players: XI('Away') },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={awayOnly} />
+  </MemoryRouter>);
+  const home = screen.getByTestId('lineup-col-home');
+  expect(home.textContent).not.toContain('Away Player');
+  // The degraded-case law: the unpublished side says so in one line, never blank.
+  expect(home.textContent).toContain('XI not yet published.');
+  expect(screen.getByTestId('lineup-col-away').textContent).toContain('Away Player 1');
+});
+
+test('lineup entries with no homeAway attribution render nothing rather than a guessed column', () => {
+  const unattributed = { ...detail, lineups: [
+    { homeAway: null, players: XI('Mystery') },
+  ] };
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={unattributed} />
+  </MemoryRouter>);
+  expect(screen.queryByText(/Mystery Player/)).not.toBeInTheDocument();
+  expect(container.querySelector('[data-testid="lineup-pitch"]')).toBeNull();
+});
+
+test('the pitch mark takes the rule token via currentColor, never a frozen hex', () => {
+  const lineupDetail = { ...detail, lineups: [
+    { homeAway: 'home', players: XI('Home') },
+    { homeAway: 'away', players: XI('Away') },
+  ] };
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={lineupDetail} />
+  </MemoryRouter>);
+  const pitch = container.querySelector('[data-testid="lineup-pitch"]');
+  expect(pitch.querySelector('svg').getAttribute('class')).toContain('text-rule');
+  expect(pitch.querySelector('circle').getAttribute('stroke')).toBe('currentColor');
+});
+
+test('a malformed feed colour falls back to muted rather than painting an invalid fill', () => {
+  const shortHex = { ...fixture,
+    home: { ...fixture.home, colour: 'fff' }, away: { ...fixture.away, colour: '1B458F' } };
+  render(<MemoryRouter>
+    <MatchRoom fixture={shortHex} comp={byId('sco.1')} detail={splitDetail} />
+  </MemoryRouter>);
+  const home = screen.getAllByTestId('split-home')[0];
+  expect(home.className).toContain('bg-muted');
+  expect(home.style.background).toBe('');
+});
+
+test('a starters-free roster (subs only, pre-announcement) renders no lineups section at all', () => {
+  const subsOnly = { ...detail, lineups: [
+    { homeAway: 'home', players: [{ id: 's1', name: 'A Sub', shirt: '20', starter: false, position: 'FW' }] },
+    { homeAway: 'away', players: [] },
+  ] };
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={subsOnly} />
+  </MemoryRouter>);
+  expect(container.querySelector('[data-testid="lineup-pitch"]')).toBeNull();
+  expect(screen.queryByTestId('lineup-col-home')).not.toBeInTheDocument();
+});
+
+test('team stats whose ids match neither side render no stats — colours must never mis-attribute', () => {
+  const driftedIds = { ...detail, teamStats: [
+    { teamId: 'someone-else', name: 'X', stats: { possessionPct: '60', totalShots: '9' } },
+    { teamId: 'another', name: 'Y', stats: { possessionPct: '40', totalShots: '4' } },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={driftedIds} />
+  </MemoryRouter>);
+  expect(screen.queryByText('Stats')).not.toBeInTheDocument();
 });

@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Crest from '../../ui/Crest.jsx';
-import FixtureRow, { MatchLine, timelinePoints } from '../../ui/FixtureRow.jsx';
+import FixtureRow, { MatchLine, pressFill, timelinePoints } from '../../ui/FixtureRow.jsx';
 import FormGlyphs from '../../ui/FormGlyphs.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
 import Shirt from '../../ui/Shirt.jsx';
@@ -249,39 +249,93 @@ function Timeline({ events, fixture, comp, onOpenPlayer }) {
   );
 }
 
+// The home side's share of a two-club count as a percentage (spec §13.24,
+// the split rule) — exported for direct unit-testing. ESPN team stats
+// arrive as strings; a both-zero or unparseable pair yields null so the
+// row keeps its plain hairline (no story, no split) instead of painting
+// a meaningless 50/50.
+export function statSplit(homeVal, awayVal) {
+  // Number('') is 0 — an empty displayValue must read as UNKNOWN, not as a
+  // measured zero, or a blank home cell would paint a confident 100%-away
+  // split (review round). Junk like '54%' parses NaN and falls out below.
+  const num = v => (String(v ?? '').trim() === '' ? NaN : Number(v));
+  const h = num(homeVal);
+  const a = num(awayVal);
+  if (!Number.isFinite(h) || !Number.isFinite(a) || h + a === 0) return null;
+  return (h / (h + a)) * 100;
+}
+
+// The split rule (spec §13.24, S-A "the tinted rule"): the row's hairline
+// carrying both clubs' shares — home colour from the left, away from the
+// right, meeting at a 1px ink tick (the match line's tick, at hairline
+// scale). Sides without a feed colour fall back to muted, the goal dots'
+// own rule. The tick is the ink-boundary idiom where the Shirt.jsx outline
+// physically cannot fit: a white-kitted share (Fulham-class ffffff) reads
+// as the bounded blank between tick and coloured edge, never as nothing.
+// tall = the possession bar's 3px weight on an 8px strip.
+function SplitRule({ pct, fixture, tall }) {
+  // overflow-hidden keeps the edge ticks (0% and shutout 100%) inside the
+  // strip; bg-rule under the segments restores the old possession bar's
+  // neutral track, so a pale-vs-pale pairing (two white-kitted clubs) still
+  // reads as a bar rather than vanishing into the paper (review round).
+  return (
+    <div data-testid="split-rule" className={`relative overflow-hidden ${tall ? 'h-[8px]' : 'h-[6px]'}`}>
+      <div className={`absolute inset-x-0 flex bg-rule ${tall ? 'top-[2.5px] h-[3px]' : 'top-[2px] h-[2px]'}`}>
+        <div data-testid="split-home" className={`h-full ${pressFill(fixture.home).className}`}
+          style={{ width: `${pct}%`, ...pressFill(fixture.home).style }} />
+        <div data-testid="split-away" className={`h-full flex-1 ${pressFill(fixture.away).className}`}
+          style={pressFill(fixture.away).style} />
+      </div>
+      <span data-testid="split-tick" style={{ left: `${pct}%` }}
+        className="absolute inset-y-0 w-px bg-ink/60 -translate-x-1/2" />
+    </div>
+  );
+}
+
 function Stats({ teamStats, fixture }) {
   if (!teamStats) return null;
-  const h = teamStats.find(t => t.teamId === fixture.home.teamId) ?? teamStats[0];
-  const a = teamStats.find(t => t.teamId === fixture.away.teamId) ?? teamStats[1];
+  // Strict id match only (review round): the old positional [0]/[1] fallback
+  // was survivable when the bars were neutral ink, but the split rules paint
+  // CLUB COLOURS — a mis-ordered fallback would tint the away team's share
+  // in the home club's colour. No match, no section; never a misattribution.
+  const h = teamStats.find(t => t.teamId === fixture.home.teamId);
+  const a = teamStats.find(t => t.teamId === fixture.away.teamId);
   if (!h || !a || h === a) return null;
   const keys = Object.keys(STAT_LABELS).filter(k => h.stats[k] != null && a.stats[k] != null);
   if (!keys.length) return null;
-  const hp = Number(h.stats.possessionPct ?? 50);
+  // Possession rides the SAME guard as every stat row: a both-zero, blank
+  // or unparseable pair renders no bar at all rather than a fabricated
+  // share for a side that reported nothing (review round).
+  const possession = statSplit(h.stats.possessionPct, a.stats.possessionPct);
   return (
     <section className="mb-8 rise-in rise-in-4">
       <SectionLabel muted>Stats</SectionLabel>
-      {h.stats.possessionPct != null && (
+      {possession != null && (
         <div className="mb-5">
           <div className="flex justify-between font-sans text-[11px] mb-1.5">
             <span className="tabular-nums">{h.stats.possessionPct}%</span>
             <span className="text-muted uppercase text-[9px] tracking-[.14em] pt-0.5">Possession</span>
             <span className="tabular-nums">{a.stats.possessionPct}%</span>
           </div>
-          <div className="h-[3px] bg-rule rounded-sm overflow-hidden">
-            <i className="block h-full bg-ink" style={{ width: `${hp}%` }} />
-          </div>
+          <SplitRule pct={possession} fixture={fixture} tall />
         </div>
       )}
-      {keys.filter(k => k !== 'possessionPct').map(k => (
-        <div key={k} className="flex justify-between py-2 border-b border-rule/60
-                                font-sans text-[12px]">
-          <span className="tabular-nums w-8">{h.stats[k]}</span>
-          <span className="text-muted uppercase text-[9px] tracking-[.14em] pt-0.5">
-            {STAT_LABELS[k]}
-          </span>
-          <span className="tabular-nums w-8 text-right">{a.stats[k]}</span>
-        </div>
-      ))}
+      {keys.filter(k => k !== 'possessionPct').map(k => {
+        const pct = statSplit(h.stats[k], a.stats[k]);
+        return (
+          <div key={k} className={`pt-2 font-sans text-[12px] ${
+            pct == null ? 'border-b border-rule/60' : ''}`}>
+            <div className="flex justify-between pb-2">
+              <span className="tabular-nums w-8">{h.stats[k]}</span>
+              <span className="text-muted uppercase text-[9px] tracking-[.14em] pt-0.5">
+                {STAT_LABELS[k]}
+              </span>
+              <span className="tabular-nums w-8 text-right">{a.stats[k]}</span>
+            </div>
+            {pct != null && <SplitRule pct={pct} fixture={fixture} />}
+          </div>
+        );
+      })}
     </section>
   );
 }
@@ -317,27 +371,76 @@ function Standouts({ standouts, fixture, comp, onOpenPlayer }) {
   );
 }
 
+// One XI, one half (spec §13.25): the club sub-label then every starter —
+// all eleven always, never an accordion — Shirt beside a single-line name
+// that truncates with an ellipsis rather than wrapping. The tap is how a
+// clipped name reaches its full player, so PlayerTap stays on every name.
+function LineupColumn({ side, players, comp, onOpenPlayer, testId }) {
+  return (
+    <div data-testid={testId} className="min-w-0">
+      <p className="font-sans text-[10px] uppercase tracking-[.14em] text-muted mb-2 truncate">
+        {side.name}
+      </p>
+      {/* One published XI without the other (normal pre-kick-off state):
+          the empty side says so in one line, never a blank half-section. */}
+      {players.length === 0 && (
+        <p className="font-sans text-[11px] text-muted">XI not yet published.</p>
+      )}
+      {players.map(p => (
+        <div key={p.id ?? p.name} className="flex items-center gap-2.5 py-1.5 min-w-0">
+          <Shirt colour={side.colour ?? null} number={p.shirt} size={20} />
+          <PlayerTap name={p.name} playerId={p.id} comp={comp} onOpen={onOpenPlayer}
+            className="text-[13px] truncate min-w-0 flex-1 text-left" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// The lineups take the field (spec §13.25, L-B "the centre circle alone"):
+// home keeps the left column — found by homeAway, never by feed array
+// order — and the two XIs meet at one drawn mark: the half-way line
+// running the gutter, opening into the centre circle at mid-height. The
+// mark is decoration, not structure: rule tone at 65%, softer than the
+// section's true hairlines, aria-hidden and inert. A circle must never
+// ride a stretched SVG (it would render as an ellipse), so the line is a
+// plain 1px div and the circle a fixed-size svg, centred independently.
 function Lineups({ lineups, fixture, comp, onOpenPlayer }) {
-  if (!lineups?.some(l => l.players.length)) return null;
-  const title = ha => (ha === 'home' ? fixture.home.name : fixture.away.name);
-  const sideColour = ha => (ha === 'home' ? fixture.home.colour : fixture.away.colour) ?? null;
+  // Attribution is by homeAway ONLY (spec §13.25's own law, hardened in the
+  // review round): an entry the feed doesn't identify is never guessed into
+  // a column — a mislabelled XI under the wrong club's name and colours is
+  // worse than no section. The gate counts STARTERS, not roster presence,
+  // so a subs-only pre-announcement roster renders nothing rather than two
+  // labelled empty columns under a floating centre circle.
+  const starters = ha =>
+    (lineups?.find(l => l.homeAway === ha)?.players ?? []).filter(p => p.starter);
+  const homeXI = starters('home');
+  const awayXI = starters('away');
+  if (!homeXI.length && !awayXI.length) return null;
   return (
     <section className="mb-8 rise-in rise-in-5">
       <SectionLabel muted>Lineups</SectionLabel>
-      {lineups.map(l => (
-        <div key={l.homeAway} className="mb-5">
-          <p className="font-sans text-[10px] uppercase tracking-[.14em] text-muted mb-2">
-            {title(l.homeAway)}
-          </p>
-          {l.players.filter(p => p.starter).map(p => (
-            <div key={p.name} className="flex items-center gap-3 py-1.5">
-              <Shirt colour={sideColour(l.homeAway)} number={p.shirt} size={22} />
-              <PlayerTap name={p.name} playerId={p.id} comp={comp} onOpen={onOpenPlayer}
-                className="text-[14px]" />
-            </div>
-          ))}
+      {/* overflow-hidden: a short column set (partial pre-match feed) must
+          clip the 190px circle, never bleed it over neighbouring sections. */}
+      <div className="relative overflow-hidden">
+        <div data-testid="lineup-pitch" aria-hidden="true"
+          className="absolute inset-0 pointer-events-none">
+          <div className="absolute left-1/2 top-0 bottom-0 w-px -translate-x-1/2 bg-rule/65" />
+          {/* currentColor under text-rule keeps the mark on the token — a
+              future rule retune moves the circle with every other hairline. */}
+          <svg className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-rule"
+            width="190" height="190" viewBox="0 0 190 190">
+            <circle cx="95" cy="95" r="93" fill="none" stroke="currentColor" strokeOpacity=".65" />
+            <circle cx="95" cy="95" r="1.5" fill="currentColor" fillOpacity=".65" />
+          </svg>
         </div>
-      ))}
+        <div className="relative grid grid-cols-2 gap-x-4">
+          <LineupColumn testId="lineup-col-home" side={fixture.home} players={homeXI}
+            comp={comp} onOpenPlayer={onOpenPlayer} />
+          <LineupColumn testId="lineup-col-away" side={fixture.away} players={awayXI}
+            comp={comp} onOpenPlayer={onOpenPlayer} />
+        </div>
+      </div>
     </section>
   );
 }

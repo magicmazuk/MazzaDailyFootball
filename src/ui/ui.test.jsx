@@ -269,7 +269,7 @@ test('FixtureRow: the result drawer\'s match line plots a goal dot per side in i
   expect(dots).toHaveLength(2);
   const homeDot = [...dots].find(d => d.dataset.side === 'home');
   const awayDot = [...dots].find(d => d.dataset.side === 'away');
-  expect(homeDot.style.background).toBe('rgb(0, 153, 33)'); // #009921
+  expect(homeDot.style.background).toBe('rgba(0, 153, 33, 0.75)'); // #009921 at the press tone
   expect(homeDot).not.toHaveClass('bg-muted');
   expect(awayDot.style.background).toBe('');
   expect(awayDot).toHaveClass('bg-muted');
@@ -466,9 +466,12 @@ test('FixtureRow: the fixture drawer\'s balance bar segments are proportional an
   // bar carries ink dividers, and a divider against an empty segment
   // would paint a stray line). The caption still tallies the zero.
   expect(awaySeg).toBeNull();
-  expect(homeSeg.style.background).toBe('rgb(0, 153, 33)'); // #009921
+  expect(homeSeg.style.background).toBe('rgba(0, 153, 33, 0.75)'); // #009921 at the press tone
   expect(drawSeg).toHaveClass('bg-rule');
-  expect(homeSeg.parentElement).toHaveClass('border-ink'); // Shirt's outline idiom — pale kits stay visible
+  // Eased to 60% ink in the SOFT-75 round (spec §13.24) — the outline idiom
+  // survives softening; pale kits still read as bounded regions.
+  expect(homeSeg.parentElement).toHaveClass('border-ink/60');
+  expect(homeSeg.parentElement).toHaveClass('divide-ink/60');
   expect(screen.getByText('Celtic 2')).toBeInTheDocument();
   expect(screen.getByText('drawn 1')).toBeInTheDocument();
   expect(screen.getByText('Aberdeen 0')).toBeInTheDocument();
@@ -796,4 +799,25 @@ test('FixtureRow: an extra-time result renders the 120′ tick set — 0′, HT,
   expect(screen.getByText('HT')).toBeInTheDocument();
   expect(screen.getByText('90′')).toBeInTheDocument();
   expect(screen.getByText('120′')).toBeInTheDocument();
+});
+
+// --- the softening (spec §13.24, SOFT-75): club colour prints at 75% with
+// 60%-ink boundaries, across every club-coloured graphic.
+test('goal dots print their club colour at the press tone with an eased outline', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({ isLoading: false, isError: false, data: { detail: { events: [
+    { minute: "23'", type: 'Goal', player: 'A Scorer', teamId: '256', scoringPlay: true },
+  ] } } });
+  const { container } = render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('ft', {
+        home: side({ teamId: '256', name: 'Heart of Midlothian', colour: '009921' }),
+        away: side({ teamId: '267', name: 'Inverness CT', colour: null }),
+      })} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  const dot = container.querySelector('[data-testid="goal-dot"]');
+  expect(dot.style.background).toBe('rgba(0, 153, 33, 0.75)');
+  expect(dot.className).toContain('border-ink/60');
 });

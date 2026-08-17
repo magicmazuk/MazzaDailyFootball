@@ -129,3 +129,12 @@ None block usage; candidates for a future 1.2 pass.
 - Pre-existing nested-<button> DOM warning (standing v1.1.0 item) also fires on the match page
   via Siblings' FixtureRow crest buttons — same root cause, no new defect, logged here only so
   the match room is named in the eventual restructure.
+
+## From the split-rule/lineups wave final review (2026-08-17)
+- Balance bar's press tone verified by exact-value unit tests only — no upcoming fixture with
+  H2H meetings was reachable in the live sweep (siblings on the probed scheduled match were all
+  FT). Eyeball one fixture drawer's balance bar next time one is naturally on screen.
+- Duplicate coloured-fixture constructions in MatchRoom.test.jsx (module-level colourFixture
+  vs inline colouredFixture, different arbitrary colours) — consolidate next time the file opens.
+- White-kit LIVE verification for split rules/dots still owed once the EPL starts (unit-pinned;
+  a real Fulham/Spurs/Leeds match is the eyeball case).
