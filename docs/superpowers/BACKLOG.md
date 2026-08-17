@@ -115,3 +115,8 @@ None block usage; candidates for a future 1.2 pass.
 ## From v1.2.0 final review (2026-08-16)
 - Domestic-shape guard also discards GENUINE rosters ESPN serves under qualifier slugs (Gornik-class, ~22/50 sampled clubs): they now show "Squad details unavailable." (same as pre-wave, honest, not a regression) though a real squad exists under uefa.*_qual. Future: fetch the non-domestic slug for the ROSTER while refusing to name it as a league.
 - Scout-line phrasing is clunky at small N ("Won 1 of their last 1") — consider "Won their only league game so far" style special-casing.
+
+## From v1.4.0 final review (2026-08-17)
+- MatchLine's away-minute-label and tick-label rows share 4px of line-box leading (12px real line box vs 10px planned): a near-tick away goal stacks e.g. "2′" directly above "0′" — legible, no ink collision; give the bands 2px more headroom next time FixtureRow is open.
+- Same-minute goals paint one dot (leading-minute parse, spec-mandated); duplicate club colours flatten the balance bar; venue composition differs between drawers (gameInfo with city vs bare fixture venue) — all accepted design consequences.
+- Windows fork-pool flake can exit 0 while under-running the suite (worker start failures on 2 files) — re-run those files if counts look short.
