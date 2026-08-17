@@ -108,7 +108,10 @@ test('a non-live fixture ignores liveScore even if present, and falls back to fi
   const { container } = render(<MemoryRouter>
     <MatchRoom fixture={ftFixture} comp={byId('sco.1')} detail={liveDetail} />
   </MemoryRouter>);
-  const headerScores = [...container.querySelector('header').querySelectorAll('.tabular-nums')]
+  // Scoped to the score spans (text-[30px]) for the same reason as the live
+  // test above: a plain '.tabular-nums' selector now also matches the match
+  // line's tick labels (spec §13.23), which sit inside the header too.
+  const headerScores = [...container.querySelector('header').querySelectorAll('[class*="text-[30px]"]')]
     .map(el => el.textContent);
   expect(headerScores).toEqual(['2', '1']);
 });
@@ -646,4 +649,73 @@ test('the room\'s sections carry staggered .rise-in classes, capped at rise-in-5
   expect(h2h).toHaveClass('rise-in', 'rise-in-5');
   expect(videoSection.className).not.toMatch(/rise-in/);
   expect(videoSection).toHaveClass('xfade-in');
+});
+
+// --- the match line in the heading (spec §13.23) — the goal-dot axis from
+// the results drawer, reused on the fixture page directly under the match
+// meta. Gated on the heading's own showScore rule (live || ft) AND on
+// detail actually having been published, so a finished-but-undetailed
+// fixture never paints a bare axis that would read as a 0-0.
+const goalDetail = {
+  ...detail,
+  events: [
+    { minute: "23'", type: 'Goal', player: 'Daizen Maeda', teamId: 'Celtic', scoringPlay: true },
+    { minute: "35'", type: 'Goal', player: 'James Tavernier', teamId: 'Rangers', scoringPlay: true },
+    { minute: "78'", type: 'Yellow Card', player: 'Reo Hatate', teamId: 'Celtic' },
+  ],
+  gameInfo: { venue: 'Celtic Park', attendance: 58914, referee: 'W Collum' },
+};
+
+test('the match line renders inside the heading, directly after the match meta', () => {
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={goalDetail} />
+  </MemoryRouter>);
+  const header = container.querySelector('header');
+  const axis = header.querySelector('[data-testid="match-axis"]');
+  expect(axis).toBeInTheDocument();
+  // Ordering, not mere presence: the meta line must precede the axis.
+  const meta = [...header.querySelectorAll('p')].find(p => p.textContent.includes('Celtic Park'));
+  expect(meta).toBeTruthy();
+  expect(meta.compareDocumentPosition(axis) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test('the match line plots one dot per scoring play, crediting each to its own side', () => {
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={goalDetail} />
+  </MemoryRouter>);
+  const dots = container.querySelector('header').querySelectorAll('[data-testid="goal-dot"]');
+  expect(dots).toHaveLength(2);
+  expect([...dots].map(d => d.dataset.side)).toEqual(['home', 'away']);
+});
+
+test('a live match shows the match line too, filling as goals land', () => {
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={goalDetail} />
+  </MemoryRouter>);
+  expect(container.querySelector('[data-testid="match-axis"]')).toBeInTheDocument();
+});
+
+test('a scheduled fixture renders no match line — a bare axis would read as 0-0', () => {
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'scheduled', minute: null }}
+      comp={byId('sco.1')} detail={goalDetail} />
+  </MemoryRouter>);
+  expect(container.querySelector('[data-testid="match-axis"]')).not.toBeInTheDocument();
+});
+
+test('a finished fixture with no published detail renders no match line, not a phantom 0-0', () => {
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, compId: 'scottish-league-one', status: 'ft' }}
+      comp={byId('scottish-league-one')} detail={null} />
+  </MemoryRouter>);
+  expect(container.querySelector('[data-testid="match-axis"]')).not.toBeInTheDocument();
+});
+
+test('a genuine published 0-0 renders the bare axis with no dots — the axis IS the story', () => {
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft', home: side('Celtic', 0), away: side('Rangers', 0) }}
+      comp={byId('sco.1')} detail={{ ...goalDetail, events: [] }} />
+  </MemoryRouter>);
+  expect(container.querySelector('[data-testid="match-axis"]')).toBeInTheDocument();
+  expect(container.querySelectorAll('[data-testid="goal-dot"]')).toHaveLength(0);
 });

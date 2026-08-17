@@ -120,3 +120,12 @@ None block usage; candidates for a future 1.2 pass.
 - MatchLine's away-minute-label and tick-label rows share 4px of line-box leading (12px real line box vs 10px planned): a near-tick away goal stacks e.g. "2′" directly above "0′" — legible, no ink collision; give the bands 2px more headroom next time FixtureRow is open.
 - Same-minute goals paint one dot (leading-minute parse, spec-mandated); duplicate club colours flatten the balance bar; venue composition differs between drawers (gameInfo with city vs bare fixture venue) — all accepted design consequences.
 - Windows fork-pool flake can exit 0 while under-running the suite (worker start failures on 2 files) — re-run those files if counts look short.
+
+## From §13.23 (match line on the fixture page, 2026-08-17)
+- The known v1.4.0 band-leading item above ("2′" stacking above "0′") now surfaces in a SECOND
+  place: the fixture page heading, verified live on Kilmarnock 1-5 Celtic (a 2′ away goal). Same
+  4px leading overlap, still legible, still no ink collision — but the 2px headroom fix now buys
+  two screens instead of one, so it is worth doing next time FixtureRow is open.
+- Pre-existing nested-<button> DOM warning (standing v1.1.0 item) also fires on the match page
+  via Siblings' FixtureRow crest buttons — same root cause, no new defect, logged here only so
+  the match room is named in the eventual restructure.

@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Crest from '../../ui/Crest.jsx';
-import FixtureRow from '../../ui/FixtureRow.jsx';
+import FixtureRow, { MatchLine, timelinePoints } from '../../ui/FixtureRow.jsx';
 import FormGlyphs from '../../ui/FormGlyphs.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
 import Shirt from '../../ui/Shirt.jsx';
@@ -101,7 +101,7 @@ function MetadataLine({ fixture, gameInfo }) {
   );
 }
 
-function ScoreHeader({ fixture, comp, gameInfo }) {
+function ScoreHeader({ fixture, comp, gameInfo, events }) {
   const pens = penaltyResult(fixture);
   // ESPN reports score:"0" before kickoff — a scheduled or postponed fixture
   // shows a dash, the same as a genuinely missing score, never a phantom 0-0.
@@ -130,6 +130,9 @@ function ScoreHeader({ fixture, comp, gameInfo }) {
         </p>
       )}
       <MetadataLine fixture={fixture} gameInfo={gameInfo} />
+      {showScore && Array.isArray(events) && (
+        <MatchLine points={timelinePoints(events, fixture)} fixture={fixture} />
+      )}
     </header>
   );
 }
@@ -395,7 +398,8 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings, fol
         <Link to={`/competition/${comp.id}`}>{comp.name}</Link>{round && ` · ${round}`}
       </p>
       <p className="text-[12px] text-muted mb-5">{fullDate(fixture.kickoff)}</p>
-      <ScoreHeader fixture={headerFixture} comp={comp} gameInfo={detail?.gameInfo} />
+      <ScoreHeader fixture={headerFixture} comp={comp} gameInfo={detail?.gameInfo}
+        events={detail?.events} />
       {comp.hasMatchDetail
         ? (<>
             <FormBlock form={detail?.form} fixture={fixture} />

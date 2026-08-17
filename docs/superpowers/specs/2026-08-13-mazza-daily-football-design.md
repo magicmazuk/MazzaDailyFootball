@@ -801,3 +801,39 @@ fixture's home club's colour left, away right, draws in the rule tone between), 
 "{Home} n · drawn n · {Away} n". Meta line: venue · date · kickoff. No form glyphs, no
 positions (F-B chosen over F-A's extras). Empty meetings keep "No recent meetings." and show
 no bar.
+
+## 13.23 The match line, on the fixture page
+
+User request (2026-08-17): reuse §13.22's goal-dot match line on the full fixture page. The
+user considered the stats section and explicitly preferred it "right after the match meta on
+the heading" — so it lives INSIDE `ScoreHeader`'s `<header>`, immediately after
+`MetadataLine`, above the header's closing space. The graphic is rendered identically to the
+drawer's — no size variant, no second recipe. Club-coloured dots already carry the Shirt.jsx
+ink outline (§13.22, v1.4 M1), which is exactly what lets them survive the move from the
+drawer tone `#F4F0E7` to paper `#FBF9F5`.
+
+`MatchLine` is EXPORTED from `FixtureRow.jsx` rather than extracted to its own module: the
+credit helper `creditedSide` — which carries the own-goal rule that a fix round once inverted —
+is shared by the timeline AND the scorer columns, and splitting it across files invites a
+divergent second copy. `timelinePoints` was already exported.
+
+**Gate** — `showScore && Array.isArray(events)`. `showScore` is the heading's own existing
+live-or-ft predicate (the one deciding score-vs-dash), so no new concept enters the file; the
+array check is what keeps the degraded case honest, because `adaptSummary` always yields an
+`events` array when detail exists and `detail` is null when it does not:
+
+| Case | `events` | Renders |
+|------|----------|---------|
+| Live or FT with goals | `[…]` | axis + dots |
+| FT, genuine 0-0 | `[]` | bare axis — the 0-0 IS the story (§13.22) |
+| FT, source publishes no detail (BBC-merged) | `undefined` | nothing — never a phantom 0-0 |
+| Scheduled / postponed | any | nothing |
+
+The page therefore carries BOTH the graphic axis in its heading and the existing textual
+`Timeline` below it — the glance and the detail. They are different components with different
+names; no collision.
+
+One existing test changed rather than being added to: the FT liveScore test's
+`'.tabular-nums'` header selector now scopes to `[class*="text-[30px]"]`, because the match
+line's tick labels are tabular too. That is the same scoping its sibling live-score test
+already carried for StatusWord's tabular minute — intent preserved, over-matching removed.
