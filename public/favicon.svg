@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- The Fitba' Times goalmouth mark (spec 13.27) on its own paper tile,
+       so the mark holds on light and dark tab strips alike. -->
+  <rect width="128" height="128" rx="24" fill="#FBF9F5"/>
+  <g transform="translate(4 22)">
+    <g stroke="#E5DFD3" stroke-width="3">
+      <line x1="36" y1="14" x2="36" y2="74"/><line x1="61" y1="14" x2="61" y2="74"/><line x1="86" y1="14" x2="86" y2="74"/>
+      <line x1="16" y1="34" x2="106" y2="34"/><line x1="16" y1="55" x2="106" y2="55"/>
+    </g>
+    <rect x="10" y="6" width="102" height="11" rx="3" fill="#17140F"/>
+    <rect x="10" y="6" width="10" height="70" rx="3" fill="#17140F"/>
+    <rect x="102" y="6" width="10" height="70" rx="3" fill="#17140F"/>
+    <rect x="2" y="73" width="118" height="8" rx="3" fill="#17140F"/>
+    <text x="61" y="64" text-anchor="middle" fill="#17140F" font-weight="700" font-size="46" font-family="Georgia, 'Times New Roman', serif">FT</text>
+  </g>
+</svg>

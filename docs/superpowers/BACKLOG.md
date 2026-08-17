@@ -137,3 +137,8 @@ None block usage; candidates for a future 1.2 pass.
   vs inline colouredFixture, different arbitrary colours) — consolidate next time the file opens.
 - White-kit LIVE verification for split rules/dots still owed once the EPL starts (unit-pinned;
   a real Fulham/Spurs/Leeds match is the eyeball case).
+
+## The unbuilt shortlist gains one (2026-08-17, late)
+- THE EVERYWHERE SHEET: one app-level PlayerSheet host so player taps work from FixtureRow
+  drawers (scorer rows are already shaped for it, spec 13.28) — not just MatchRoom. Joins
+  Golden Boot, minute-by-minute, weekend planner, home/away splits, rivalry ledger.

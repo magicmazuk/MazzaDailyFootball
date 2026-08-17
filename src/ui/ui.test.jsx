@@ -202,9 +202,11 @@ test('FixtureRow: a ft espn row toggles a drawer with scorers and attendance, an
   const link = screen.getByRole('link', { name: 'Full detail →' });
   expect(link).toHaveAttribute('href', '/match/sco.1/e1');
   const drawer = link.parentElement;
-  expect(drawer.textContent).toContain('Maeda 12');
+  expect(drawer.textContent).toContain('Daizen Maeda');
+  expect(drawer.textContent).toContain('12′');
   expect(drawer.textContent).toContain('61');
-  expect(drawer.textContent).toContain('Hatate 45+2');
+  expect(drawer.textContent).toContain('Reo Hatate');
+  expect(drawer.textContent).toContain('45+2');
   expect(drawer.textContent).toContain('(pen)');
   expect(drawer.textContent).toContain('Attendance 58,876');
 
@@ -300,6 +302,14 @@ test('FixtureRow: the result drawer lists scorers in two columns under each club
       { minute: "82'", type: 'Penalty', player: 'David Miller', teamId: '256', scoringPlay: true },
       { minute: "90+4'", type: 'Penalty', player: 'David Miller', teamId: '256', scoringPlay: true },
       { minute: "54'", type: 'Goal', player: 'Aaron Doran', teamId: '267', scoringPlay: true },
+    ], lineups: [
+      { homeAway: 'home', players: [
+        { id: 'p9', name: 'Lawrence Shankland', shirt: '9', starter: true, position: 'FW' },
+        { id: 'p7', name: 'David Miller', shirt: '7', starter: false, position: 'FW' },
+      ] },
+      { homeAway: 'away', players: [
+        { id: 'p11', name: 'Aaron Doran', shirt: '11', starter: true, position: 'MF' },
+      ] },
     ] } },
   });
   const { container } = render(
@@ -314,9 +324,15 @@ test('FixtureRow: the result drawer lists scorers in two columns under each club
   const homeCol = container.querySelector('[data-testid="scorer-col-home"]');
   const awayCol = container.querySelector('[data-testid="scorer-col-away"]');
   expect(homeCol.textContent).toContain('Hearts'); // club shortName sub-label
-  // one line per scorer — Miller's two goals join onto ONE line, comma-joined
-  expect(homeCol.querySelectorAll('p')).toHaveLength(3); // sub-label + Shankland + Miller
-  expect(homeCol.textContent).toContain('Shankland');
+  // one line per scorer — Miller's two goals join onto ONE line, comma-joined.
+  // The lineups' row form (spec §13.28): shirt glyph with the scorer's real
+  // number looked up from the same payload's rosters, then the FULL name.
+  expect(homeCol.querySelectorAll('[data-testid="scorer-row"]')).toHaveLength(2);
+  const homeShirts = [...homeCol.querySelectorAll('[data-testid="shirt-shape"]')];
+  expect(homeShirts).toHaveLength(2);
+  expect(homeShirts[0].closest('svg').textContent).toBe('9');  // Shankland, from the roster
+  expect(homeShirts[1].closest('svg').textContent).toBe('7');  // Miller, found among the subs
+  expect(homeCol.textContent).toContain('Lawrence Shankland');
   expect(homeCol.textContent).toContain('16');
   expect(homeCol.textContent).toContain('Miller');
   expect(homeCol.textContent).toContain('82');
@@ -884,4 +900,25 @@ test('FitbaMark: goal and net take their colours from the ink and rule tokens, n
   const net = goal.querySelector('g');
   expect(net.getAttribute('class')).toContain('text-rule');
   expect(net.getAttribute('stroke')).toBe('currentColor');
+});
+
+test('FixtureRow: a scorer missing from the rosters gets a numberless shirt, never a crash or wrong number', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { events: [
+      { minute: "16'", type: 'Goal', player: 'Mystery Striker', teamId: '256', scoringPlay: true },
+    ], lineups: [] } },
+  });
+  const { container } = render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('ft')} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  const row = container.querySelector('[data-testid="scorer-row"]');
+  expect(row.textContent).toContain('Mystery Striker');
+  const shirt = row.querySelector('[data-testid="shirt-shape"]');
+  // Shirt's own convention for an unknown number is the quiet em-dash.
+  expect(shirt.closest('svg').textContent).toBe('—');
 });
