@@ -226,46 +226,56 @@ export default function TeamScreen() {
         </div>
       )}
       <div className="relative z-10">
-        <div className="flex items-center gap-4 mb-2">
-          <Crest side={team} size={46} />
-          <div className="flex-1 min-w-0">
-            <h1 className="text-[24px] truncate">{team.name}</h1>
+        {/* Motion (spec §13.21): the page's top-level blocks — header
+            (crest/name/follow + Next/Last), scout line, film, squad, season
+            — rise in on mount, one static delay class per NAMED slot rather
+            than one computed from which of them happen to be present for a
+            given team (a domestic club, with no scout line/film, still puts
+            Squad at rise-in-4 and Season at rise-in-5). */}
+        <div className="rise-in rise-in-1">
+          <div className="flex items-center gap-4 mb-2">
+            <Crest side={team} size={46} />
+            <div className="flex-1 min-w-0">
+              <h1 className="text-[24px] truncate">{team.name}</h1>
+            </div>
+            <Link to={'/calendar/' + teamId} aria-label={team.name + ' calendar'} className="shrink-0 p-1.5">
+              <CalendarGlyph />
+            </Link>
+            <FollowButton team={{ id: teamId, name: team.name, crestUrl: team.crestUrl ?? null,
+              monogram: team.monogram, colour: team.colour ?? null, compId }} />
           </div>
-          <Link to={'/calendar/' + teamId} aria-label={team.name + ' calendar'} className="shrink-0 p-1.5">
-            <CalendarGlyph />
-          </Link>
-          <FollowButton team={{ id: teamId, name: team.name, crestUrl: team.crestUrl ?? null,
-            monogram: team.monogram, colour: team.colour ?? null, compId }} />
-        </div>
-        <p className="font-sans text-[10px] uppercase tracking-[.18em] text-muted mb-8">
-          {comp?.name ?? ''}
-          {formGuide(allFixtures, teamId).length > 0 &&
-            ` · ${formGuide(allFixtures, teamId).join(' ')}`}
-        </p>
+          <p className="font-sans text-[10px] uppercase tracking-[.18em] text-muted mb-8">
+            {comp?.name ?? ''}
+            {formGuide(allFixtures, teamId).length > 0 &&
+              ` · ${formGuide(allFixtures, teamId).join(' ')}`}
+          </p>
 
-        {next && (<section className="mb-8">
-          <SectionLabel>Next</SectionLabel>
-          {/* Keyed on the fixture id (review fix, spec §13.19.1): FixtureRow
-              now owns its own `open` drawer state, so without a key React
-              would reuse this instance across a refetch that changes which
-              fixture is next — an open drawer would silently re-point to a
-              different match instead of resetting closed. */}
-          <FixtureRow key={next.id} fixture={next} followedIds={followedIds} />
-        </section>)}
-        {last && (<section className="mb-8">
-          <SectionLabel muted>Last</SectionLabel>
-          <FixtureRow key={last.id} fixture={last} followedIds={followedIds} />
-        </section>)}
+          {next && (<section className="mb-8">
+            <SectionLabel>Next</SectionLabel>
+            {/* Keyed on the fixture id (review fix, spec §13.19.1): FixtureRow
+                now owns its own `open` drawer state, so without a key React
+                would reuse this instance across a refetch that changes which
+                fixture is next — an open drawer would silently re-point to a
+                different match instead of resetting closed. */}
+            <FixtureRow key={next.id} fixture={next} followedIds={followedIds} />
+          </section>)}
+          {last && (<section className="mb-8">
+            <SectionLabel muted>Last</SectionLabel>
+            <FixtureRow key={last.id} fixture={last} followedIds={followedIds} />
+          </section>)}
+        </div>
 
         {squad.data?.discovered && (
-          <p className="font-serif text-[14.5px] max-w-[60ch] text-ink/70 mb-4">
+          <p className="font-serif text-[14.5px] max-w-[60ch] text-ink/70 mb-4 rise-in rise-in-2">
             {scoutLine(squad.data)}
           </p>
         )}
         {squad.data?.discovered && youtubeKey() && (
-          <ScoutFilm team={{ id: teamId, name: team.name }} />
+          <div className="rise-in rise-in-3">
+            <ScoutFilm team={{ id: teamId, name: team.name }} />
+          </div>
         )}
-        <section className="mb-8">
+        <section className="mb-8 rise-in rise-in-4">
           <SectionLabel muted>Squad</SectionLabel>
           {comp?.hasSquads === false && (
             <p className="font-sans text-[11px] text-muted">
@@ -285,7 +295,7 @@ export default function TeamScreen() {
           {comp?.hasSquads && squad.isError && <p className="font-sans text-[11px] text-muted">Squad unavailable right now.</p>}
         </section>
 
-        <section>
+        <section className="rise-in rise-in-5">
           {phaseReplayLinks.length > 0 ? (
             <div className="flex items-baseline justify-between gap-3 flex-wrap mb-4">
               <SectionLabel muted>Season</SectionLabel>

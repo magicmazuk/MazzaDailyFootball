@@ -886,3 +886,27 @@ test('changing which fixture is "next" (e.g. after a refetch) closes any open dr
   expect(within(nextSection()).getByRole('button', { expanded: false })).toBeInTheDocument();
   expect(within(nextSection()).queryByRole('button', { expanded: true })).not.toBeInTheDocument();
 });
+
+// --- motion (spec §13.21): the team page's top-level blocks rise in on
+// mount — header (crest/name/follow + Next/Last), scout line, film, squad,
+// season — one static delay class per named slot, regardless of which of
+// them happen to be present for a given team. ---
+
+test('the team page\'s top-level blocks carry staggered .rise-in classes', () => {
+  stubDiscoveredSturmGraz();
+  youtubeKey.mockReturnValue('test-key');
+
+  renderAt('uefa.champions', '4411');
+
+  const header = screen.getByRole('heading', { name: 'Sturm Graz' }).closest('.rise-in');
+  const scoutLine = screen.getByText(/Won 3 of their last 3/).closest('.rise-in');
+  const film = screen.getByText('The scout film').closest('.rise-in');
+  const squad = screen.getByRole('heading', { name: 'Squad' }).closest('.rise-in');
+  const season = screen.getByRole('heading', { name: 'Season' }).closest('.rise-in');
+
+  expect(header).toHaveClass('rise-in-1');
+  expect(scoutLine).toHaveClass('rise-in-2');
+  expect(film).toHaveClass('rise-in-3');
+  expect(squad).toHaveClass('rise-in-4');
+  expect(season).toHaveClass('rise-in-5');
+});

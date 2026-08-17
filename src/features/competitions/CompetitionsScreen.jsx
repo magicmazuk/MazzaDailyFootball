@@ -8,11 +8,15 @@ export default function CompetitionsScreen() {
   return (
     <main>
       <h1 className="text-[27px] mb-8">Competitions</h1>
-      {COMPETITION_GROUPS.map(([country, comps]) => {
+      {COMPETITION_GROUPS.map(([country, comps], i) => {
         const visible = comps.filter(c => !hidden.includes(c.id));
         if (!visible.length) return null;
+        // Motion (spec §13.21): delay class from this group's stable
+        // position in COMPETITION_GROUPS (a fixed, build-time list — never
+        // reordered at runtime), capped at rise-in-5 same as every other
+        // screen's stagger.
         return (
-          <section key={country} className="mt-8 first:mt-0">
+          <section key={country} className={`mt-8 first:mt-0 rise-in rise-in-${Math.min(i + 1, 5)}`}>
             <SectionLabel muted>{country}</SectionLabel>
             {visible.map(c => (
               <Link key={c.id} to={`/competition/${c.id}`}

@@ -19,10 +19,15 @@ const groupOnTvByDay = fixtures => {
   return [...groups.entries()];
 };
 
-function Section({ label, muted, fixtures, followedIds }) {
+// riseIn (spec §13.21): a static "rise-in rise-in-N" string, or undefined
+// for sections that don't take part in the arrival choreography (today,
+// just Yesterday) — assigned per NAMED slot, not by this section's runtime
+// position among its visible siblings, so a section always rises with the
+// same delay regardless of which of its neighbours happen to be absent.
+function Section({ label, muted, fixtures, followedIds, riseIn }) {
   if (!fixtures.length) return null;
   return (
-    <section className="mt-8 first:mt-0">
+    <section className={`mt-8 first:mt-0 ${riseIn ?? ''}`}>
       <SectionLabel muted={muted}>{label}</SectionLabel>
       {fixtures.map(f => <FixtureRow key={f.id} fixture={f} followedIds={followedIds} />)}
     </section>
@@ -48,7 +53,7 @@ export default function TodayView({ partition, followedIds, date, asOf = null, n
         <DrawInvitation key={`${d.comp.id}:${d.round}:${d.club.teamId}`} draw={d} />
       ))}
       {(yours.length > 0 || nextUp.length > 0) && (
-        <section className="mt-8 first:mt-0">
+        <section className="mt-8 first:mt-0 rise-in rise-in-1">
           <SectionLabel>★ Your clubs</SectionLabel>
           {yours.map(f => <FixtureRow key={f.id} fixture={f} followedIds={followedIds} />)}
           {nextUp.length > 0 && (
@@ -61,13 +66,18 @@ export default function TodayView({ partition, followedIds, date, asOf = null, n
           )}
         </section>
       )}
-      <Section label="Live" fixtures={live} followedIds={followedIds} />
-      <Section label="Later today" muted fixtures={later} followedIds={followedIds} />
-      <Section label="Earlier today" muted fixtures={earlier} followedIds={followedIds} />
+      <Section label="Live" fixtures={live} followedIds={followedIds} riseIn="rise-in rise-in-2" />
+      <Section label="Later today" muted fixtures={later} followedIds={followedIds} riseIn="rise-in rise-in-3" />
+      <Section label="Earlier today" muted fixtures={earlier} followedIds={followedIds} riseIn="rise-in rise-in-4" />
       {quiet && <p className="text-muted mt-2">No matches today.</p>}
-      <Papers />
+      {/* Papers owns its own <section> internally (task 2) — wrapped here
+          rather than touched directly, so the rise-in slot stays a purely
+          section-level, page-owned concern (spec §13.21). */}
+      <div className="rise-in rise-in-5">
+        <Papers />
+      </div>
       {onTv.length > 0 && (
-        <section className="mt-8">
+        <section className="mt-8 rise-in rise-in-5">
           <SectionLabel muted>On TV</SectionLabel>
           {groupOnTvByDay(onTv).map(([day, list]) => (
             <div key={day} className="mb-4">
@@ -78,7 +88,7 @@ export default function TodayView({ partition, followedIds, date, asOf = null, n
         </section>
       )}
       {quickTables.some(q => q.rows?.length) && (
-        <section className="mt-8">
+        <section className="mt-8 rise-in rise-in-5">
           <SectionLabel muted>Quick view</SectionLabel>
           {quickTables.map(q => (
             <MiniTable key={q.comp.id} comp={q.comp} rows={q.rows} followedIds={followedIds} />

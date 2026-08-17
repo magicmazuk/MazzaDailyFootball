@@ -59,3 +59,21 @@ test('paging to another month clears the selected day — no day stays highlight
 
   expect(screen.queryAllByRole('button', { pressed: true })).toHaveLength(0);
 });
+
+// --- motion (spec §13.21): the page's top-level blocks — header (club link
+// or the plain "Fixtures" title), the month nav + grid, the selected-day
+// fixture list — rise in on mount, one static delay class per slot. ---
+
+test('the calendar page\'s top-level blocks carry staggered .rise-in classes', () => {
+  usePrefs.setState({ followed: { [CELTIC.id]: CELTIC }, hiddenComps: [] });
+  seasonFixtures = [fx('1', CELTIC.id, 'Celtic', '267', 'St Johnstone')];
+  const { container } = renderAt(CELTIC.id);
+
+  const header = screen.getByRole('link', { name: /Celtic/ }).closest('.rise-in');
+  const monthArea = screen.getByRole('heading', { level: 2 }).closest('.rise-in');
+  const dayList = container.querySelector('section').closest('.rise-in');
+
+  expect(header).toHaveClass('rise-in-1');
+  expect(monthArea).toHaveClass('rise-in-2');
+  expect(dayList).toHaveClass('rise-in-3');
+});

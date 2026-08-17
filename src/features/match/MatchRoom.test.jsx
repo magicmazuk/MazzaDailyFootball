@@ -619,3 +619,31 @@ test('siblings show no star when followedIds is omitted (defaults to empty)', ()
   </MemoryRouter>);
   expect(screen.queryByText('★')).not.toBeInTheDocument();
 });
+
+// --- motion (spec §13.21): the room's top-level sections rise in on mount,
+// one static delay class per named slot, capped at rise-in-5. The video
+// card is excluded — it owns its own .xfade-in (item 3), and stacking
+// .rise-in on the same element would fight it over the `animation`
+// shorthand rather than combine. ---
+
+test('the room\'s sections carry staggered .rise-in classes, capped at rise-in-5; the video card is excluded', () => {
+  const h2hDetail = { ...detail, headToHead: {
+    meetings: [{ date: '2026-02-15T14:00:00Z', homeName: 'Rangers', awayName: 'Celtic', homeScore: 1, awayScore: 2 }],
+  } };
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={h2hDetail} videos={videos} />
+  </MemoryRouter>);
+
+  const header = container.querySelector('header');
+  const timeline = screen.getByText('The match').closest('section');
+  const stats = screen.getByText('Stats').closest('section');
+  const h2h = screen.getByText('Head to head').closest('section');
+  const videoSection = screen.getByText('Video').closest('section');
+
+  expect(header).toHaveClass('rise-in', 'rise-in-1');
+  expect(timeline).toHaveClass('rise-in', 'rise-in-3');
+  expect(stats).toHaveClass('rise-in', 'rise-in-4');
+  expect(h2h).toHaveClass('rise-in', 'rise-in-5');
+  expect(videoSection.className).not.toMatch(/rise-in/);
+  expect(videoSection).toHaveClass('xfade-in');
+});

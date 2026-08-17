@@ -177,6 +177,25 @@ test('the replay link picks the LATEST fully-seen round when more than one quali
   expect(link).toHaveAttribute('href', '/draw/sco.tennents/quarterfinals');
 });
 
+// --- motion (spec §13.21): the page's one content block — whichever tab is
+// active — rises in on mount, in the same static rise-in-1 slot regardless
+// of which tab that happens to be (there's only ever one visible at a
+// time, so they share the slot rather than each claiming their own). ---
+
+test('the Overview tab content rises in on mount (.rise-in rise-in-1)', () => {
+  vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {}))); // never resolves — deterministic loading state
+  renderAt('sco.tennents');
+  const wrapper = screen.getByText('Loading the field…').closest('.rise-in');
+  expect(wrapper).toHaveClass('rise-in-1');
+});
+
+test('the Table tab content also rises in the same rise-in-1 slot', () => {
+  vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+  renderAt('sco.1'); // a league, defaults to Table
+  const wrapper = screen.getByText('Loading table…').closest('.rise-in');
+  expect(wrapper).toHaveClass('rise-in-1');
+});
+
 test('a league carries no displayable round (ESPN season.slug is a year-prefixed season name) and stays flat, unchanged', async () => {
   const user = (await import('@testing-library/user-event')).default.setup();
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({

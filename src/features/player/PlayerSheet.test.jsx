@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { expect, test, vi } from 'vitest';
@@ -216,10 +216,52 @@ test('"Open as page →" renders as a Link with the player route href once expan
   expect(onClose).toHaveBeenCalled();
 });
 
-test('open with no bio while the query is still fetching shows a muted "Loading player…" line', () => {
+// --- motion (spec §13.21): the sheet opens at a stable size — a shaped
+// skeleton (2 name/sys-line bars + 3 headline-number blocks, same grid
+// Headline itself uses) stands in for the old thin "Loading player…" strip
+// that jumped once bio landed. ---
+
+test('open with no bio while the query is still fetching shows a skeleton (2 lines + 3 headline blocks), not "Loading player…"', () => {
   usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: true, isError: false });
-  render(<MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>);
-  expect(screen.getByText('Loading player…')).toBeInTheDocument();
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
+  expect(screen.queryByText('Loading player…')).not.toBeInTheDocument();
+  const bars = container.querySelectorAll('.skeleton-pulse');
+  expect(bars).toHaveLength(5); // 2 name/sys-line bars + 3 headline blocks
+  bars.forEach(bar => expect(bar.closest('[aria-hidden="true"]')).toBeTruthy());
+});
+
+test('bio content carries the entrance crossfade (.xfade-in) once loaded', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
+  const xfade = container.querySelector('.xfade-in');
+  expect(xfade).toBeInTheDocument();
+  expect(within(xfade).getByText('Kasper Høgh')).toBeInTheDocument();
+});
+
+// --- peek <-> expanded (retires the parked v1.0 finding, spec §13.21): the
+// old h-auto -> h-[88vh] class jump never interpolated. The expanded
+// region's height is now driven by Collapse's measured-height glide. ---
+
+test('the expanded region is driven by the Collapse glide mechanism (.collapse-glide), present even while collapsed', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
+  expect(container.querySelector('.collapse-glide')).toBeInTheDocument();
+});
+
+test('expanding no longer jumps the sheet to a fixed h-[88vh] class', async () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
+  expect(screen.getByText('Attacking')).toBeInTheDocument();
+  expect(sheetEl(container).className).not.toMatch(/h-\[88vh\]/);
 });
 
 test('usePlayer isError shows "Player information unavailable."', () => {

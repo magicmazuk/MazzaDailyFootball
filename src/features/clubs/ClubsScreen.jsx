@@ -47,7 +47,7 @@ export default function ClubsScreen() {
     <main>
       <h1 className="text-[27px] mb-8">Clubs</h1>
 
-      <section className="mb-9">
+      <section className="mb-9 rise-in rise-in-1">
         <SectionLabel>★ Following</SectionLabel>
         {Object.values(followed).map(club => (
           <div key={club.id} className="flex items-center gap-3 py-3 border-b border-rule/70">
@@ -69,7 +69,7 @@ export default function ClubsScreen() {
         ))}
       </section>
 
-      <section className="mb-9">
+      <section className="mb-9 rise-in rise-in-2">
         <SectionLabel muted>Find a club</SectionLabel>
         <input
           value={q}
@@ -102,7 +102,7 @@ export default function ClubsScreen() {
         })}
       </section>
 
-      <section>
+      <section className="rise-in rise-in-3">
         <SectionLabel muted>Competitions shown</SectionLabel>
         {COMPETITIONS.map(c => (
           <label key={c.id} className="flex items-center gap-3 py-2.5 border-b border-rule/60
