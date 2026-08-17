@@ -909,3 +909,31 @@ for any other shape, so a malformed feed colour can never paint invalid CSS whil
 the fallback. Live-verified post-hardening: match page (8 splits, rule track, clipped circle,
 11v11) and a result drawer (6 dots at press tone). The balance bar's press tone is pinned by
 exact-value tests; no upcoming-with-meetings drawer was reachable in the live sweep tonight.
+
+## 13.26 One head-to-head language
+
+User request (2026-08-17, evening — with S-A live on their phone): every head-to-head surface
+uses the fixture drawer's graphical setup, and the balance bar adopts the stats page's tinted
+split-rule theme. This consciously REVERSES the morning's B-KEEP verdict — the user chose
+B-JOIN with fresh eyes after seeing the split rules in production, which is a better-informed
+decision than the mockup round's.
+
+**The balance, re-drawn**: same name, testids and caption; the body becomes split-rule
+geometry at the possession weight (3px line, 8px strip, overflow-hidden) — rule track,
+home wins press-toned from the left, away wins from the right, draws as the EXPOSED TRACK
+held between 60%-ink ticks at the two outcome boundaries. Equal boundaries (no draws)
+collapse to one tick; edge boundaries clip like the stats page's shutout ticks. The v1.4
+frame-and-dividers form is retired; its white-kit duty falls to track + ticks, as the
+review round established for the split rules.
+
+**The match page joins**: HeadToHead renders the drawer's own exported MeetingRow ledger
+(crest · tabular score · crest) instead of prose, then the shared BalanceBar. Two depths,
+deliberate: the drawer glances at the LAST THREE ("Recent meetings"); the match page is the
+deep view — ALL meetings, sorted most-recent-first here (seasonseries order isn't trusted),
+balance struck over everything shown. The feed's summary line stays.
+
+Verified live on Rangers v St Mirren (the user's own reference match, hours after it
+finished): 5 meetings sorted 16 Aug 26 → 26 Apr 25, ten crests, ticks at 60/100, press-tone
+fill, rule track, no old frame anywhere. The drawer inherits the identical component, which
+also retires the backlogged "balance-bar press tone by eye" debt — one component, seen once,
+is seen everywhere.
