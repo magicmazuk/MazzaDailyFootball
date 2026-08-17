@@ -508,7 +508,10 @@ test('head-to-head renders past meetings and an optional summary line', () => {
   </MemoryRouter>);
   expect(screen.getByText('Head to head')).toBeInTheDocument();
   expect(screen.getByText('Celtic lead the series 3-1')).toBeInTheDocument();
-  expect(screen.getByText(/Rangers 1–2 Celtic/)).toBeInTheDocument();
+  // The drawer's ledger form (spec §13.26), not prose: crest-score-crest.
+  expect(screen.queryByText(/Rangers 1–2 Celtic/)).not.toBeInTheDocument();
+  const row = screen.getByTestId('meeting-row');
+  expect(row.textContent).toContain('1–2');
 });
 
 test('head-to-head section is absent without meetings', () => {
@@ -973,4 +976,31 @@ test('team stats whose ids match neither side render no stats — colours must n
     <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={driftedIds} />
   </MemoryRouter>);
   expect(screen.queryByText('Stats')).not.toBeInTheDocument();
+});
+
+test('the match page head-to-head shows ALL meetings most-recent-first with the balance beneath', () => {
+  const h2hDetail = { ...detail, headToHead: { meetings: [
+    { date: '2025-11-02T15:00:00Z', homeName: 'Rangers', awayName: 'Celtic', homeScore: 0, awayScore: 3 },
+    { date: '2026-02-15T14:00:00Z', homeName: 'Rangers', awayName: 'Celtic', homeScore: 1, awayScore: 2 },
+    { date: '2026-01-02T14:00:00Z', homeName: 'Celtic', awayName: 'Rangers', homeScore: 2, awayScore: 2 },
+    { date: '2025-09-01T14:00:00Z', homeName: 'Celtic', awayName: 'Rangers', homeScore: 1, awayScore: 0 },
+  ] } };
+  const colours = { ...fixture,
+    home: { ...fixture.home, colour: '009933' }, away: { ...fixture.away, colour: '1B458F' } };
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={colours} comp={byId('sco.1')} detail={h2hDetail} />
+  </MemoryRouter>);
+  const section = screen.getByText('Head to head').closest('section');
+  const rows = section.querySelectorAll('[data-testid="meeting-row"]');
+  expect(rows).toHaveLength(4); // all of them — the match page is the deep view
+  // Most recent (15 Feb) first, oldest (1 Sep) last.
+  expect(rows[0].textContent).toContain('1–2');
+  expect(rows[3].textContent).toContain('1–0');
+  // The balance rides beneath in the split-rule theme, over ALL shown meetings:
+  // Celtic 3 wins (incl. the fixture-home flip), 1 draw, 0 Rangers wins.
+  expect(section.querySelector('[data-testid="balance-seg-home"]')).toBeTruthy();
+  expect(section.querySelectorAll('[data-testid="balance-tick"]').length).toBeGreaterThan(0);
+  expect(screen.getByText('Celtic 3')).toBeInTheDocument();
+  expect(screen.getByText('drawn 1')).toBeInTheDocument();
+  expect(screen.getByText('Rangers 0')).toBeInTheDocument();
 });

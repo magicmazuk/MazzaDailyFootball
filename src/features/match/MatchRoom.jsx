@@ -6,7 +6,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Crest from '../../ui/Crest.jsx';
-import FixtureRow, { MatchLine, pressFill, timelinePoints } from '../../ui/FixtureRow.jsx';
+import FixtureRow, { BalanceBar, MatchLine, MeetingRow, meetingBalance, pressFill,
+  timelinePoints } from '../../ui/FixtureRow.jsx';
 import FormGlyphs from '../../ui/FormGlyphs.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
 import Shirt from '../../ui/Shirt.jsx';
@@ -447,24 +448,28 @@ function Lineups({ lineups, fixture, comp, onOpenPlayer }) {
 
 // Prior meetings between these two sides — rendered pre-match too, since
 // history doesn't need kickoff to have happened.
-function HeadToHead({ headToHead }) {
+// The match page's head-to-head speaks the drawer's language (spec §13.26):
+// the same MeetingRow ledger and the same balance, imported from the
+// drawer's own module rather than re-drawn. Two surface-appropriate
+// depths, deliberately kept: the drawer glances at the last three; this
+// page is the deep view — ALL meetings the feed carries, most recent
+// first (sorted here, seasonseries order isn't guaranteed), the balance
+// struck over everything shown.
+function HeadToHead({ headToHead, fixture }) {
   if (!headToHead?.meetings?.length) return null;
+  const meetings = [...headToHead.meetings]
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  const { homeWins, draws, awayWins } = meetingBalance(meetings, fixture);
   return (
     <section className="mb-8 rise-in rise-in-5">
       <SectionLabel muted>Head to head</SectionLabel>
       {headToHead.summary && (
         <p className="font-sans text-[10px] text-muted mb-3">{headToHead.summary}</p>
       )}
-      {headToHead.meetings.map((m, i) => (
-        <div key={i} className="flex items-baseline gap-4 py-2 border-b border-rule/60">
-          <span className="w-20 font-sans text-[10px] text-muted tabular-nums shrink-0">
-            {shortDate(m.date)}
-          </span>
-          <span className="text-[14px] flex-1 min-w-0">
-            {m.homeName} {m.homeScore}–{m.awayScore} {m.awayName}
-          </span>
-        </div>
-      ))}
+      <div className="mb-1">
+        {meetings.map((m, i) => <MeetingRow key={i} meeting={m} fixture={fixture} />)}
+      </div>
+      <BalanceBar homeWins={homeWins} draws={draws} awayWins={awayWins} fixture={fixture} />
     </section>
   );
 }
@@ -510,7 +515,7 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings, fol
             <Stats teamStats={detail?.teamStats} fixture={fixture} />
             <Standouts standouts={detail?.standouts} fixture={fixture} comp={comp} onOpenPlayer={setSheetPlayerId} />
             <Lineups lineups={detail?.lineups} fixture={fixture} comp={comp} onOpenPlayer={setSheetPlayerId} />
-            <HeadToHead headToHead={detail?.headToHead} />
+            <HeadToHead headToHead={detail?.headToHead} fixture={fixture} />
           </>)
         : (
           <p className="font-sans text-[11px] text-muted">

@@ -468,10 +468,13 @@ test('FixtureRow: the fixture drawer\'s balance bar segments are proportional an
   expect(awaySeg).toBeNull();
   expect(homeSeg.style.background).toBe('rgba(0, 153, 33, 0.75)'); // #009921 at the press tone
   expect(drawSeg).toHaveClass('bg-rule');
-  // Eased to 60% ink in the SOFT-75 round (spec §13.24) — the outline idiom
-  // survives softening; pale kits still read as bounded regions.
-  expect(homeSeg.parentElement).toHaveClass('border-ink/60');
-  expect(homeSeg.parentElement).toHaveClass('divide-ink/60');
+  // The split-rule theme (spec §13.26): the bar rides a rule track with
+  // 60%-ink ticks at the outcome boundaries — no frame, no dividers.
+  expect(homeSeg.parentElement).toHaveClass('bg-rule');
+  const ticks = container.querySelectorAll('[data-testid="balance-tick"]');
+  expect([...ticks].map(t => parseFloat(t.style.left))).toEqual([
+    expect.closeTo(66.7, 1), expect.closeTo(100, 1),
+  ]);
   expect(screen.getByText('Celtic 2')).toBeInTheDocument();
   expect(screen.getByText('drawn 1')).toBeInTheDocument();
   expect(screen.getByText('Aberdeen 0')).toBeInTheDocument();
@@ -820,4 +823,29 @@ test('goal dots print their club colour at the press tone with an eased outline'
   const dot = container.querySelector('[data-testid="goal-dot"]');
   expect(dot.style.background).toBe('rgba(0, 153, 33, 0.75)');
   expect(dot.className).toContain('border-ink/60');
+});
+
+test('FixtureRow: zero draws collapses the balance ticks to one — no doubled boundary', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { headToHead: { meetings: [
+      { date: '2026-03-04', homeName: 'Celtic', awayName: 'Aberdeen', homeScore: 2, awayScore: 0 },
+      { date: '2026-01-10', homeName: 'Aberdeen', awayName: 'Celtic', homeScore: 0, awayScore: 1 },
+      { date: '2025-11-02', homeName: 'Celtic', awayName: 'Aberdeen', homeScore: 0, awayScore: 2 },
+    ] } } },
+  });
+  const { container } = render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('scheduled', {
+        home: side({ teamId: '256', name: 'Celtic', shortName: 'Celtic', colour: '009921' }),
+        away: side({ teamId: '299', name: 'Aberdeen', shortName: 'Aberdeen', colour: null }),
+      })} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  // 2 Celtic wins, 0 draws, 1 Aberdeen win: both boundaries sit at 66.7%.
+  const ticks = container.querySelectorAll('[data-testid="balance-tick"]');
+  expect(ticks).toHaveLength(1);
+  expect(parseFloat(ticks[0].style.left)).toBeCloseTo(66.7, 1);
 });

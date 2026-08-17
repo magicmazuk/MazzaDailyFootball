@@ -353,7 +353,7 @@ function meetingSide(name, fixture) {
 // One head-to-head meeting row (spec §13.22, task 1b): a fixed-width date
 // column (the muted sans tabular recipe), then that meeting's OWN
 // home/away order — crest, tabular serif score, crest.
-function MeetingRow({ meeting, fixture }) {
+export function MeetingRow({ meeting, fixture }) {
   const home = meetingSide(meeting.homeName, fixture);
   const away = meetingSide(meeting.awayName, fixture);
   return (
@@ -376,29 +376,39 @@ function MeetingRow({ meeting, fixture }) {
 // owns a draw), this fixture's away club's wins on the right (its
 // colour). The caller only mounts this once meetings.length > 0, so total
 // is always > 0 here; the guard is defensive, not reachable in practice.
-function BalanceBar({ homeWins, draws, awayWins, fixture }) {
+export function BalanceBar({ homeWins, draws, awayWins, fixture }) {
   const total = homeWins + draws + awayWins;
   if (total === 0) return null;
-  const pct = n => `${(n / total) * 100}%`;
+  const pct = n => (n / total) * 100;
+  // The split-rule theme (spec §13.26, B-JOIN chosen with S-A live on the
+  // user's phone): the possession bar's weight — rule track, press-tone
+  // wins from each end, draws as the quiet middle held between two
+  // 60%-ink ticks at the outcome boundaries. Equal boundaries (no draws)
+  // collapse to one tick; edge boundaries clip inside overflow-hidden the
+  // same as the stats page's shutout ticks. The v1.4 frame-and-dividers
+  // form retired here — its white-kit duty now falls to track + ticks,
+  // exactly as the review round established for the split rules.
+  const boundaries = [...new Set([pct(homeWins), pct(homeWins + draws)])];
   return (
     <>
-      {/* border-ink + ink dividers (the Shirt.jsx outline idiom, v1.4
-          final review M1): a white-kitted club's segment must read as a
-          bounded region of the bar, not as empty track. Zero-count
-          segments don't render at all — a divider against nothing would
-          paint a stray 1px line. */}
-      <div className="h-3 rounded-[3px] overflow-hidden flex mt-1.5 mb-1.5 border border-ink/60 divide-x divide-ink/60">
-        {homeWins > 0 && (
-          <div data-testid="balance-seg-home" className={`h-full ${pressFill(fixture.home).className}`}
-            style={{ width: pct(homeWins), ...pressFill(fixture.home).style }} />
-        )}
-        {draws > 0 && (
-          <div data-testid="balance-seg-draws" className="h-full bg-rule" style={{ width: pct(draws) }} />
-        )}
-        {awayWins > 0 && (
-          <div data-testid="balance-seg-away" className={`h-full ${pressFill(fixture.away).className}`}
-            style={{ width: pct(awayWins), ...pressFill(fixture.away).style }} />
-        )}
+      <div className="relative overflow-hidden h-[8px] mt-1.5 mb-1.5">
+        <div className="absolute inset-x-0 top-[2.5px] h-[3px] flex bg-rule">
+          {homeWins > 0 && (
+            <div data-testid="balance-seg-home" className={`h-full ${pressFill(fixture.home).className}`}
+              style={{ width: `${pct(homeWins)}%`, ...pressFill(fixture.home).style }} />
+          )}
+          {draws > 0 && (
+            <div data-testid="balance-seg-draws" className="h-full bg-rule" style={{ width: `${pct(draws)}%` }} />
+          )}
+          {awayWins > 0 && (
+            <div data-testid="balance-seg-away" className={`h-full flex-1 ${pressFill(fixture.away).className}`}
+              style={pressFill(fixture.away).style} />
+          )}
+        </div>
+        {boundaries.map(b => (
+          <span key={b} data-testid="balance-tick" style={{ left: `${b}%` }}
+            className="absolute inset-y-0 w-px bg-ink/60 -translate-x-1/2" />
+        ))}
       </div>
       <div className="flex justify-between font-sans text-[10px] text-muted tabular-nums">
         <span>{fixture.home.shortName ?? fixture.home.name} {homeWins}</span>
