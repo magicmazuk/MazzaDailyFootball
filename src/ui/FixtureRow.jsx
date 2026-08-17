@@ -7,6 +7,7 @@ import { useMatchDetail } from '../data/queries.js';
 import Collapse from './Collapse.jsx';
 import Crest from './Crest.jsx';
 import { SkeletonLines } from './Skeleton.jsx';
+import Shirt from './Shirt.jsx';
 import StatusWord from './StatusWord.jsx';
 import TvBadge from './TvBadge.jsx';
 
@@ -124,19 +125,41 @@ function surnameOf(name) {
 // ("Miller 82′ (pen), 90+4′") — one line per scorer, in first-goal order.
 // Events with no player, or that credit neither side, are skipped rather
 // than crashing.
-function scorersBySide(events, fixture) {
+// Shirt numbers live on the rosters, not the goal events — but the drawer's
+// summary payload carries BOTH, so each scorer's number is looked up by
+// playerId (name as fallback) across every roster entry, subs included (a
+// sub can score) and BOTH sides (an own-goal scorer is credited to the
+// benefiting column but plays for the other club — the number is real, the
+// (og) marker carries the story). No match: null, and the Shirt renders
+// numberless rather than wrong.
+function shirtLookup(lineups) {
+  const byId = new Map();
+  const byName = new Map();
+  for (const l of lineups ?? []) {
+    for (const pl of l.players ?? []) {
+      if (pl.id != null && !byId.has(pl.id)) byId.set(pl.id, pl.shirt ?? null);
+      if (pl.name && !byName.has(pl.name)) byName.set(pl.name, pl.shirt ?? null);
+    }
+  }
+  return (playerId, name) => byId.get(playerId) ?? byName.get(name) ?? null;
+}
+
+function scorersBySide(events, fixture, lineups) {
   const goalsBySide = { home: [], away: [] };
   for (const e of events ?? []) {
     if (!e.scoringPlay || e.player == null) continue;
     const side = creditedSide(e, fixture);
     if (side) goalsBySide[side].push(e);
   }
+  const shirtFor = shirtLookup(lineups);
   const build = goals => {
     const order = [];
     const minutesByPlayer = new Map();
+    const idByPlayer = new Map();
     for (const g of goals) {
       if (!minutesByPlayer.has(g.player)) {
         minutesByPlayer.set(g.player, []);
+        idByPlayer.set(g.player, g.playerId ?? null);
         order.push(g.player);
       }
       // ESPN's clock strings carry straight apostrophes ("90'+4'"); the
@@ -145,7 +168,8 @@ function scorersBySide(events, fixture) {
       minutesByPlayer.get(g.player).push(`${String(g.minute).replace(/'/g, '′')}${goalMarker(g.type)}`);
     }
     return order.map(player => ({
-      player, surname: surnameOf(player),
+      player,
+      shirt: shirtFor(idByPlayer.get(player), player),
       minutesText: minutesByPlayer.get(player).join(', '),
     }));
   };
@@ -302,10 +326,16 @@ function ScorerColumn({ clubSide, scorers, testId }) {
       <p className="font-sans text-[9px] uppercase tracking-[.14em] text-muted mb-3">
         {clubSide.shortName ?? clubSide.name}
       </p>
+      {/* The lineups' row form (spec §13.28): shirt in the COLUMN club's
+          colour with the scorer's real number, full name on one truncating
+          line, the minutes fragment held whole at the end. */}
       {scorers.map(s => (
-        <p key={s.player} className="text-[13px] mb-1">
-          {s.surname} <span className="font-sans text-[10.5px] text-muted tabular-nums">{s.minutesText}</span>
-        </p>
+        <div key={s.player} data-testid="scorer-row"
+          className="flex items-center gap-2.5 py-1.5 min-w-0">
+          <Shirt colour={clubSide.colour ?? null} number={s.shirt} size={20} />
+          <span className="text-[13px] truncate min-w-0">{s.player}</span>
+          <span className="font-sans text-[10.5px] text-muted tabular-nums shrink-0">{s.minutesText}</span>
+        </div>
       ))}
     </div>
   );
@@ -317,7 +347,7 @@ function ScorerColumn({ clubSide, scorers, testId }) {
 // full page.
 function ResultDrawer({ detail, fixture, comp }) {
   const points = timelinePoints(detail.events, fixture);
-  const scorers = scorersBySide(detail.events, fixture);
+  const scorers = scorersBySide(detail.events, fixture, detail.lineups);
   const attendance = detail.gameInfo?.attendance;
   const metaParts = [
     detail.gameInfo?.venue,

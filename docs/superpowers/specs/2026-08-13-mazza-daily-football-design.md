@@ -958,3 +958,34 @@ Today keeps its h1 (M-B's whole point). Browser title → "Fitba' Times". No PWA
 exists, so the tab title is the entire rename surface.
 
 Verified live on Today and a match page: mark + hairline present, title renamed.
+
+**The home-screen icon (same evening)**: F-A "the goalmouth" chosen from three rendered
+candidates (vs big-initials F-B and red-letters F-C, judged at true 60px home-screen size).
+`public/apple-touch-icon.png` (exact 180x180, paper tile, mark centred — cut from the same
+SVG via headless Chromium, not a hand export) plus `public/favicon.svg` (mark on its own
+rounded paper tile so it holds on dark tab strips), linked from index.html. No unit tests —
+binary asset + two link tags; verified by dist inspection and the prod content-type check.
+Note: the vercel.json catch-all does NOT swallow these — static files outrank rewrites,
+the same mechanism serving /assets/*.js.
+
+## 13.28 Scorers in the lineups' row form
+
+User request (2026-08-17, last of the night): the result drawer's scorer columns match the
+lineups' line design, "clickable if ui/ux and data allow".
+
+**The rows**: each scorer line becomes the lineups' row — Shirt at 20 in the COLUMN club's
+colour carrying the scorer's REAL number, full name on one truncating line (surname retires),
+the minutes fragment (primes, markers) held whole at the end via shrink-0. Numbers come from
+the drawer's own summary payload: `shirtLookup` maps every roster entry (subs included — a
+sub can score; BOTH sides — an own-goal scorer plays for the other club, their number is
+real, the (og) marker carries the story) by playerId with name fallback. No match → null →
+Shirt's own em-dash convention, never a wrong number.
+
+**Clickable — deliberately deferred, not fudged**: the data allows it but PlayerSheet mounts
+only in MatchRoom; drawers live on screens with no sheet host. Tappable scorers need one
+app-level sheet ("the everywhere sheet") — added to the unbuilt shortlist as its own wave.
+These rows are already shaped for it.
+
+Verified live on Dundee Utd 1-1 Rangers (a sibling drawer): #15 Rose and #11 Aasgaard in
+their clubs' shirts, numbers from the rosters. The same frame incidentally provided the
+first drawer-surface eyeball of the §13.26 balance rule.
