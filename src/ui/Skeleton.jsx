@@ -19,7 +19,7 @@ export function SkeletonLines({ lines = 3, widths = ['85%', '60%', '72%'] }) {
         <div
           // eslint-disable-next-line react/no-array-index-key -- static placeholder bars, no reorder/identity concern
           key={i}
-          className="skeleton-pulse bg-drawer h-[11px] rounded-[2px] my-2"
+          className="skeleton-pulse bg-rule h-[11px] rounded-[2px] my-2"
           style={{ width: widths[i % widths.length] }}
         />
       ))}
@@ -28,5 +28,5 @@ export function SkeletonLines({ lines = 3, widths = ['85%', '60%', '72%'] }) {
 }
 
 export function SkeletonBlock({ className = '' }) {
-  return <div aria-hidden="true" className={`skeleton-pulse bg-drawer ${className}`} />;
+  return <div aria-hidden="true" className={`skeleton-pulse bg-rule ${className}`} />;
 }

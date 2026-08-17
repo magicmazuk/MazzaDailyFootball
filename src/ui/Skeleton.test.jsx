@@ -15,7 +15,7 @@ test('SkeletonLines renders 3 bars by default, each pulsing over drawer tone', (
   const bars = container.querySelectorAll('.skeleton-pulse');
   expect(bars).toHaveLength(3);
   bars.forEach((bar) => {
-    expect(bar).toHaveClass('bg-drawer', 'h-[11px]', 'rounded-[2px]');
+    expect(bar).toHaveClass('bg-rule', 'h-[11px]', 'rounded-[2px]');
   });
 });
 
@@ -44,6 +44,6 @@ test('SkeletonLines wraps its bars in an aria-hidden container', () => {
 test('SkeletonBlock renders a single pulsing drawer-tone rectangle, sized by the caller', () => {
   const { container } = render(<SkeletonBlock className="aspect-video rounded-lg" />);
   const block = container.firstChild;
-  expect(block).toHaveClass('bg-drawer', 'skeleton-pulse', 'aspect-video', 'rounded-lg');
+  expect(block).toHaveClass('bg-rule', 'skeleton-pulse', 'aspect-video', 'rounded-lg');
   expect(block).toHaveAttribute('aria-hidden', 'true');
 });

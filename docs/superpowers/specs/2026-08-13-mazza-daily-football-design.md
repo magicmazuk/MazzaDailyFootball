@@ -769,7 +769,7 @@ Everything that appears on screen now arrives through ONE motion language:
 - **The glide (accordions)**: a drawer opens IMMEDIATELY at tap — skeleton inside if data isn't
   there yet — and its height animates smoothly (measured, ResizeObserver-driven) both on open/
   close AND when arriving content changes the height. No jutting, ever.
-- **The skeleton**: drawer-tone (#F4F0E7) placeholder bars in the shape of the coming content
+- **The skeleton**: hairline-tone (#E5DFD3) placeholder bars — visibly darker than both the paper and the drawer surfaces they sit on in the shape of the coming content
   (2-3 hairline-height lines), gently pulsing opacity 0.55↔1, 1.6s. Replaced by a 160ms
   crossfade when content lands. Skeletons appear ONLY during genuine fetches — cached content
   renders instantly with no placeholder flash.

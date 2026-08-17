@@ -120,8 +120,14 @@ test('a later content-size change while settled open glides to the new measured 
     act(() => { roCallback(); }); // first fire: measurement only
     expect(container.firstChild.style.height).toBe('auto');
     Object.defineProperty(inner, 'offsetHeight', { configurable: true, value: 200 });
-    act(() => { roCallback(); }); // growth: glides to the new concrete px
-    expect(container.firstChild.style.height).toBe('200px');
+    act(() => { roCallback(); }); // growth: pin-then-glide to the new px…
+    // …then settle straight to 'auto': jsdom computes no transition on the
+    // node (same as prefers-reduced-motion in a real browser), and a px
+    // pin left waiting for a transitionend that never fires would clip
+    // any later growth (final review, HIGH). In a transition-capable
+    // browser this reads '200px' until the glide's transitionend settles
+    // it — the live final review observes that path.
+    expect(container.firstChild.style.height).toBe('auto');
   } finally {
     globalThis.ResizeObserver = original;
   }

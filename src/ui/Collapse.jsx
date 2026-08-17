@@ -31,6 +31,20 @@ function hasResizeObserver() {
   return typeof ResizeObserver !== 'undefined';
 }
 
+// Whether a height transition can actually run on this node right now —
+// false under prefers-reduced-motion (the .collapse-glide utility lives
+// inside the no-preference media block, so its computed duration is 0s
+// there). When false, transitionend never fires, so callers settle to
+// 'auto' immediately instead of waiting for an event that never comes.
+function hasRunningTransition(node) {
+  if (typeof getComputedStyle !== 'function') return false;
+  const style = getComputedStyle(node);
+  return style.transitionProperty.split(',').some((prop) => {
+    const p = prop.trim();
+    return p === 'height' || p === 'all';
+  }) && parseFloat(style.transitionDuration) > 0;
+}
+
 export default function Collapse({ open, children, className = '' }) {
   const outerRef = useRef(null);
   const innerRef = useRef(null);
@@ -76,18 +90,22 @@ export default function Collapse({ open, children, className = '' }) {
       const current = heightRef.current;
       if (current === 0) return; // closed: content changes move nothing
       if (current === 'auto') {
+        const outer = outerRef.current;
+        // No transition can run (reduced motion, jsdom): the box already
+        // laid out at the new size and instant IS correct — and pinning
+        // would be a trap: with state ending back at 'auto' (unchanged),
+        // React skips the style write entirely and the pinned px would
+        // stick forever. Do nothing.
+        if (!outer || !hasRunningTransition(outer)) return;
         // Settled at 'auto', so the box has ALREADY laid out at the new
         // size — but RO callbacks run before paint, so there's still time
         // to pin the OLD px straight onto the node (state can't do it:
         // React batches the two writes into one commit and the start
         // value never paints — review round 1, verified empirically),
         // force a reflow to commit it, then glide to the new value.
-        const outer = outerRef.current;
-        if (outer) {
-          outer.style.height = `${prevPx}px`;
-          // eslint-disable-next-line no-unused-expressions -- forces the reflow that commits the pinned start value
-          outer.offsetHeight;
-        }
+        outer.style.height = `${prevPx}px`;
+        // eslint-disable-next-line no-unused-expressions -- forces the reflow that commits the pinned start value
+        outer.offsetHeight;
         applyHeight(`${measured}px`);
       } else {
         // Mid-glide growth: retarget the running transition — both ends
@@ -108,13 +126,10 @@ export default function Collapse({ open, children, className = '' }) {
     if (!outer || !inner) return undefined;
 
     if (open) {
-      // Already settled open ('auto') — this is the mount-while-open case
-      // (initial state is 'auto', nothing to glide from) — leave it be.
-      if (heightRef.current === 'auto') return undefined;
-      // 0 -> measured px: the transition needs two concrete numbers.
-      const measured = inner.offsetHeight;
-      lastPxRef.current = measured;
-      applyHeight(`${measured}px`);
+      // The settle-to-'auto' listener registers for EVERY open state —
+      // including mount-while-open — so a later RO glide on this instance
+      // can still settle (final review, MEDIUM: ScoutFilm's mount-open
+      // Collapse never registered it and stayed pinned/clipped forever).
       const onTransitionEnd = (event) => {
         if (event.target === outer && event.propertyName === 'height') {
           // Settle on 'auto': resilience so a growth event this glide
@@ -123,6 +138,21 @@ export default function Collapse({ open, children, className = '' }) {
         }
       };
       outer.addEventListener('transitionend', onTransitionEnd);
+      // Already settled open ('auto') — the mount-while-open case (initial
+      // state is 'auto', nothing to glide from) — keep the listener, skip
+      // the glide.
+      if (heightRef.current !== 'auto') {
+        // 0 -> measured px: the transition needs two concrete numbers.
+        const measured = inner.offsetHeight;
+        lastPxRef.current = measured;
+        applyHeight(`${measured}px`);
+        // No transition running (reduced motion, or the glide class ever
+        // absent): transitionend will NEVER fire, and a px pin left in
+        // place clips any later content growth (final review, HIGH: the
+        // reduced-motion sheet lost its "Open as page" link). Settle now —
+        // instant IS the correct reduced-motion behaviour.
+        if (!hasRunningTransition(outer)) applyHeight('auto');
+      }
       return () => outer.removeEventListener('transitionend', onTransitionEnd);
     }
 
@@ -145,7 +175,13 @@ export default function Collapse({ open, children, className = '' }) {
 
   return (
     <div ref={outerRef} className={`overflow-hidden collapse-glide ${className}`} style={{ height }}>
-      <div ref={innerRef}>{children}</div>
+      {/* flow-root: the inner div is its own block formatting context, so
+          children's top/bottom margins are CONTAINED here and included in
+          offsetHeight — without it they collapse through into the outer
+          BFC, offsetHeight under-measures by exactly those margins, and
+          every glide ends short then snaps on the settle to 'auto' (final
+          review, MEDIUM: +16px jut on the sheet, +12px on the papers). */}
+      <div ref={innerRef} className="flow-root">{children}</div>
     </div>
   );
 }
