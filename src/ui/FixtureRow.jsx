@@ -203,7 +203,7 @@ function FixtureDrawer({ comp, fixture }) {
   // background (isFetching true) but isLoading stays false throughout.
   const { data, isLoading, isError } = useMatchDetail(comp, fixture.id, false);
   return (
-    <div className="bg-drawer -mx-5 px-5 py-4">
+    <div className="bg-drawer px-5 py-4">
       {isLoading && <SkeletonLines lines={3} />}
       {!isLoading && isError && (
         <p className="font-sans text-[11px] text-muted">Match detail unavailable.</p>
@@ -266,7 +266,11 @@ export default function FixtureRow({ fixture, followedIds = new Set(), showConte
         className="w-full text-left block py-3 border-b border-rule/70">
         {body}
       </button>
-      <Collapse open={open}>
+      {/* The full-bleed (-mx-5, escaping AppShell's page padding) lives on
+          the Collapse itself: its overflow-hidden — load-bearing for the
+          height clip — would otherwise clip the drawer's own negative-
+          margin overhang and inset the box (v1.3.1 hotfix, user report). */}
+      <Collapse open={open} className="-mx-5">
         {everOpened && <FixtureDrawer comp={comp} fixture={fixture} />}
       </Collapse>
     </div>

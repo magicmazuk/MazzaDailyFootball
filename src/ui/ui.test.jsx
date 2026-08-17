@@ -384,3 +384,23 @@ test('FixtureRow: the crest button still navigates to the team page from an expa
   // the row itself must not have toggled open as a side effect
   expect(screen.getByRole('button', { expanded: false })).toBeInTheDocument();
 });
+
+// --- v1.3.1 hotfix (user report): Collapse's overflow-hidden clipped the
+// drawer's own -mx-5 full-bleed, insetting the box off the screen edges.
+// The bleed lives on the Collapse wrapper now; the drawer keeps only its
+// horizontal padding. ---
+
+test('FixtureRow: the drawer bleeds edge-to-edge via the Collapse wrapper, not a clipped negative margin', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({ isLoading: true, isError: false, data: undefined });
+  const { container } = render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('ft')} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  const collapse = container.querySelector('.collapse-glide');
+  expect(collapse).toHaveClass('-mx-5');
+  const drawer = collapse.querySelector('.bg-drawer');
+  expect(drawer.className).not.toMatch(/-mx-5/);
+});

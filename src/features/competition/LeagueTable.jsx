@@ -28,7 +28,7 @@ function Drawer({ row, form }) {
     ['L', row.lost], ['GF', row.goalsFor], ['GA', row.goalsAgainst],
   ];
   return (
-    <div className="bg-drawer -mx-5 px-5 py-4 xfade-in">
+    <div className="bg-drawer px-5 py-4 xfade-in">
       <div className="grid grid-cols-6 gap-x-1 gap-y-2 text-center">
         {cells.map(([k, v]) => (
           <div key={k}>
@@ -102,7 +102,10 @@ export default function LeagueTable({ comp, rows, followedIds, formByTeam }) {
           {/* No fetch here — the row + form are already props (spec §13.21),
               so the drawer glides straight open to its content, never a
               skeleton. */}
-          <Collapse open={openId === row.teamId}>
+          {/* -mx-5 on the Collapse, not the Drawer: Collapse's overflow-
+              hidden would clip the drawer's own negative-margin bleed
+              (v1.3.1 hotfix — same fix as FixtureRow). */}
+          <Collapse open={openId === row.teamId} className="-mx-5">
             {everOpenedIds.has(row.teamId) && (
               <Drawer row={{ ...row, compId: comp.id }} form={formByTeam[row.teamId]} />
             )}
