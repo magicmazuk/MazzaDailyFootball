@@ -779,3 +779,25 @@ Everything that appears on screen now arrives through ONE motion language:
 - **Reduced motion**: every rule above collapses to instant state changes under
   prefers-reduced-motion — one global CSS guard, not per-component opt-ins.
 - The draw ceremony's own choreography (§8.3-8.5) is UNTOUCHED — it is performance, not chrome.
+
+## 13.22 The drawers, redrawn (v1.4)
+
+User verdict on the interior mockups (2026-08-17): result drawer = "the match line" (R-A);
+fixture drawer = "the ledger alone" (F-B) PLUS F-A's balance bar. Explicit constraint:
+"make sure typography is consistent!" — every text style in the drawers reuses an EXISTING
+recipe from the app's furniture, no new sizes/weights/trackings.
+
+**Result drawer**: a full-width match line — hairline axis (ink), 0′/HT/90′ ticks (scale
+stretches to 120′ with a 90′ tick when extra-time goals exist), goals as 9px club-coloured dots
+(home above, away below, colour falls back to muted), minute labels in the muted 8px sans that
+skip when they'd collide. Beneath: two scorer columns under club sub-labels (surname + minutes,
+(pen)/(og) markers kept). Meta line: venue · attendance (whichever exist). Skeleton/error/Full
+detail unchanged.
+
+**Fixture drawer**: "Recent meetings" sub-label; each meeting an aligned row — fixed-width date
+column (sans, tabular) then crest · score · crest as played, tabular serif. Beneath: the balance
+bar — one 12px rounded bar, segments proportional to each side's wins in those meetings (this
+fixture's home club's colour left, away right, draws in the rule tone between), captioned
+"{Home} n · drawn n · {Away} n". Meta line: venue · date · kickoff. No form glyphs, no
+positions (F-B chosen over F-A's extras). Empty meetings keep "No recent meetings." and show
+no bar.

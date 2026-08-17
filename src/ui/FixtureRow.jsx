@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { byId } from '../domain/competitions.js';
+import { monogram } from '../domain/monogram.js';
 import { prettifyRound } from '../domain/round.js';
 import { useMatchDetail } from '../data/queries.js';
 import Collapse from './Collapse.jsx';
@@ -109,11 +110,20 @@ function creditedSide(event, fixture) {
   return null;
 }
 
+// A player's surname (spec §13.22, task 1: the match line's scorer
+// columns) — the last word of their full name, so "Daizen Maeda" reads as
+// "Maeda" beside its minutes fragment, matching a scorecard's convention.
+function surnameOf(name) {
+  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean);
+  return parts.length > 0 ? parts[parts.length - 1] : (name ?? '');
+}
+
 // Scorers grouped by the side credited for each goal, then by player (spec
-// §13.19.1): every goal one player scored collapses onto a single
-// "Maeda 12′, 61′" line; different scorers on the same side join with
-// ' · '. Events with no player, or that credit neither side, are skipped
-// rather than crashing.
+// §13.19.1, redrawn per spec §13.22 task 1): every goal one player scored
+// collapses onto a single line — surname + its minutes joined by commas
+// ("Miller 82′ (pen), 90+4′") — one line per scorer, in first-goal order.
+// Events with no player, or that credit neither side, are skipped rather
+// than crashing.
 function scorersBySide(events, fixture) {
   const goalsBySide = { home: [], away: [] };
   for (const e of events ?? []) {
@@ -121,7 +131,7 @@ function scorersBySide(events, fixture) {
     const side = creditedSide(e, fixture);
     if (side) goalsBySide[side].push(e);
   }
-  const format = goals => {
+  const build = goals => {
     const order = [];
     const minutesByPlayer = new Map();
     for (const g of goals) {
@@ -129,11 +139,74 @@ function scorersBySide(events, fixture) {
         minutesByPlayer.set(g.player, []);
         order.push(g.player);
       }
-      minutesByPlayer.get(g.player).push(`${g.minute}${goalMarker(g.type)}`);
+      // ESPN's clock strings carry straight apostrophes ("90'+4'"); the
+      // match line above renders primes — one drawer, one mark (v1.4
+      // final review, L2; same conversion player.js applies to heights).
+      minutesByPlayer.get(g.player).push(`${String(g.minute).replace(/'/g, '′')}${goalMarker(g.type)}`);
     }
-    return order.map(player => `${player} ${minutesByPlayer.get(player).join(', ')}`).join(' · ');
+    return order.map(player => ({
+      player, surname: surnameOf(player),
+      minutesText: minutesByPlayer.get(player).join(', '),
+    }));
   };
-  return { home: format(goalsBySide.home), away: format(goalsBySide.away) };
+  return { home: build(goalsBySide.home), away: build(goalsBySide.away) };
+}
+
+// A goal event's leading minute integer (spec §13.22, task 1: the match
+// line) — "90'+4'" and "105'" both parse via their LEADING digits only, so
+// a stoppage-time goal keeps the minute it was added to (90), not the
+// stoppage count. Unparseable/absent minutes return null so the caller can
+// skip them rather than plot a NaN.
+function leadingMinute(raw) {
+  const m = /^(\d+)/.exec(raw ?? '');
+  return m ? Number(m[1]) : null;
+}
+
+// The match line's goal positions (spec §13.22, task 1), exported for
+// direct unit-testing of the scale/clamp/skip logic. A 90-minute axis
+// stretches to 120 the moment any goal's leading minute passes 90 (extra
+// time); every goal's pct is clamped to the resulting scale so a genuine
+// outlier (e.g. 130') still lands on the right edge instead of overflowing
+// past 100%. Labels are thinned per side: a dot within 7% of the last
+// LABELLED dot on the SAME side goes unlabelled (busy scrambles, e.g. a
+// stoppage-time flurry, still read as one moment rather than a smear of
+// overlapping numerals) — the other side's labels are unaffected.
+export function timelinePoints(events, fixture) {
+  const goals = (events ?? [])
+    .filter(e => e.scoringPlay)
+    .map(e => ({ minute: leadingMinute(e.minute), side: creditedSide(e, fixture) }))
+    .filter(e => e.minute != null && e.side)
+    .sort((a, b) => a.minute - b.minute);
+  if (goals.length === 0) return [];
+  const scale = goals.some(g => g.minute > 90) ? 120 : 90;
+  const lastLabelledPct = { home: null, away: null };
+  return goals.map(g => {
+    const pct = Math.min(g.minute, scale) / scale * 100;
+    const last = lastLabelledPct[g.side];
+    const labelled = last == null || Math.abs(pct - last) >= 7;
+    if (labelled) lastLabelledPct[g.side] = pct;
+    return { pct, side: g.side, minute: g.minute, labelled };
+  });
+}
+
+// The head-to-head balance (spec §13.22, task 1: the balance bar), exported
+// for direct unit-testing of the attribution. Meetings carry only
+// homeName/awayName (espn.js's adaptHeadToHead — no teamId), so a club is
+// identified by matching its NAME against this fixture's own home/away
+// sides — the only two clubs a head-to-head meeting can ever involve.
+// Whichever side THIS fixture's home club played in a given meeting (it
+// flips freely across meetings), a win for that club counts as homeWins;
+// same logic, mirrored, for the away club. Draws are orientation-agnostic.
+export function meetingBalance(meetings, fixture) {
+  const result = { homeWins: 0, draws: 0, awayWins: 0 };
+  for (const m of meetings ?? []) {
+    if (m.homeScore == null || m.awayScore == null) continue;
+    if (m.homeScore === m.awayScore) { result.draws += 1; continue; }
+    const winnerName = m.homeScore > m.awayScore ? m.homeName : m.awayName;
+    if (winnerName === fixture.home.name) result.homeWins += 1;
+    else if (winnerName === fixture.away.name) result.awayWins += 1;
+  }
+  return result;
 }
 
 function FullDetailLink({ comp, fixture }) {
@@ -146,44 +219,222 @@ function FullDetailLink({ comp, fixture }) {
   );
 }
 
-// Result drawer content (spec §13.19.1): each side's scorers, then
-// attendance when the source published it, then the way through to the
-// full page. A goalless side (or a goalless match) simply contributes no
-// line — nothing to report is not a degraded state.
+// The match line (spec §13.22, task 1): ninety minutes (widened to 120 the
+// moment any goal's leading minute passes 90) as a single hairline axis —
+// home goals above, away below, half-time ticked. Always renders, even
+// with zero points: the bare axis IS the 0-0 story (brief, task 1c).
+// Tick/minute-label typography: the muted 8px sans (MonthGrid's own
+// overflow-count recipe), plus tabular-nums for the numerals — a variant,
+// not a new size/tracking/weight combination.
+function MatchLine({ points, fixture }) {
+  const scale = points.some(p => p.minute > 90) ? 120 : 90;
+  const ticks = [
+    { pos: 'left', label: '0′' },
+    { pos: 'center', pct: (45 / scale) * 100, label: 'HT' },
+    ...(scale === 120 ? [{ pos: 'center', pct: (90 / scale) * 100, label: '90′' }] : []),
+    { pos: 'right', label: `${scale}′` },
+  ];
+  const dotStyle = clubSide => (clubSide.colour ? { background: `#${clubSide.colour}` } : undefined);
+  // border-ink: the Shirt.jsx idiom — every club-coloured shape carries a
+  // 1px ink outline so a pale kit (Fulham/Spurs/Leeds are literally
+  // #ffffff in the feed) still reads as a shape on the drawer tone
+  // (v1.4 final review, M1).
+  const dotClass = clubSide => `absolute w-[9px] h-[9px] rounded-full border border-ink -translate-x-1/2 -translate-y-1/2 ${
+    clubSide.colour ? '' : 'bg-muted'}`;
+  // Vertical bands, top to bottom (v1.4 final review, M2 — tick labels
+  // used to share the away-dot band, so an early or stoppage-time away
+  // goal overpainted "0′"/"HT"/"90′"): home minute labels 0-10, home dots
+  // ~15-25, axis 30, away dots ~35-45, away minute labels 46-56, tick
+  // labels 56-66. Each row owns its strip; nothing overlaps.
+  return (
+    <div className="relative h-[66px] mt-2 mb-1">
+      <div data-testid="match-axis" className="absolute inset-x-0 top-[30px] h-px bg-ink" />
+      {ticks.map(t => (
+        <span key={t.label}
+          className={`absolute bottom-0 font-sans text-[8px] text-muted tabular-nums ${
+            t.pos === 'left' ? 'left-0' : t.pos === 'right' ? 'right-0' : '-translate-x-1/2'}`}
+          style={t.pos === 'center' ? { left: `${t.pct}%` } : undefined}>
+          {t.label}
+        </span>
+      ))}
+      {points.map((p, i) => (
+        <span key={`dot-${i}`} data-testid="goal-dot" data-side={p.side}
+          className={`${dotClass(fixture[p.side])} ${p.side === 'home' ? 'top-[20px]' : 'top-[40px]'}`}
+          style={{ left: `${p.pct}%`, ...dotStyle(fixture[p.side]) }} />
+      ))}
+      {points.filter(p => p.labelled).map((p, i) => (
+        <span key={`lab-${i}`}
+          className={`absolute -translate-x-1/2 font-sans text-[8px] text-muted tabular-nums ${
+            p.side === 'home' ? 'top-0' : 'top-[46px]'}`}
+          style={{ left: `${p.pct}%` }}>
+          {p.minute}′
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// One scorer column (spec §13.22, task 1b): the FieldBoard muted sub-label
+// recipe over the club's shortName, then one line per scorer — surname in
+// the drawer's existing serif content size, minutes fragment in a muted
+// sans tabular style (markers kept, e.g. "82′ (pen), 90+4′"). Always
+// renders its label even with zero scorers (the 0-0 "empty column" case).
+function ScorerColumn({ clubSide, scorers, testId }) {
+  return (
+    <div data-testid={testId}>
+      <p className="font-sans text-[9px] uppercase tracking-[.14em] text-muted mb-3">
+        {clubSide.shortName ?? clubSide.name}
+      </p>
+      {scorers.map(s => (
+        <p key={s.player} className="text-[13px] mb-1">
+          {s.surname} <span className="font-sans text-[10.5px] text-muted tabular-nums">{s.minutesText}</span>
+        </p>
+      ))}
+    </div>
+  );
+}
+
+// Result drawer content (spec §13.19.1, redrawn per spec §13.22 task 1 —
+// "the match line"): the goal timeline, two scorer columns, then venue +
+// attendance whichever the source published, then the way through to the
+// full page.
 function ResultDrawer({ detail, fixture, comp }) {
+  const points = timelinePoints(detail.events, fixture);
   const scorers = scorersBySide(detail.events, fixture);
   const attendance = detail.gameInfo?.attendance;
+  const metaParts = [
+    detail.gameInfo?.venue,
+    attendance != null ? `Attendance ${Number(attendance).toLocaleString('en-GB')}` : null,
+  ].filter(Boolean);
   return (
     <>
-      {scorers.home && <p className="text-[13px] mb-1">{fixture.home.name}: {scorers.home}</p>}
-      {scorers.away && <p className="text-[13px] mb-1">{fixture.away.name}: {scorers.away}</p>}
-      {attendance != null && (
-        <p className="font-sans text-[10px] text-muted tabular-nums mt-2">
-          Attendance {Number(attendance).toLocaleString('en-GB')}
-        </p>
+      <MatchLine points={points} fixture={fixture} />
+      <div className="grid grid-cols-2 gap-x-4 mt-3">
+        <ScorerColumn clubSide={fixture.home} scorers={scorers.home} testId="scorer-col-home" />
+        <ScorerColumn clubSide={fixture.away} scorers={scorers.away} testId="scorer-col-away" />
+      </div>
+      {metaParts.length > 0 && (
+        <p className="font-sans text-[10px] text-muted tabular-nums mt-2">{metaParts.join(' · ')}</p>
       )}
       <FullDetailLink comp={comp} fixture={fixture} />
     </>
   );
 }
 
-// Upcoming drawer content (spec §13.19.1): the last three head-to-head
-// meetings, most recent first — sorted here rather than trusted from the
-// feed, since seasonseries' event order isn't guaranteed. "No recent
-// meetings." keeps the line honest rather than blank when there are none.
+// A meeting side, resolved onto this fixture's own club records (spec
+// §13.22, task 1: the ledger) — head-to-head meetings carry only names
+// (espn.js's adaptHeadToHead has no teamId), and a meeting can only ever
+// be between THIS fixture's two clubs, so matching by name recovers the
+// crest the meeting's own row can't carry. An unmatched name (should never
+// happen) still renders via the monogram fallback rather than crashing.
+function meetingSide(name, fixture) {
+  if (name === fixture.home.name) return fixture.home;
+  if (name === fixture.away.name) return fixture.away;
+  return { name, crestUrl: null, monogram: monogram(name) };
+}
+
+// One head-to-head meeting row (spec §13.22, task 1b): a fixed-width date
+// column (the muted sans tabular recipe), then that meeting's OWN
+// home/away order — crest, tabular serif score, crest.
+function MeetingRow({ meeting, fixture }) {
+  const home = meetingSide(meeting.homeName, fixture);
+  const away = meetingSide(meeting.awayName, fixture);
+  return (
+    <div data-testid="meeting-row" className="flex items-center gap-2.5 py-1">
+      <span className="w-[84px] shrink-0 font-sans text-[10px] text-muted tabular-nums">
+        {shortDate(meeting.date)}
+      </span>
+      <span className="flex items-center gap-2 text-[13px] tabular-nums">
+        <Crest side={home} size={20} />
+        {meeting.homeScore}–{meeting.awayScore}
+        <Crest side={away} size={20} />
+      </span>
+    </div>
+  );
+}
+
+// The balance bar (spec §13.22, task 1c): a club-coloured proportion of
+// the shown meetings' outcomes — THIS fixture's home club's wins on the
+// left (its colour), draws the quiet middle (bg-rule always — no club
+// owns a draw), this fixture's away club's wins on the right (its
+// colour). The caller only mounts this once meetings.length > 0, so total
+// is always > 0 here; the guard is defensive, not reachable in practice.
+function BalanceBar({ homeWins, draws, awayWins, fixture }) {
+  const total = homeWins + draws + awayWins;
+  if (total === 0) return null;
+  const pct = n => `${(n / total) * 100}%`;
+  const segStyle = clubSide => (clubSide.colour ? { background: `#${clubSide.colour}` } : undefined);
+  const segClass = clubSide => (clubSide.colour ? '' : 'bg-muted');
+  return (
+    <>
+      {/* border-ink + ink dividers (the Shirt.jsx outline idiom, v1.4
+          final review M1): a white-kitted club's segment must read as a
+          bounded region of the bar, not as empty track. Zero-count
+          segments don't render at all — a divider against nothing would
+          paint a stray 1px line. */}
+      <div className="h-3 rounded-[3px] overflow-hidden flex mt-1.5 mb-1.5 border border-ink divide-x divide-ink">
+        {homeWins > 0 && (
+          <div data-testid="balance-seg-home" className={`h-full ${segClass(fixture.home)}`}
+            style={{ width: pct(homeWins), ...segStyle(fixture.home) }} />
+        )}
+        {draws > 0 && (
+          <div data-testid="balance-seg-draws" className="h-full bg-rule" style={{ width: pct(draws) }} />
+        )}
+        {awayWins > 0 && (
+          <div data-testid="balance-seg-away" className={`h-full ${segClass(fixture.away)}`}
+            style={{ width: pct(awayWins), ...segStyle(fixture.away) }} />
+        )}
+      </div>
+      <div className="flex justify-between font-sans text-[10px] text-muted tabular-nums">
+        <span>{fixture.home.shortName ?? fixture.home.name} {homeWins}</span>
+        <span>drawn {draws}</span>
+        <span>{fixture.away.shortName ?? fixture.away.name} {awayWins}</span>
+      </div>
+    </>
+  );
+}
+
+// Weekday-date and kickoff-time formatting (spec §13.22, task 1d) — the
+// app's existing en-GB conventions, exactly as NextUpRow/TodayView/
+// roundGroups already format a fixture's day, and StatusWord already
+// formats its kickoff clock.
+const weekdayDate = iso => new Date(iso).toLocaleDateString('en-GB',
+  { weekday: 'short', day: 'numeric', month: 'short' });
+const kickoffTime = iso => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+// Upcoming drawer content (spec §13.19.1, redrawn per spec §13.22 task 1 —
+// "the ledger + the balance"): the last three head-to-head meetings as
+// aligned rows, most recent first — sorted here rather than trusted from
+// the feed, since seasonseries' event order isn't guaranteed — then the
+// balance those meetings strike between the two clubs. "No recent
+// meetings." keeps the line honest rather than blank when there are none
+// (and there's no proportion left to bar).
 function UpcomingDrawer({ detail, fixture, comp }) {
   const meetings = [...(detail.headToHead?.meetings ?? [])]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 3);
+  const { homeWins, draws, awayWins } = meetingBalance(meetings, fixture);
+  const metaParts = [
+    fixture.venue,
+    fixture.kickoff ? weekdayDate(fixture.kickoff) : null,
+    fixture.kickoff ? kickoffTime(fixture.kickoff) : null,
+  ].filter(Boolean);
   return (
     <>
+      <p className="font-sans text-[9px] uppercase tracking-[.14em] text-muted mb-3">Recent meetings</p>
       {meetings.length === 0
         ? <p className="text-[13px] text-muted mb-1">No recent meetings.</p>
-        : meetings.map((m, i) => (
-          <p key={i} className="text-[12px] mb-1">
-            {shortDate(m.date)} · {m.homeName} {m.homeScore}–{m.awayScore} {m.awayName}
-          </p>
-        ))}
+        : (
+          <>
+            <div className="mb-1">
+              {meetings.map((m, i) => <MeetingRow key={i} meeting={m} fixture={fixture} />)}
+            </div>
+            <BalanceBar homeWins={homeWins} draws={draws} awayWins={awayWins} fixture={fixture} />
+          </>
+        )}
+      {metaParts.length > 0 && (
+        <p className="font-sans text-[10px] text-muted tabular-nums mt-2">{metaParts.join(' · ')}</p>
+      )}
       <FullDetailLink comp={comp} fixture={fixture} />
     </>
   );

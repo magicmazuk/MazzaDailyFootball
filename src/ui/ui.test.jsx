@@ -14,7 +14,7 @@ vi.mock('../data/queries.js', () => ({
   useMatchDetail: vi.fn(() => ({ data: undefined, isLoading: false, isError: false })),
 }));
 
-import FixtureRow from './FixtureRow.jsx';
+import FixtureRow, { timelinePoints, meetingBalance } from './FixtureRow.jsx';
 import { useMatchDetail } from '../data/queries.js';
 
 beforeEach(() => {
@@ -227,21 +227,155 @@ test('FixtureRow: an own goal stays under its event teamId — ESPN already cred
       { minute: "30'", type: 'Own Goal', player: 'Unlucky Defender', teamId: '256', scoringPlay: true },
     ] } },
   });
-  render(
+  const { container } = render(
     <MemoryRouter>
       <FixtureRow fixture={fixture('ft')} followedIds={new Set()} />
     </MemoryRouter>,
   );
   await user.click(screen.getByRole('button', { expanded: false }));
 
-  const link = screen.getByRole('link', { name: 'Full detail →' });
-  const drawer = link.parentElement;
-  expect(drawer.textContent).toContain('Celtic: Unlucky Defender 30');
-  expect(drawer.textContent).toContain('(og)');
-  expect(drawer.textContent).not.toContain('St Johnstone: Unlucky Defender');
+  // The own goal's dot sits on the HOME side of the match line...
+  const dot = container.querySelector('[data-testid="goal-dot"]');
+  expect(dot).toHaveAttribute('data-side', 'home');
+  // ...and its scorer line lives in the home column, not away's.
+  const homeCol = container.querySelector('[data-testid="scorer-col-home"]');
+  const awayCol = container.querySelector('[data-testid="scorer-col-away"]');
+  expect(homeCol.textContent).toContain('Defender');
+  expect(homeCol.textContent).toContain('(og)');
+  expect(awayCol.textContent).not.toContain('Defender');
 });
 
-test('FixtureRow: a sched espn row\'s drawer shows the last 3 head-to-head meetings, most recent first', async () => {
+// --- the match line (spec §13.22, task 1) ---
+
+test('FixtureRow: the result drawer\'s match line plots a goal dot per side in its club colour, muted when a club carries none', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { events: [
+      { minute: "16'", type: 'Goal', player: 'Lawrence Shankland', teamId: '256', scoringPlay: true },
+      { minute: "54'", type: 'Goal', player: 'Billy Mckay', teamId: '267', scoringPlay: true },
+    ] } },
+  });
+  const { container } = render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('ft', {
+        home: side({ teamId: '256', name: 'Heart of Midlothian', colour: '009921' }),
+        away: side({ teamId: '267', name: 'Inverness CT', colour: null }),
+      })} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  const dots = container.querySelectorAll('[data-testid="goal-dot"]');
+  expect(dots).toHaveLength(2);
+  const homeDot = [...dots].find(d => d.dataset.side === 'home');
+  const awayDot = [...dots].find(d => d.dataset.side === 'away');
+  expect(homeDot.style.background).toBe('rgb(0, 153, 33)'); // #009921
+  expect(homeDot).not.toHaveClass('bg-muted');
+  expect(awayDot.style.background).toBe('');
+  expect(awayDot).toHaveClass('bg-muted');
+});
+
+test('FixtureRow: a 0-0 result still renders the match line axis with no dots — nothing to list is honest', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({ isLoading: false, isError: false, data: { detail: { events: [] } } });
+  const { container } = render(
+    <MemoryRouter><FixtureRow fixture={fixture('ft')} followedIds={new Set()} /></MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  expect(container.querySelector('[data-testid="match-axis"]')).toBeInTheDocument();
+  expect(container.querySelectorAll('[data-testid="goal-dot"]')).toHaveLength(0);
+  // both scorer columns still render, just with nothing listed under them
+  expect(container.querySelector('[data-testid="scorer-col-home"]')).toBeInTheDocument();
+  expect(container.querySelector('[data-testid="scorer-col-away"]')).toBeInTheDocument();
+});
+
+test('FixtureRow: the result drawer lists scorers in two columns under each club\'s sub-label, surname + minutes fragment, one line per scorer', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { events: [
+      { minute: "16'", type: 'Goal', player: 'Lawrence Shankland', teamId: '256', scoringPlay: true },
+      { minute: "82'", type: 'Penalty', player: 'David Miller', teamId: '256', scoringPlay: true },
+      { minute: "90+4'", type: 'Penalty', player: 'David Miller', teamId: '256', scoringPlay: true },
+      { minute: "54'", type: 'Goal', player: 'Aaron Doran', teamId: '267', scoringPlay: true },
+    ] } },
+  });
+  const { container } = render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('ft', {
+        home: side({ teamId: '256', name: 'Heart of Midlothian', shortName: 'Hearts' }),
+        away: side({ teamId: '267', name: 'Inverness CT', shortName: 'Inverness CT' }),
+      })} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  const homeCol = container.querySelector('[data-testid="scorer-col-home"]');
+  const awayCol = container.querySelector('[data-testid="scorer-col-away"]');
+  expect(homeCol.textContent).toContain('Hearts'); // club shortName sub-label
+  // one line per scorer — Miller's two goals join onto ONE line, comma-joined
+  expect(homeCol.querySelectorAll('p')).toHaveLength(3); // sub-label + Shankland + Miller
+  expect(homeCol.textContent).toContain('Shankland');
+  expect(homeCol.textContent).toContain('16');
+  expect(homeCol.textContent).toContain('Miller');
+  expect(homeCol.textContent).toContain('82');
+  expect(homeCol.textContent).toContain('90+4');
+  expect(homeCol.textContent).toContain('(pen)');
+  expect(awayCol.textContent).toContain('Doran');
+  expect(awayCol.textContent).not.toContain('Shankland');
+});
+
+test('FixtureRow: the result drawer\'s scorer sub-labels reuse the exact FieldBoard muted sub-label recipe — typography-consistency constraint, executable', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({ isLoading: false, isError: false, data: { detail: { events: [] } } });
+  const { container } = render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('ft', {
+        home: side({ teamId: '256', name: 'Celtic', shortName: 'Celtic' }),
+      })} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  const label = container.querySelector('[data-testid="scorer-col-home"] p');
+  expect(label.textContent).toBe('Celtic');
+  expect(label.className).toBe('font-sans text-[9px] uppercase tracking-[.14em] text-muted mb-3');
+});
+
+test('FixtureRow: the result drawer\'s meta line joins venue and attendance, dropping whichever is absent', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { events: [], gameInfo: { venue: 'Tynecastle Park', attendance: 15327 } } },
+  });
+  render(<MemoryRouter><FixtureRow fixture={fixture('ft')} followedIds={new Set()} /></MemoryRouter>);
+  await user.click(screen.getByRole('button', { expanded: false }));
+  expect(screen.getByText('Tynecastle Park · Attendance 15,327')).toBeInTheDocument();
+});
+
+test('FixtureRow: the result drawer\'s meta line renders venue alone when attendance is unpublished', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { events: [], gameInfo: { venue: 'Tynecastle Park', attendance: null } } },
+  });
+  render(<MemoryRouter><FixtureRow fixture={fixture('ft')} followedIds={new Set()} /></MemoryRouter>);
+  await user.click(screen.getByRole('button', { expanded: false }));
+  expect(screen.getByText('Tynecastle Park')).toBeInTheDocument();
+  expect(screen.queryByText(/Attendance/)).not.toBeInTheDocument();
+});
+
+test('FixtureRow: the result drawer renders no meta line when neither venue nor attendance exist', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({ isLoading: false, isError: false, data: { detail: { events: [] } } });
+  const { container } = render(
+    <MemoryRouter><FixtureRow fixture={fixture('ft')} followedIds={new Set()} /></MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  const metaLine = [...container.querySelectorAll('p')]
+    .find(p => p.className === 'font-sans text-[10px] text-muted tabular-nums mt-2');
+  expect(metaLine).toBeUndefined();
+});
+
+test('FixtureRow: a sched espn row\'s drawer shows the last 3 head-to-head meetings, most recent first, as aligned rows', async () => {
   const user = userEvent.setup();
   useMatchDetail.mockReturnValue({
     isLoading: false, isError: false,
@@ -252,23 +386,118 @@ test('FixtureRow: a sched espn row\'s drawer shows the last 3 head-to-head meeti
       { date: '2022-08-10', homeName: 'Celtic', awayName: 'St Johnstone', homeScore: 4, awayScore: 1 },
     ] } } },
   });
-  render(
+  const { container } = render(
     <MemoryRouter>
       <FixtureRow fixture={fixture('scheduled')} followedIds={new Set()} />
     </MemoryRouter>,
   );
   await user.click(screen.getByRole('button', { expanded: false }));
 
-  const link = screen.getByRole('link', { name: 'Full detail →' });
-  const drawer = link.parentElement;
-  const lines = [...drawer.querySelectorAll('p')].map(p => p.textContent);
-  expect(lines).toHaveLength(3); // capped at 3, the oldest (2022) meeting dropped
-  expect(lines[0]).toContain('St Johnstone 1–2 Celtic'); // most recent (2025) first
-  expect(lines[1]).toContain('Celtic 3–0 St Johnstone'); // 2024
-  expect(lines[2]).toContain('Celtic 2–2 St Johnstone'); // 2023
+  const rows = container.querySelectorAll('[data-testid="meeting-row"]');
+  expect(rows).toHaveLength(3); // capped at 3, the oldest (2022) meeting dropped
+  const rowText = [...rows].map(r => r.textContent);
+  expect(rowText[0]).toContain('10 Aug 2025'); // most recent (2025) first
+  expect(rowText[0]).toContain('1–2');
+  expect(rowText[1]).toContain('10 Aug 2024');
+  expect(rowText[1]).toContain('3–0');
+  expect(rowText[2]).toContain('10 Aug 2023');
+  expect(rowText[2]).toContain('2–2');
 });
 
-test('FixtureRow: a sched espn row with no head-to-head history says so, and still links through', async () => {
+test('FixtureRow: each meeting row shows crests in that meeting\'s OWN home/away order, with tabular scores', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { headToHead: { meetings: [
+      { date: '2026-03-04', homeName: 'Aberdeen', awayName: 'Celtic', homeScore: 1, awayScore: 2 },
+      { date: '2025-12-21', homeName: 'Celtic', awayName: 'Aberdeen', homeScore: 3, awayScore: 1 },
+    ] } } },
+  });
+  const { container } = render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('scheduled', {
+        home: side({ teamId: '256', name: 'Celtic', crestUrl: 'celtic.png' }),
+        away: side({ teamId: '299', name: 'Aberdeen', crestUrl: 'aberdeen.png' }),
+      })} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+
+  const rows = container.querySelectorAll('[data-testid="meeting-row"]');
+  expect(rows).toHaveLength(2);
+  const crests0 = rows[0].querySelectorAll('img');
+  expect(crests0[0]).toHaveAttribute('src', 'aberdeen.png'); // that meeting's own home first
+  expect(crests0[1]).toHaveAttribute('src', 'celtic.png');
+  expect(rows[0].querySelector('.tabular-nums')).toBeInTheDocument();
+
+  const crests1 = rows[1].querySelectorAll('img');
+  expect(crests1[0]).toHaveAttribute('src', 'celtic.png');
+  expect(crests1[1]).toHaveAttribute('src', 'aberdeen.png');
+});
+
+// --- the balance bar (spec §13.22, task 1) ---
+
+test('FixtureRow: the fixture drawer\'s balance bar segments are proportional and club-coloured, with a captioned tally beneath', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { headToHead: { meetings: [
+      { date: '2026-03-04', homeName: 'Aberdeen', awayName: 'Celtic', homeScore: 1, awayScore: 2 }, // Celtic win
+      { date: '2025-12-21', homeName: 'Celtic', awayName: 'Aberdeen', homeScore: 1, awayScore: 1 }, // draw
+      { date: '2025-08-10', homeName: 'Aberdeen', awayName: 'Celtic', homeScore: 0, awayScore: 2 }, // Celtic win
+    ] } } },
+  });
+  const { container } = render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('scheduled', {
+        home: side({ teamId: '256', name: 'Celtic', shortName: 'Celtic', colour: '009921' }),
+        away: side({ teamId: '299', name: 'Aberdeen', shortName: 'Aberdeen', colour: null }),
+      })} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+
+  const homeSeg = container.querySelector('[data-testid="balance-seg-home"]');
+  const drawSeg = container.querySelector('[data-testid="balance-seg-draws"]');
+  const awaySeg = container.querySelector('[data-testid="balance-seg-away"]');
+  expect(homeSeg.style.width).toBe('66.66666666666666%');
+  expect(drawSeg.style.width).toBe('33.33333333333333%');
+  // Zero-count segments don't render at all (v1.4 final-review fix: the
+  // bar carries ink dividers, and a divider against an empty segment
+  // would paint a stray line). The caption still tallies the zero.
+  expect(awaySeg).toBeNull();
+  expect(homeSeg.style.background).toBe('rgb(0, 153, 33)'); // #009921
+  expect(drawSeg).toHaveClass('bg-rule');
+  expect(homeSeg.parentElement).toHaveClass('border-ink'); // Shirt's outline idiom — pale kits stay visible
+  expect(screen.getByText('Celtic 2')).toBeInTheDocument();
+  expect(screen.getByText('drawn 1')).toBeInTheDocument();
+  expect(screen.getByText('Aberdeen 0')).toBeInTheDocument();
+});
+
+test('FixtureRow: the fixture drawer\'s "Recent meetings" sub-label and balance caption reuse existing muted-sans recipes exactly — typography-consistency constraint, executable', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { headToHead: { meetings: [
+      { date: '2026-03-04', homeName: 'Aberdeen', awayName: 'Celtic', homeScore: 1, awayScore: 2 },
+    ] } } },
+  });
+  render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('scheduled', {
+        home: side({ teamId: '256', name: 'Celtic', shortName: 'Celtic' }),
+        away: side({ teamId: '299', name: 'Aberdeen', shortName: 'Aberdeen' }),
+      })} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  expect(screen.getByText('Recent meetings').className)
+    .toBe('font-sans text-[9px] uppercase tracking-[.14em] text-muted mb-3');
+  expect(screen.getByText('Celtic 1').closest('div'))
+    .toHaveClass('font-sans', 'text-[10px]', 'text-muted', 'tabular-nums');
+});
+
+test('FixtureRow: the fixture drawer\'s meta line joins venue, weekday date and kickoff time', async () => {
   const user = userEvent.setup();
   useMatchDetail.mockReturnValue({
     isLoading: false, isError: false,
@@ -276,12 +505,30 @@ test('FixtureRow: a sched espn row with no head-to-head history says so, and sti
   });
   render(
     <MemoryRouter>
+      <FixtureRow fixture={fixture('scheduled', {
+        venue: 'Celtic Park', kickoff: '2026-09-02T18:45:00Z',
+      })} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  expect(screen.getByText(/Celtic Park · Wed 2 Sept · \d{2}:\d{2}/)).toBeInTheDocument();
+});
+
+test('FixtureRow: a sched espn row with no head-to-head history says so, still links through, and shows no balance bar', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { headToHead: { meetings: [] } } },
+  });
+  const { container } = render(
+    <MemoryRouter>
       <FixtureRow fixture={fixture('scheduled')} followedIds={new Set()} />
     </MemoryRouter>,
   );
   await user.click(screen.getByRole('button', { expanded: false }));
   expect(screen.getByText('No recent meetings.')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Full detail →' })).toBeInTheDocument();
+  expect(container.querySelector('[data-testid="balance-seg-home"]')).not.toBeInTheDocument();
 });
 
 test('FixtureRow: the drawer shows skeleton lines (aria-hidden) while useMatchDetail is pending, not the old fetching text, with no link yet', async () => {
@@ -403,4 +650,150 @@ test('FixtureRow: the drawer bleeds edge-to-edge via the Collapse wrapper, not a
   expect(collapse).toHaveClass('-mx-5');
   const drawer = collapse.querySelector('.bg-drawer');
   expect(drawer.className).not.toMatch(/-mx-5/);
+});
+
+// --- timelinePoints (spec §13.22, task 1: the match line) — pure, no
+// rendering. scale/clamp/skip logic tested directly per the brief. ---
+
+test('timelinePoints: places goals proportionally on the 90-scale by minute, HOME above / AWAY below via creditedSide', () => {
+  const points = timelinePoints([
+    { minute: "9'", type: 'Goal', teamId: '256', scoringPlay: true },
+    { minute: "81'", type: 'Goal', teamId: '267', scoringPlay: true },
+  ], fixture('ft'));
+  expect(points).toEqual([
+    { pct: 10, side: 'home', minute: 9, labelled: true },
+    { pct: 90, side: 'away', minute: 81, labelled: true },
+  ]);
+});
+
+test("timelinePoints: a 90'+4' stoppage-time goal parses its leading minute integer and clamps to the scale's edge", () => {
+  const points = timelinePoints([
+    { minute: "90'+4'", type: 'Goal', teamId: '256', scoringPlay: true },
+  ], fixture('ft'));
+  expect(points).toEqual([{ pct: 100, side: 'home', minute: 90, labelled: true }]);
+});
+
+test('timelinePoints: a minute past 120 still clamps to the right edge rather than overflowing 100%', () => {
+  const points = timelinePoints([
+    { minute: "105'", type: 'Goal', teamId: '256', scoringPlay: true },
+    { minute: "130'", type: 'Goal', teamId: '267', scoringPlay: true },
+  ], fixture('ft'));
+  expect(points[1]).toEqual({ pct: 100, side: 'away', minute: 130, labelled: true });
+});
+
+test("timelinePoints: a 105' goal flips the scale from 90 to 120, repositioning every goal on the shared axis", () => {
+  const scale90 = timelinePoints([{ minute: "60'", teamId: '256', scoringPlay: true }], fixture('ft'));
+  expect(scale90[0].pct).toBeCloseTo(66.667, 2); // 60/90
+
+  const scale120 = timelinePoints([
+    { minute: "60'", teamId: '256', scoringPlay: true },
+    { minute: "105'", teamId: '267', scoringPlay: true },
+  ], fixture('ft'));
+  expect(scale120[0].pct).toBe(50); // 60/120, same raw minute now reads differently
+  expect(scale120[1].pct).toBe(87.5); // 105/120
+});
+
+test('timelinePoints: skips a label within 7% of the last LABELLED dot on the same side; the other side tracks independently', () => {
+  // Points are chronological (sorted by minute), so the away dot at 41'
+  // lands between the two home dots: 40, 41(away), 44, 70.
+  const points = timelinePoints([
+    { minute: "40'", teamId: '256', scoringPlay: true }, // home, pct 44.44 — first home dot: labelled
+    { minute: "44'", teamId: '256', scoringPlay: true }, // home, pct 48.89 — 4.44% from last labelled home: skip
+    { minute: "70'", teamId: '256', scoringPlay: true }, // home, pct 77.78 — far from 44.44: labelled
+    { minute: "41'", teamId: '267', scoringPlay: true }, // away, pct 45.56 — first away dot: always labelled
+  ], fixture('ft'));
+  expect(points.map(p => `${p.minute}:${p.side}`)).toEqual(['40:home', '41:away', '44:home', '70:home']);
+  expect(points.map(p => p.labelled)).toEqual([true, true, false, true]);
+});
+
+test('timelinePoints: an own-goal event stays under its own teamId credit, same as the scorer prose (v1.1 lesson)', () => {
+  const points = timelinePoints([
+    { minute: "27'", type: 'Own Goal', teamId: '256', scoringPlay: true },
+  ], fixture('ft'));
+  expect(points).toEqual([{ pct: 30, side: 'home', minute: 27, labelled: true }]);
+});
+
+test('timelinePoints: non-scoring events, unparseable minutes and events crediting neither side are skipped, not crashed', () => {
+  const points = timelinePoints([
+    { minute: "10'", teamId: '256', scoringPlay: false }, // not a goal
+    { minute: null, teamId: '256', scoringPlay: true }, // no minute
+    { minute: "20'", teamId: 'nobody', scoringPlay: true }, // credits neither side
+  ], fixture('ft'));
+  expect(points).toEqual([]);
+});
+
+test('timelinePoints: no events yields an empty array (0-0 renders the bare axis)', () => {
+  expect(timelinePoints([], fixture('ft'))).toEqual([]);
+  expect(timelinePoints(undefined, fixture('ft'))).toEqual([]);
+});
+
+// --- meetingBalance (spec §13.22, task 1: the balance bar) — pure. ---
+
+test('meetingBalance: attributes a win to this fixture\'s home club whichever side it played, both orientations', () => {
+  const fx = fixture('scheduled', {
+    home: side({ teamId: '256', name: 'Celtic' }),
+    away: side({ teamId: '299', name: 'Aberdeen' }),
+  });
+  const result = meetingBalance([
+    // this fixture's home club (Celtic) played AWAY here and won
+    { homeName: 'Aberdeen', awayName: 'Celtic', homeScore: 1, awayScore: 2 },
+    // this fixture's home club (Celtic) played HOME here and won
+    { homeName: 'Celtic', awayName: 'Aberdeen', homeScore: 3, awayScore: 1 },
+  ], fx);
+  expect(result).toEqual({ homeWins: 2, draws: 0, awayWins: 0 });
+});
+
+test('meetingBalance: all meetings won by this fixture\'s away club count as awayWins regardless of orientation', () => {
+  const fx = fixture('scheduled', {
+    home: side({ teamId: '256', name: 'Celtic' }),
+    away: side({ teamId: '299', name: 'Aberdeen' }),
+  });
+  const result = meetingBalance([
+    { homeName: 'Aberdeen', awayName: 'Celtic', homeScore: 2, awayScore: 0 },
+    { homeName: 'Celtic', awayName: 'Aberdeen', homeScore: 0, awayScore: 1 },
+    { homeName: 'Aberdeen', awayName: 'Celtic', homeScore: 3, awayScore: 1 },
+  ], fx);
+  expect(result).toEqual({ homeWins: 0, draws: 0, awayWins: 3 });
+});
+
+test('meetingBalance: equal scores count as a draw regardless of orientation', () => {
+  const fx = fixture('scheduled', {
+    home: side({ teamId: '256', name: 'Celtic' }),
+    away: side({ teamId: '299', name: 'Aberdeen' }),
+  });
+  const result = meetingBalance([
+    { homeName: 'Celtic', awayName: 'Aberdeen', homeScore: 1, awayScore: 1 },
+    { homeName: 'Aberdeen', awayName: 'Celtic', homeScore: 2, awayScore: 2 },
+  ], fx);
+  expect(result).toEqual({ homeWins: 0, draws: 2, awayWins: 0 });
+});
+
+test('meetingBalance: no meetings yields all-zero counts', () => {
+  expect(meetingBalance([], fixture('scheduled'))).toEqual({ homeWins: 0, draws: 0, awayWins: 0 });
+});
+
+// --- v1.4 final review, L4: the 120′ scale had unit coverage in
+// timelinePoints but no RENDER assertion for MatchLine's extra-time
+// tick set. ---
+
+test('FixtureRow: an extra-time result renders the 120′ tick set — 0′, HT, 90′ and 120′', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { events: [
+      { minute: "12'", type: 'Goal', player: 'Early Opener', teamId: '256', scoringPlay: true },
+      { minute: "105'", type: 'Goal', player: 'Extra Time Hero', teamId: '256', scoringPlay: true },
+    ] } },
+  });
+  render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('ft')} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+
+  expect(screen.getByText('0′')).toBeInTheDocument();
+  expect(screen.getByText('HT')).toBeInTheDocument();
+  expect(screen.getByText('90′')).toBeInTheDocument();
+  expect(screen.getByText('120′')).toBeInTheDocument();
 });
