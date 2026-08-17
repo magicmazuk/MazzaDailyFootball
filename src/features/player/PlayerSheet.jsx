@@ -84,7 +84,13 @@ export default function PlayerSheet({ comp, playerId, onClose }) {
   // to collapsed whenever playerId changes, which also covers the sheet
   // closing (callers null out playerId on close).
   const [expanded, setExpanded] = useState(false);
-  useEffect(() => { setExpanded(false); }, [playerId]);
+  // Lazy-ONCE mounting (fix round 1, HIGH): the expanded Splits region
+  // stays mounted once shown, even after collapsing back to the peek, so
+  // Collapse glides shut around real content — see FixtureRow's fuller
+  // comment on the same fix. Reset alongside `expanded` on playerId change
+  // so a new player's sheet never inherits the old player's mounted Splits.
+  const [everExpanded, setEverExpanded] = useState(false);
+  useEffect(() => { setExpanded(false); setEverExpanded(false); }, [playerId]);
 
   // Body scroll lock while open (gold review): without it a swipe on the
   // sheet also scrolls the page behind, so dismissing left the reader
@@ -118,7 +124,7 @@ export default function PlayerSheet({ comp, playerId, onClose }) {
     if (Math.abs(dx) > Math.abs(dy)) return; // horizontal-dominant swipe — ignore
 
     if (dy <= -SWIPE_THRESHOLD) {
-      if (!expanded) setExpanded(true);
+      if (!expanded) { setExpanded(true); setEverExpanded(true); }
     } else if (dy >= SWIPE_THRESHOLD) {
       if (expanded) {
         // A downward swipe over scrolled content is a scroll, not a
@@ -165,7 +171,8 @@ export default function PlayerSheet({ comp, playerId, onClose }) {
               button itself carries generous padding — canceled by an equal
               negative margin — so the tap/touch target clears 44px without
               growing the bar's footprint in the layout. */}
-          <button type="button" onClick={() => setExpanded(v => !v)}
+          <button type="button"
+            onClick={() => { setExpanded(v => !v); setEverExpanded(true); }}
             aria-label={expanded ? 'Collapse' : 'Expand profile'}
             className="p-[20.5px] -m-[20.5px]">
             <span aria-hidden className="block w-9 h-[3px] rounded-sm bg-rule" />
@@ -200,7 +207,8 @@ export default function PlayerSheet({ comp, playerId, onClose }) {
             <Headline items={headline} />
 
             {!expanded && (
-              <button type="button" onClick={() => setExpanded(true)}
+              <button type="button"
+                onClick={() => { setExpanded(true); setEverExpanded(true); }}
                 className="block w-full text-center font-sans text-[10px] uppercase
                   tracking-[.16em] text-accent mt-4">
                 Full profile →
@@ -215,7 +223,7 @@ export default function PlayerSheet({ comp, playerId, onClose }) {
                 growing past the viewport while genuinely tall content still
                 scrolls internally rather than pushing the sheet off-screen. */}
             <Collapse open={expanded}>
-              {expanded && (
+              {everExpanded && (
                 <div ref={scrollRef} className="mt-4 max-h-[60vh] overflow-y-auto overscroll-contain">
                   <Splits bio={bio} stats={stats} comp={comp} />
                   <Link to={`/player/${comp?.id}/${playerId}`} onClick={onClose}

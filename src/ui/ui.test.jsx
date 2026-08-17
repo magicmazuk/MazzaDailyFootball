@@ -187,7 +187,7 @@ test('FixtureRow: a ft espn row toggles a drawer with scorers and attendance, an
       gameInfo: { attendance: 58876 },
     } },
   });
-  render(
+  const { container } = render(
     <MemoryRouter>
       <FixtureRow fixture={fixture('ft')} followedIds={new Set()} />
     </MemoryRouter>,
@@ -206,9 +206,12 @@ test('FixtureRow: a ft espn row toggles a drawer with scorers and attendance, an
   expect(drawer.textContent).toContain('(pen)');
   expect(drawer.textContent).toContain('Attendance 58,876');
 
-  // tap again closes it
+  // tap again closes it — content stays mounted (clipped to height 0 by
+  // Collapse) rather than unmounting, so the close glide has real content
+  // to shut around instead of an already-empty box (fix round 1, HIGH).
   await user.click(screen.getByRole('button', { expanded: true }));
-  expect(screen.queryByRole('link', { name: 'Full detail →' })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Full detail →' })).toBeInTheDocument();
+  expect(container.querySelector('.collapse-glide').style.height).toBe('0px');
 });
 
 test('FixtureRow: an own goal stays under its event teamId — ESPN already credits the benefiting side', async () => {

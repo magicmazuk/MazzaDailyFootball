@@ -12,7 +12,7 @@ const row = (position, name, over = {}) => ({
 const rows = Array.from({ length: 12 }, (_, i) => row(i + 1, 'Team' + (i + 1)));
 
 test('tap a row to open its record; tap again to close', async () => {
-  render(<MemoryRouter>
+  const { container } = render(<MemoryRouter>
     <LeagueTable comp={byId('sco.1')} rows={rows} followedIds={new Set()}
       formByTeam={{ Team2: ['W', 'W', 'D', 'W', 'L'] }} />
   </MemoryRouter>);
@@ -21,7 +21,13 @@ test('tap a row to open its record; tap again to close', async () => {
   expect(screen.getByText('GF')).toBeInTheDocument();
   expect(screen.getByText('67')).toBeInTheDocument(); // goals for in the drawer
   await userEvent.click(screen.getByText('Team2'));
-  expect(screen.queryByText('GF')).toBeNull();
+  // Content stays mounted (clipped to height 0 by Collapse) rather than
+  // unmounting, so the close glide has real content to shut around
+  // instead of an already-empty box (fix round 1, HIGH).
+  expect(screen.getByText('GF')).toBeInTheDocument();
+  const collapses = [...container.querySelectorAll('.collapse-glide')];
+  const closed = collapses.find(el => within(el).queryByText('GF'));
+  expect(closed.style.height).toBe('0px');
 });
 
 test('the split renders after 6th in the Premiership and a deduction is stated', async () => {

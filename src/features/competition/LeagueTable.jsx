@@ -59,6 +59,11 @@ function Drawer({ row, form }) {
 
 export default function LeagueTable({ comp, rows, followedIds, formByTeam }) {
   const [openId, setOpenId] = useState(null);
+  // Lazy-ONCE mounting (fix round 1, HIGH): a row's Drawer stays mounted
+  // once it's been opened, even after openId moves to another row, so its
+  // Collapse glides shut around real content — see FixtureRow's fuller
+  // comment on the same fix.
+  const [everOpenedIds, setEverOpenedIds] = useState(() => new Set());
   const usedZones = [...new Set(rows.map(r => zoneFor(comp, r.position)).filter(Boolean))];
   return (
     <div>
@@ -74,7 +79,10 @@ export default function LeagueTable({ comp, rows, followedIds, formByTeam }) {
             </div>
           )}
           <button type="button"
-            onClick={() => setOpenId(openId === row.teamId ? null : row.teamId)}
+            onClick={() => {
+              setOpenId(cur => (cur === row.teamId ? null : row.teamId));
+              setEverOpenedIds(ids => (ids.has(row.teamId) ? ids : new Set(ids).add(row.teamId)));
+            }}
             className="w-full text-left flex items-center gap-3 py-3 border-b border-rule/70">
             <span className="w-0.5 self-stretch rounded-sm -mr-1"
               style={{ background: ZONE_META[zoneFor(comp, row.position)]?.colour ?? 'transparent' }} />
@@ -95,7 +103,7 @@ export default function LeagueTable({ comp, rows, followedIds, formByTeam }) {
               so the drawer glides straight open to its content, never a
               skeleton. */}
           <Collapse open={openId === row.teamId}>
-            {openId === row.teamId && (
+            {everOpenedIds.has(row.teamId) && (
               <Drawer row={{ ...row, compId: comp.id }} form={formByTeam[row.teamId]} />
             )}
           </Collapse>

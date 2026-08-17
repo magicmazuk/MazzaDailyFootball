@@ -64,9 +64,17 @@ function CompactRow({ item }) {
 
 function Block({ label, feed }) {
   const [revealed, setRevealed] = useState(false);
-  // isLoading (never isFetching): true only on the FIRST fetch for this
-  // feed, so a re-visit landing on cached news never re-flashes the
-  // skeleton on a background refetch (spec §13.21).
+  // Lazy-ONCE mounting (fix round 1, HIGH): the revealed rows stay mounted
+  // once shown, even after "− fewer" closes them, so the Collapse glides
+  // shut around real content — see FixtureRow's fuller comment on the
+  // same fix.
+  const [everRevealed, setEverRevealed] = useState(false);
+  // isLoading (never isFetching): React Query v5 defines isLoading as
+  // isPending && isFetching — true only while there's no cached data yet.
+  // What actually keeps a re-visit skeleton-free is cache PRESENCE, not
+  // staleTime: isPending flips false the instant this query has ever
+  // resolved, so a stale-but-cached re-visit still refetches in the
+  // background (isFetching true) but isLoading stays false throughout.
   const { data, isLoading } = useNews(feed);
   const items = data?.items ?? [];
   const [top, ...rest] = items;
@@ -84,13 +92,14 @@ function Block({ label, feed }) {
           <TopStory item={top} />
           {rest.length > 0 && (
             <div className="mt-4">
-              <button type="button" onClick={() => setRevealed(r => !r)}
+              <button type="button"
+                onClick={() => { setRevealed(r => !r); setEverRevealed(true); }}
                 aria-expanded={revealed} aria-controls={moreId}
                 className="font-sans text-[10px] uppercase tracking-[.16em] text-accent">
                 {revealed ? '− fewer' : `+ ${rest.length} more`}
               </button>
               <Collapse open={revealed}>
-                {revealed && (
+                {everRevealed && (
                   <div id={moreId} className="mt-3 divide-y divide-rule/60">
                     {rest.map(item => <CompactRow key={item.id} item={item} />)}
                   </div>

@@ -88,7 +88,10 @@ test('hidden items are not in the DOM before reveal; "+ n more" reveals them and
   expect(document.getElementById(controlsId)).toContainElement(screen.getByText('Story c2'));
 
   await user.click(fewerButton);
-  expect(screen.queryByText('Story c2')).not.toBeInTheDocument();
+  // Content stays mounted (clipped to height 0 by Collapse) rather than
+  // unmounting, so the close glide has real content to shut around
+  // instead of an already-empty box (fix round 1, HIGH).
+  expect(screen.getByText('Story c2')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '+ 4 more' })).toHaveAttribute('aria-expanded', 'false');
 });
 
@@ -129,7 +132,11 @@ test('the revealed rows sit inside a Collapse (collapse-glide) that glides open 
   expect(within(collapse).getByText('Story c2')).toBeInTheDocument();
 
   await user.click(screen.getByRole('button', { name: '− fewer' }));
-  expect(screen.queryByText('Story c2')).not.toBeInTheDocument();
+  // Content stays mounted (clipped to height 0 by Collapse) rather than
+  // unmounting, so the close glide has real content to shut around
+  // instead of an already-empty box (fix round 1, HIGH).
+  expect(screen.getByText('Story c2')).toBeInTheDocument();
+  expect(collapse.style.height).toBe('0px');
 });
 
 test('the top story\'s content root crossfades in (.xfade-in) once it lands', () => {
