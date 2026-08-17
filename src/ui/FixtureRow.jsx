@@ -139,7 +139,10 @@ function scorersBySide(events, fixture) {
         minutesByPlayer.set(g.player, []);
         order.push(g.player);
       }
-      minutesByPlayer.get(g.player).push(`${g.minute}${goalMarker(g.type)}`);
+      // ESPN's clock strings carry straight apostrophes ("90'+4'"); the
+      // match line above renders primes — one drawer, one mark (v1.4
+      // final review, L2; same conversion player.js applies to heights).
+      minutesByPlayer.get(g.player).push(`${String(g.minute).replace(/'/g, '′')}${goalMarker(g.type)}`);
     }
     return order.map(player => ({
       player, surname: surnameOf(player),
@@ -232,14 +235,23 @@ function MatchLine({ points, fixture }) {
     { pos: 'right', label: `${scale}′` },
   ];
   const dotStyle = clubSide => (clubSide.colour ? { background: `#${clubSide.colour}` } : undefined);
-  const dotClass = clubSide => `absolute w-[9px] h-[9px] rounded-full -translate-x-1/2 -translate-y-1/2 ${
+  // border-ink: the Shirt.jsx idiom — every club-coloured shape carries a
+  // 1px ink outline so a pale kit (Fulham/Spurs/Leeds are literally
+  // #ffffff in the feed) still reads as a shape on the drawer tone
+  // (v1.4 final review, M1).
+  const dotClass = clubSide => `absolute w-[9px] h-[9px] rounded-full border border-ink -translate-x-1/2 -translate-y-1/2 ${
     clubSide.colour ? '' : 'bg-muted'}`;
+  // Vertical bands, top to bottom (v1.4 final review, M2 — tick labels
+  // used to share the away-dot band, so an early or stoppage-time away
+  // goal overpainted "0′"/"HT"/"90′"): home minute labels 0-10, home dots
+  // ~15-25, axis 30, away dots ~35-45, away minute labels 46-56, tick
+  // labels 56-66. Each row owns its strip; nothing overlaps.
   return (
-    <div className="relative h-[58px] mt-2 mb-1">
-      <div data-testid="match-axis" className="absolute inset-x-0 top-1/2 h-px bg-ink" />
+    <div className="relative h-[66px] mt-2 mb-1">
+      <div data-testid="match-axis" className="absolute inset-x-0 top-[30px] h-px bg-ink" />
       {ticks.map(t => (
         <span key={t.label}
-          className={`absolute top-[34px] font-sans text-[8px] text-muted tabular-nums ${
+          className={`absolute bottom-0 font-sans text-[8px] text-muted tabular-nums ${
             t.pos === 'left' ? 'left-0' : t.pos === 'right' ? 'right-0' : '-translate-x-1/2'}`}
           style={t.pos === 'center' ? { left: `${t.pct}%` } : undefined}>
           {t.label}
@@ -247,13 +259,13 @@ function MatchLine({ points, fixture }) {
       ))}
       {points.map((p, i) => (
         <span key={`dot-${i}`} data-testid="goal-dot" data-side={p.side}
-          className={`${dotClass(fixture[p.side])} ${p.side === 'home' ? 'top-[19px]' : 'top-[39px]'}`}
+          className={`${dotClass(fixture[p.side])} ${p.side === 'home' ? 'top-[20px]' : 'top-[40px]'}`}
           style={{ left: `${p.pct}%`, ...dotStyle(fixture[p.side]) }} />
       ))}
       {points.filter(p => p.labelled).map((p, i) => (
         <span key={`lab-${i}`}
           className={`absolute -translate-x-1/2 font-sans text-[8px] text-muted tabular-nums ${
-            p.side === 'home' ? 'top-0' : 'bottom-0'}`}
+            p.side === 'home' ? 'top-0' : 'top-[46px]'}`}
           style={{ left: `${p.pct}%` }}>
           {p.minute}′
         </span>
@@ -355,12 +367,23 @@ function BalanceBar({ homeWins, draws, awayWins, fixture }) {
   const segClass = clubSide => (clubSide.colour ? '' : 'bg-muted');
   return (
     <>
-      <div className="h-3 rounded-[3px] overflow-hidden flex mt-1.5 mb-1.5">
-        <div data-testid="balance-seg-home" className={`h-full ${segClass(fixture.home)}`}
-          style={{ width: pct(homeWins), ...segStyle(fixture.home) }} />
-        <div data-testid="balance-seg-draws" className="h-full bg-rule" style={{ width: pct(draws) }} />
-        <div data-testid="balance-seg-away" className={`h-full ${segClass(fixture.away)}`}
-          style={{ width: pct(awayWins), ...segStyle(fixture.away) }} />
+      {/* border-ink + ink dividers (the Shirt.jsx outline idiom, v1.4
+          final review M1): a white-kitted club's segment must read as a
+          bounded region of the bar, not as empty track. Zero-count
+          segments don't render at all — a divider against nothing would
+          paint a stray 1px line. */}
+      <div className="h-3 rounded-[3px] overflow-hidden flex mt-1.5 mb-1.5 border border-ink divide-x divide-ink">
+        {homeWins > 0 && (
+          <div data-testid="balance-seg-home" className={`h-full ${segClass(fixture.home)}`}
+            style={{ width: pct(homeWins), ...segStyle(fixture.home) }} />
+        )}
+        {draws > 0 && (
+          <div data-testid="balance-seg-draws" className="h-full bg-rule" style={{ width: pct(draws) }} />
+        )}
+        {awayWins > 0 && (
+          <div data-testid="balance-seg-away" className={`h-full ${segClass(fixture.away)}`}
+            style={{ width: pct(awayWins), ...segStyle(fixture.away) }} />
+        )}
       </div>
       <div className="flex justify-between font-sans text-[10px] text-muted tabular-nums">
         <span>{fixture.home.shortName ?? fixture.home.name} {homeWins}</span>

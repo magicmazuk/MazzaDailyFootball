@@ -462,10 +462,13 @@ test('FixtureRow: the fixture drawer\'s balance bar segments are proportional an
   const awaySeg = container.querySelector('[data-testid="balance-seg-away"]');
   expect(homeSeg.style.width).toBe('66.66666666666666%');
   expect(drawSeg.style.width).toBe('33.33333333333333%');
-  expect(awaySeg.style.width).toBe('0%');
+  // Zero-count segments don't render at all (v1.4 final-review fix: the
+  // bar carries ink dividers, and a divider against an empty segment
+  // would paint a stray line). The caption still tallies the zero.
+  expect(awaySeg).toBeNull();
   expect(homeSeg.style.background).toBe('rgb(0, 153, 33)'); // #009921
   expect(drawSeg).toHaveClass('bg-rule');
-  expect(awaySeg).toHaveClass('bg-muted'); // no colour fallback
+  expect(homeSeg.parentElement).toHaveClass('border-ink'); // Shirt's outline idiom — pale kits stay visible
   expect(screen.getByText('Celtic 2')).toBeInTheDocument();
   expect(screen.getByText('drawn 1')).toBeInTheDocument();
   expect(screen.getByText('Aberdeen 0')).toBeInTheDocument();
@@ -767,4 +770,30 @@ test('meetingBalance: equal scores count as a draw regardless of orientation', (
 
 test('meetingBalance: no meetings yields all-zero counts', () => {
   expect(meetingBalance([], fixture('scheduled'))).toEqual({ homeWins: 0, draws: 0, awayWins: 0 });
+});
+
+// --- v1.4 final review, L4: the 120′ scale had unit coverage in
+// timelinePoints but no RENDER assertion for MatchLine's extra-time
+// tick set. ---
+
+test('FixtureRow: an extra-time result renders the 120′ tick set — 0′, HT, 90′ and 120′', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { events: [
+      { minute: "12'", type: 'Goal', player: 'Early Opener', teamId: '256', scoringPlay: true },
+      { minute: "105'", type: 'Goal', player: 'Extra Time Hero', teamId: '256', scoringPlay: true },
+    ] } },
+  });
+  render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('ft')} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+
+  expect(screen.getByText('0′')).toBeInTheDocument();
+  expect(screen.getByText('HT')).toBeInTheDocument();
+  expect(screen.getByText('90′')).toBeInTheDocument();
+  expect(screen.getByText('120′')).toBeInTheDocument();
 });
