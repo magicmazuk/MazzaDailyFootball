@@ -937,3 +937,24 @@ finished): 5 meetings sorted 16 Aug 26 → 26 Apr 25, ten crests, ticks at 60/10
 fill, rule track, no old frame anywhere. The drawer inherits the identical component, which
 also retires the backlogged "balance-bar press tone by eye" debt — one component, seen once,
 is seen everywhere.
+
+## 13.27 The Fitba' Times (the nameplate)
+
+The rebrand (2026-08-17, evening): the user named the paper — "The Financial Times Sport
+Section... mixed with Celtic and or Scottish humour" — and the name is THE FITBA' TIMES,
+because the abbreviation is FT. Their own goalmouth-FT logo, redrawn as token-true SVG.
+Masthead round: M-B "the running head" chosen over M-A (front-page masthead, Today only)
+and M-C (printer's mark).
+
+**FitbaMark** (src/ui/FitbaMark.jsx): goal mark + wordmark, BOTH drawn as SVG — a LOGO, not
+typography, so the closed type set gains no recipe. Colours ride the repo's currentColor
+idiom (outer svg text-ink; the net's group text-rule) — a palette retune moves the mark with
+every hairline. One accessible name ("Fitba' Times") on the wrapper; every svg beneath it
+aria-hidden.
+
+**Placement**: one quiet row in AppShell above the Outlet — mark at 19px, wordmark, hairline
+border-rule beneath — so every screen carries the nameplate and no screen component changed.
+Today keeps its h1 (M-B's whole point). Browser title → "Fitba' Times". No PWA manifest
+exists, so the tab title is the entire rename surface.
+
+Verified live on Today and a match page: mark + hairline present, title renamed.

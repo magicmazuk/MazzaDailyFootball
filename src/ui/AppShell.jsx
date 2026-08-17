@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import FitbaMark from './FitbaMark.jsx';
 
 const TABS = [
   ['/', 'Today'],
@@ -10,6 +11,11 @@ const TABS = [
 export default function AppShell() {
   return (
     <div className="min-h-screen max-w-md mx-auto px-5 pt-7 pb-24">
+      {/* The running head (spec §13.27, M-B): the paper's nameplate on
+          every screen, one quiet row over a hairline. */}
+      <header className="flex items-center pb-2.5 mb-5 border-b border-rule">
+        <FitbaMark />
+      </header>
       <Outlet />
       {/* z-30: above any page content (team pages lift to z-10 over their
           watermark), below the player sheet's scrim/panel (z-40/z-50). */}

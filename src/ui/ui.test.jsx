@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { byId } from '../domain/competitions.js';
 import Crest from './Crest.jsx';
@@ -16,6 +16,8 @@ vi.mock('../data/queries.js', () => ({
 
 import FixtureRow, { timelinePoints, meetingBalance } from './FixtureRow.jsx';
 import { useMatchDetail } from '../data/queries.js';
+import AppShell from './AppShell.jsx';
+import FitbaMark from './FitbaMark.jsx';
 
 beforeEach(() => {
   useMatchDetail.mockReset();
@@ -848,4 +850,38 @@ test('FixtureRow: zero draws collapses the balance ticks to one — no doubled b
   const ticks = container.querySelectorAll('[data-testid="balance-tick"]');
   expect(ticks).toHaveLength(1);
   expect(parseFloat(ticks[0].style.left)).toBeCloseTo(66.7, 1);
+});
+
+// --- the Fitba' Times running head (spec §13.27, M-B): one nameplate row
+// in the shell, every screen, over a hairline. The wordmark is SVG — a
+// LOGO, not typography — so the closed type set stays closed.
+test("AppShell: every screen carries the Fitba' Times running head over a hairline", () => {
+  render(
+    <MemoryRouter initialEntries={['/']}>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route index element={<p>front page</p>} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
+  const mark = screen.getByRole('img', { name: "Fitba' Times" });
+  expect(mark).toBeInTheDocument();
+  // Decorative internals stay hidden from the tree — one accessible name only.
+  mark.querySelectorAll('svg').forEach(svg =>
+    expect(svg.getAttribute('aria-hidden')).toBe('true'));
+  const header = mark.closest('header');
+  expect(header.className).toContain('border-b');
+  expect(header.className).toContain('border-rule');
+  expect(screen.getByText('front page')).toBeInTheDocument();
+});
+
+test('FitbaMark: goal and net take their colours from the ink and rule tokens, never frozen hex', () => {
+  render(<FitbaMark />);
+  const mark = screen.getByRole('img', { name: "Fitba' Times" });
+  const goal = mark.querySelector('svg');
+  expect(goal.getAttribute('class')).toContain('text-ink');
+  const net = goal.querySelector('g');
+  expect(net.getAttribute('class')).toContain('text-rule');
+  expect(net.getAttribute('stroke')).toBe('currentColor');
 });
