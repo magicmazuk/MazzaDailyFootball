@@ -226,7 +226,7 @@ function FullDetailLink({ comp, fixture }) {
 // Tick/minute-label typography: the muted 8px sans (MonthGrid's own
 // overflow-count recipe), plus tabular-nums for the numerals — a variant,
 // not a new size/tracking/weight combination.
-function MatchLine({ points, fixture }) {
+export function MatchLine({ points, fixture }) {
   const scale = points.some(p => p.minute > 90) ? 120 : 90;
   const ticks = [
     { pos: 'left', label: '0′' },
