@@ -837,3 +837,75 @@ One existing test changed rather than being added to: the FT liveScore test's
 `'.tabular-nums'` header selector now scopes to `[class*="text-[30px]"]`, because the match
 line's tick labels are tabular too. That is the same scoping its sibling live-score test
 already carried for StatusWord's tabular minute — intent preserved, over-matching removed.
+
+## 13.24 The split rule (stats as tinted rules)
+
+User request (2026-08-17), from the MatchPal reference "tho nowhere near as in your face.
+classy. Subtle." Mockup round: S-A "the tinted rule" chosen over S-B (miniature balance) and
+S-C (ink share). Addendum round: the drawer's balance bar stays as it is (B-KEEP) — its data
+is three-way with draws, its 12px outlined weight is the drawer's focal instrument, and it was
+validated in the v1.4 round. Player-page bars unconsidered candidates: one player, no
+two-club split to colour. Coherence lives at the idiom level: INK BOUNDS CLUB COLOUR — the
+outline at block scale, the split rule's tick at hairline scale.
+
+**The treatment**: each scoring stat row's hairline becomes a 2px line on a 6px strip — home
+colour from the left, away from the right, meeting at a 1px ink tick at the home share
+(`statSplit`: null on 0-0 or unparseable, so those rows keep today's plain `border-rule/60`
+hairline — no story, no split). Sides without a feed colour fall back to muted (the goal
+dots' rule). The tick is the ink-boundary idiom where the Shirt outline cannot physically
+fit: a white-kitted share reads as the bounded blank between tick and coloured edge. The
+possession bar joins the family at its own 3px weight (8px strip), keeping its %-header row.
+
+**The softening (same wave, SOFT-75 round)**: "broadsheet printed kind of softness" — every
+CLUB-COLOUR FILL prints at 75% (`#RRGGBBbf`: split segments, possession, goal dots, balance
+segments) and every INK BOUNDARY eases to 60% (`/60`: the tick, dot outlines, the balance
+frame and dividers). Full black never borders a coloured shape anywhere. Deliberately
+untouched: muted fallbacks (already the quiet tone), the match-line axis and every text/rule
+ink (structure, not border), and Shirt/crest glyphs (icons at 11-18px need the full outline).
+Tests pin the recipe: `rgba(r, g, b, 0.75)` fills, `bg-ink/60` / `border-ink/60` /
+`divide-ink/60` boundaries.
+
+Shutouts pin the tick to the edge (1-0 → 100). Verified live on Kilmarnock v Celtic: eight
+split rules, two genuine 100% edges, the 0-0 red-cards row plain between coloured neighbours.
+No live white-kit fixture existed to verify (EPL unstarted at build time) — that path is
+pinned by unit tests and the approved mockup sheet.
+
+## 13.25 The lineups take the field
+
+User request (2026-08-17): lineups side by side, "have some fun with a subtle field in the
+background. Nothing in your face." Mockup round: L-B "the centre circle alone" chosen over
+L-A (full boundary — a new shape the app would have to carry) and L-C (plain columns).
+
+**Layout**: two columns under one section label — HOME KEEPS THE LEFT, found by `homeAway`,
+never by feed array order. All eleven starters always render (user law, stated verbatim:
+an accordion "removes the point of the line up"); substitutes stay out as before. Names drop
+to 13px, keep to ONE line and truncate with an ellipsis — the user chose truncation over
+wrapping because every name remains tappable: the tap is how a clipped name reaches its full
+player. Club sub-labels reuse the FieldBoard-family 10px sub-label recipe (ScorerColumn's is 9px) and truncate likewise. Shirts at 20.
+
+**The field**: one mark — the half-way line running the gutter (1px, rule/65), opening into
+the centre circle at mid-height (190px, rule at 65%, centre spot). Decoration sits BELOW
+structure: 65% rule is deliberately softer than the section's true hairlines. aria-hidden,
+pointer-events-none, drawn only when lineups exist. A circle never rides a stretched SVG
+(ellipse distortion) — the line is a plain div, the circle a fixed-size svg.
+
+Verified live on Hearts 4-0 Dundee United (the user's own reference match): home left,
+11 v 11, circle behind the gutter, no name overflowing at 390px.
+
+**Review-round hardening (same wave, 2026-08-17 final review — 8 finder angles, 14 confirmed)**:
+the degraded-case and attribution laws now hold for every new graphic. `statSplit` treats
+blank/junk strings as UNKNOWN (never Number('')→0); possession rides that same guard (no
+fabricated 100%-away bar on 0-0/unparseable/missing feeds); `Stats` requires strict teamId
+matches (the positional fallback died — club-coloured bars must never misattribute); Lineups
+attributes by homeAway ONLY (an unattributed XI renders nothing, an unpublished side says
+"XI not yet published." in one line), gates on STARTERS not roster presence, and keys rows by
+player id. Geometry: SplitRule gained the old possession bar's bg-rule track (a pale-vs-pale
+pairing still reads as a bar) and overflow-hidden (edge ticks clip, never overhang); the
+lineups wrapper clips the 190px circle (short pre-match columns never bleed the arc over
+neighbouring sections); the circle strokes currentColor under text-rule (token-true). The
+press tone now lives in ONE exported helper — `pressFill` (FixtureRow.jsx) — used by the goal
+dots, the balance bar and the split rules; it validates six-digit hex and falls back to muted
+for any other shape, so a malformed feed colour can never paint invalid CSS while skipping
+the fallback. Live-verified post-hardening: match page (8 splits, rule track, clipped circle,
+11v11) and a result drawer (6 dots at press tone). The balance bar's press tone is pinned by
+exact-value tests; no upcoming-with-meetings drawer was reachable in the live sweep tonight.

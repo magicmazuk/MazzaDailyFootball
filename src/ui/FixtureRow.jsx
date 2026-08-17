@@ -157,6 +157,24 @@ function scorersBySide(events, fixture) {
 // a stoppage-time goal keeps the minute it was added to (90), not the
 // stoppage count. Unparseable/absent minutes return null so the caller can
 // skip them rather than plot a NaN.
+// The press tone (spec §13.24, hardened in the review round): every
+// club-coloured FILL prints at 75%, through this ONE helper so the tone can
+// never drift between the goal dots, the balance bar and the stats' split
+// rules (the SOFT-75 retune had to hand-edit three copies; never again).
+// Only a six-digit feed hex is paintable — anything else (3-digit,
+// hash-prefixed, junk) falls back to muted exactly like a missing colour,
+// rather than producing invalid CSS that drops the fill AND skips the
+// fallback. Shirt.jsx stays deliberately outside this: icons at 11-18px
+// keep their full-strength treatment (spec §13.24 carve-out).
+const SIX_HEX = /^[0-9a-f]{6}$/i;
+export function pressFill(clubSide) {
+  const paintable = clubSide?.colour != null && SIX_HEX.test(clubSide.colour);
+  return {
+    className: paintable ? '' : 'bg-muted',
+    style: paintable ? { background: `#${clubSide.colour}bf` } : undefined,
+  };
+}
+
 function leadingMinute(raw) {
   const m = /^(\d+)/.exec(raw ?? '');
   return m ? Number(m[1]) : null;
@@ -234,13 +252,12 @@ export function MatchLine({ points, fixture }) {
     ...(scale === 120 ? [{ pos: 'center', pct: (90 / scale) * 100, label: '90′' }] : []),
     { pos: 'right', label: `${scale}′` },
   ];
-  const dotStyle = clubSide => (clubSide.colour ? { background: `#${clubSide.colour}` } : undefined);
   // border-ink: the Shirt.jsx idiom — every club-coloured shape carries a
   // 1px ink outline so a pale kit (Fulham/Spurs/Leeds are literally
   // #ffffff in the feed) still reads as a shape on the drawer tone
   // (v1.4 final review, M1).
-  const dotClass = clubSide => `absolute w-[9px] h-[9px] rounded-full border border-ink -translate-x-1/2 -translate-y-1/2 ${
-    clubSide.colour ? '' : 'bg-muted'}`;
+  const dotClass = clubSide => `absolute w-[9px] h-[9px] rounded-full border border-ink/60 -translate-x-1/2 -translate-y-1/2 ${
+    pressFill(clubSide).className}`;
   // Vertical bands, top to bottom (v1.4 final review, M2 — tick labels
   // used to share the away-dot band, so an early or stoppage-time away
   // goal overpainted "0′"/"HT"/"90′"): home minute labels 0-10, home dots
@@ -260,7 +277,7 @@ export function MatchLine({ points, fixture }) {
       {points.map((p, i) => (
         <span key={`dot-${i}`} data-testid="goal-dot" data-side={p.side}
           className={`${dotClass(fixture[p.side])} ${p.side === 'home' ? 'top-[20px]' : 'top-[40px]'}`}
-          style={{ left: `${p.pct}%`, ...dotStyle(fixture[p.side]) }} />
+          style={{ left: `${p.pct}%`, ...pressFill(fixture[p.side]).style }} />
       ))}
       {points.filter(p => p.labelled).map((p, i) => (
         <span key={`lab-${i}`}
@@ -363,8 +380,6 @@ function BalanceBar({ homeWins, draws, awayWins, fixture }) {
   const total = homeWins + draws + awayWins;
   if (total === 0) return null;
   const pct = n => `${(n / total) * 100}%`;
-  const segStyle = clubSide => (clubSide.colour ? { background: `#${clubSide.colour}` } : undefined);
-  const segClass = clubSide => (clubSide.colour ? '' : 'bg-muted');
   return (
     <>
       {/* border-ink + ink dividers (the Shirt.jsx outline idiom, v1.4
@@ -372,17 +387,17 @@ function BalanceBar({ homeWins, draws, awayWins, fixture }) {
           bounded region of the bar, not as empty track. Zero-count
           segments don't render at all — a divider against nothing would
           paint a stray 1px line. */}
-      <div className="h-3 rounded-[3px] overflow-hidden flex mt-1.5 mb-1.5 border border-ink divide-x divide-ink">
+      <div className="h-3 rounded-[3px] overflow-hidden flex mt-1.5 mb-1.5 border border-ink/60 divide-x divide-ink/60">
         {homeWins > 0 && (
-          <div data-testid="balance-seg-home" className={`h-full ${segClass(fixture.home)}`}
-            style={{ width: pct(homeWins), ...segStyle(fixture.home) }} />
+          <div data-testid="balance-seg-home" className={`h-full ${pressFill(fixture.home).className}`}
+            style={{ width: pct(homeWins), ...pressFill(fixture.home).style }} />
         )}
         {draws > 0 && (
           <div data-testid="balance-seg-draws" className="h-full bg-rule" style={{ width: pct(draws) }} />
         )}
         {awayWins > 0 && (
-          <div data-testid="balance-seg-away" className={`h-full ${segClass(fixture.away)}`}
-            style={{ width: pct(awayWins), ...segStyle(fixture.away) }} />
+          <div data-testid="balance-seg-away" className={`h-full ${pressFill(fixture.away).className}`}
+            style={{ width: pct(awayWins), ...pressFill(fixture.away).style }} />
         )}
       </div>
       <div className="flex justify-between font-sans text-[10px] text-muted tabular-nums">
