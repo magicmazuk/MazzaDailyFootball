@@ -513,7 +513,9 @@ function Siblings({ siblings, fixture, followedIds }) {
   if (!siblings?.length) return null;
   return (
     <section className="mb-8 rise-in rise-in-5">
-      <SectionLabel muted>{fixture.round != null ? 'In this round' : 'That day'}</SectionLabel>
+      {/* Same discriminator as siblingFixtures (2026-08-20 fix): a league's
+          season-slug round is not a round — those siblings are "That day". */}
+      <SectionLabel muted>{prettifyRound(fixture.round) != null ? 'In this round' : 'That day'}</SectionLabel>
       {siblings.map(f => (
         <FixtureRow key={f.id} fixture={f} showContext={false} followedIds={followedIds} />
       ))}

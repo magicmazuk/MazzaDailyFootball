@@ -63,3 +63,18 @@ test('empty-safe: an empty fixtures list returns an empty array', () => {
   const self = fx('e1', { round: 'final' });
   expect(siblingFixtures([], self)).toEqual([]);
 });
+
+// The bug the user walked into (2026-08-20, spec §13.13 hardening): a league
+// fixture's round is NEVER null — it is the YEAR_PREFIXED season slug
+// ('2026-27-scottish-premiership', live-probed). The raw != null check sent
+// every league fixture down the round branch, where the whole season
+// matched and slice(0,8) returned the season's EARLIEST games — "this
+// week's results" under a fixture three weeks away.
+test('a league fixture (season-slug round) groups by day, not by the slug the whole season shares', () => {
+  const slug = '2026-27-scottish-premiership';
+  const self = fx('e1', { round: slug, kickoff: '2026-09-05T14:00:00Z' });
+  const sameDay = fx('e2', { round: slug, kickoff: '2026-09-05T16:30:00Z' });
+  const seasonOpener = fx('e3', { round: slug, kickoff: '2026-08-02T14:00:00Z' });
+  const out = siblingFixtures([self, sameDay, seasonOpener], self);
+  expect(out.map(f => f.id)).toEqual(['e2']);
+});

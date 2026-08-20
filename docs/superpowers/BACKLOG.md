@@ -142,3 +142,8 @@ None block usage; candidates for a future 1.2 pass.
 - THE EVERYWHERE SHEET: one app-level PlayerSheet host so player taps work from FixtureRow
   drawers (scorer rows are already shaped for it, spec 13.28) — not just MatchRoom. Joins
   Golden Boot, minute-by-minute, weekend planner, home/away splits, rivalry ledger.
+
+## From the league-siblings fix (2026-08-20)
+- Matchday-number grouping ("Matchday 5") for league siblings: the feed carries no week field
+  (live-probed); inference from fixture sequence is possible but postponements make it fragile.
+  Revisit only if same-day grouping proves insufficient across a real season.
