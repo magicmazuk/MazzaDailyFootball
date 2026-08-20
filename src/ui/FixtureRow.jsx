@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { byId } from '../domain/competitions.js';
 import { monogram } from '../domain/monogram.js';
+import { legLabel, tieLine } from '../domain/legs.js';
 import { prettifyRound } from '../domain/round.js';
 import { useMatchDetail } from '../data/queries.js';
 import Collapse from './Collapse.jsx';
@@ -31,7 +32,7 @@ function ContextLine({ fixture }) {
     <button type="button" onClick={toCompetition} aria-label={`${comp.shortName} page`}
       className="font-sans text-[8.5px] uppercase tracking-[.16em] text-muted mb-0.5
                  text-left block truncate">
-      {comp.shortName}{round && ` · ${round}`}
+      {comp.shortName}{round && ` · ${round}`}{fixture.leg != null && ` · ${legLabel(fixture.leg)}`}
     </button>
   );
 }
@@ -348,6 +349,7 @@ function ScorerColumn({ clubSide, scorers, testId }) {
 function ResultDrawer({ detail, fixture, comp }) {
   const points = timelinePoints(detail.events, fixture);
   const scorers = scorersBySide(detail.events, fixture, detail.lineups);
+  const tie = tieLine(fixture);
   const attendance = detail.gameInfo?.attendance;
   const metaParts = [
     detail.gameInfo?.venue,
@@ -360,6 +362,16 @@ function ResultDrawer({ detail, fixture, comp }) {
         <ScorerColumn clubSide={fixture.home} scorers={scorers.home} testId="scorer-col-home" />
         <ScorerColumn clubSide={fixture.away} scorers={scorers.away} testId="scorer-col-away" />
       </div>
+      {/* The tie's verdict (spec §13.29), in the shootout line's accent
+          recipe — printed even (especially) when this leg's own score
+          points the other way. A won leg must never read as a won tie. */}
+      {tie && (
+        <p data-testid="tie-line" className="font-sans text-[10px] text-accent mt-2">
+          {tie.level
+            ? `${tie.winnerName} through — ${tie.winnerAgg}–${tie.loserAgg} on aggregate`
+            : `${tie.winnerName} through ${tie.winnerAgg}–${tie.loserAgg} on aggregate`}
+        </p>
+      )}
       {metaParts.length > 0 && (
         <p className="font-sans text-[10px] text-muted tabular-nums mt-2">{metaParts.join(' · ')}</p>
       )}

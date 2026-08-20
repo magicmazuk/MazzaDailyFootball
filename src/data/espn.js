@@ -36,6 +36,11 @@ function side(competitor = {}) {
     score: competitor.score != null && competitor.score !== '' ? Number(competitor.score) : null,
     penaltyScore: competitor.shootoutScore != null && competitor.shootoutScore !== ''
       ? Number(competitor.shootoutScore) : null,
+    // Two-legged ties only (spec §13.29): ESPN serves the AGGREGATE per
+    // side right on the scoreboard event (live-probed on the 2026 UEFA
+    // qualifiers). Null everywhere else — never invented.
+    agg: competitor.aggregateScore != null && competitor.aggregateScore !== ''
+      ? Number(competitor.aggregateScore) : null,
   };
 }
 
@@ -53,6 +58,14 @@ export function adaptScoreboard(json, compId) {
       venue: comp.venue?.fullName ?? null,
       home: side(competitors.find(c => c.homeAway === 'home')),
       away: side(competitors.find(c => c.homeAway === 'away')),
+      // Two-legged ties (spec §13.29): the leg number, whether the tie is
+      // decided, and — only once decided — who goes through, straight from
+      // the event's series block. All null for ordinary fixtures, so no
+      // other surface changes behaviour.
+      leg: comp.leg?.value ?? null,
+      tieCompleted: (ev.series ?? comp.series)?.completed ?? null,
+      tieWinnerId: ((ev.series ?? comp.series)?.completed
+        && (ev.series ?? comp.series)?.competitors?.find(c => c.winner)?.id) || null,
     };
   });
 }

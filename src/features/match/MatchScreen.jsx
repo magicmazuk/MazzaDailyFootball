@@ -4,6 +4,7 @@ import { byId } from '../../domain/competitions.js';
 import { todayWindowQuery, useMatchDetail, useSeasonFixtures } from '../../data/queries.js';
 import { usePrefs } from '../../store/prefs.js';
 import MatchRoom from './MatchRoom.jsx';
+import { otherLeg } from '../../domain/legs.js';
 import { siblingFixtures } from './siblings.js';
 import { useMatchVideos } from './video.js';
 
@@ -48,5 +49,6 @@ export default function MatchScreen() {
   // the same set so a followed club's row stars there too.
   const followedIds = new Set(Object.keys(followed));
   return <MatchRoom fixture={fixture} comp={roomComp} detail={detail.data?.detail ?? null}
-    videos={videos.data ?? []} siblings={siblings} followedIds={followedIds} />;
+    videos={videos.data ?? []} siblings={siblings} followedIds={followedIds}
+    otherLeg={otherLeg(fixture, season.data?.fixtures ?? [])} />;
 }

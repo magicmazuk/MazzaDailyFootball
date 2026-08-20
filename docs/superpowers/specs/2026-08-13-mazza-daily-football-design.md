@@ -989,3 +989,35 @@ These rows are already shaped for it.
 Verified live on Dundee Utd 1-1 Rangers (a sibling drawer): #15 Rose and #11 Aasgaard in
 their clubs' shirts, numbers from the rosters. The same frame incidentally provided the
 first drawer-surface eyeball of the §13.26 balance rule.
+
+## 13.29 Two-legged ties (a won leg is not a won tie)
+
+User report (2026-08-20): Rangers won a leg 1-0 and the app let it read as a good night —
+the tie was lost on aggregate. The deepest law applies: THE APP MUST NEVER MISLEAD. The user
+asked for the aggregate, the qualifier named, and the other leg one click away.
+
+**The feed does the hard part** (live-probed on the UEFA qualifier codes): scoreboard events
+carry `competitions[0].leg` ({value, displayValue}), a `series` block (completed +
+per-competitor winner flags) and — decisive — `competitors[].aggregateScore`. Nothing is
+computed that the feed already states; the adapter passes through `leg`, per-side `agg`,
+`tieCompleted` and `tieWinnerId` (winner only surfaced once completed), all null on ordinary
+fixtures so no other surface moves.
+
+**domain/legs.js**: `tieLine(fixture)` — the verdict oriented like penaltyResult (null
+unless leg + decided + winner-is-a-side + both aggregates published; `level` marks an
+all-square aggregate whose winner came by ET/pens — the pens line tells that half).
+`otherLeg(fixture, fixtures)` — the twin found by the draw ceremonies' own exported
+`pairKey` (venue-reversal-proof, round-scoped). `legLabel` — '1st leg'/'2nd leg'.
+
+**Three surfaces**: (1) the row's context line gains "· 2nd leg" — the smallest honest flag
+at the point of misreading; (2) the result drawer prints the verdict in the shootout line's
+accent recipe ("Levski through 2–0 on aggregate"), even and especially against the leg's own
+score; (3) the match heading carries the same verdict beside the pens line, and the OTHER
+LEG as a linked meeting-ledger-form line (label · crest score crest) navigating to that
+leg's page — symmetric from either leg. The other-leg link lives on the page, not the
+drawer (threading season fixtures into every FixtureRow host was the wrong trade; Full
+detail is one tap).
+
+Verified live on Kairat 0-1 Levski (Q3, decided): verdict correct against the leg score,
+1st-leg link navigates, the reverse link navigates back. Celtic v LASK decides 2026-08-26 —
+the first tie this feature will report in anger.

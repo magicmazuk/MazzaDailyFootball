@@ -22,7 +22,7 @@ const pairSideKey = side => (side?.teamId != null ? String(side.teamId) : `n:${n
 // (sorted) so a reversed-venue return leg still matches its first leg.
 // Scoped by round too, so two different rounds never collide even in the
 // pathological case of the same two clubs meeting again later.
-const pairKey = f => `${f?.round}::${[pairSideKey(f?.home), pairSideKey(f?.away)].sort().join('|')}`;
+export const pairKey = f => `${f?.round}::${[pairSideKey(f?.home), pairSideKey(f?.away)].sort().join('|')}`;
 
 // A draw ceremony draws PAIRINGS, not legs — but a two-legged round (or a
 // qualifying round with a return fixture) publishes one FIXTURE per leg.

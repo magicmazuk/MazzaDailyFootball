@@ -922,3 +922,69 @@ test('FixtureRow: a scorer missing from the rosters gets a numberless shirt, nev
   // Shirt's own convention for an unknown number is the quiet em-dash.
   expect(shirt.closest('svg').textContent).toBe('—');
 });
+
+// --- two-legged ties (spec §13.29): the row names its leg; the result
+// drawer prints the TIE'S verdict even when the leg's own score points the
+// other way — the app must never let a won leg read as a won tie.
+const tieFixture = (over = {}) => fixture('ft', {
+  compId: 'uefa.champions', round: 'third-qualifying-round',
+  leg: 2, tieCompleted: true, tieWinnerId: '490',
+  home: { ...side({ teamId: '2528', name: 'Kairat Almaty', shortName: 'Kairat' }), score: 1, agg: 1 },
+  away: { ...side({ teamId: '490', name: 'Levski Sofia', shortName: 'Levski' }), score: 0, agg: 2 },
+  ...over,
+});
+
+test('FixtureRow: a leg fixture names its leg on the context line', () => {
+  render(
+    <MemoryRouter>
+      <FixtureRow fixture={tieFixture()} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByLabelText('Champions League page').textContent).toContain('2nd leg');
+});
+
+test("FixtureRow: the result drawer prints the tie's verdict against the leg's own score", async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({ isLoading: false, isError: false,
+    data: { detail: { events: [], gameInfo: { venue: 'Almaty Arena' } } } });
+  const { container } = render(
+    <MemoryRouter>
+      <FixtureRow fixture={tieFixture()} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  const verdict = container.querySelector('[data-testid="tie-line"]');
+  // Kairat won the leg 1-0; the verdict says Levski go through.
+  expect(verdict.textContent).toBe('Levski through 2–1 on aggregate');
+});
+
+test('FixtureRow: a level aggregate says so — the pens line finishes that story', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({ isLoading: false, isError: false,
+    data: { detail: { events: [], gameInfo: {} } } });
+  const { container } = render(
+    <MemoryRouter>
+      <FixtureRow fixture={tieFixture({
+        home: { ...side({ teamId: '2528', name: 'Kairat Almaty', shortName: 'Kairat' }), score: 2, agg: 3 },
+        away: { ...side({ teamId: '490', name: 'Levski Sofia', shortName: 'Levski' }), score: 1, agg: 3 },
+      })} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  expect(container.querySelector('[data-testid="tie-line"]').textContent)
+    .toBe('Levski through — 3–3 on aggregate');
+});
+
+test('FixtureRow: an ordinary result renders no tie line and no leg on the context', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({ isLoading: false, isError: false,
+    data: { detail: { events: [], gameInfo: {} } } });
+  const { container } = render(
+    <MemoryRouter>
+      <FixtureRow fixture={fixture('ft')} followedIds={new Set()} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByLabelText('Premiership page').textContent).not.toContain('leg');
+  await user.click(screen.getByRole('button', { expanded: false }));
+  expect(container.querySelector('[data-testid="tie-line"]')).toBeNull();
+});
