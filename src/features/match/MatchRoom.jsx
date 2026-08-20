@@ -144,8 +144,11 @@ function ScoreHeader({ fixture, comp, gameInfo, events, otherLeg }) {
       )}
       <MetadataLine fixture={fixture} gameInfo={gameInfo} />
       {/* The other leg, one tap away (spec §13.29): its label and score in
-          the meeting-ledger's muted recipes, linking to that leg's page. */}
-      {otherLeg && (
+          the meeting-ledger's muted recipes, linking to that leg's page.
+          PLAYED legs only (user report, 2026-08-20): a scheduled return
+          leg carries ESPN's phantom score:"0" both sides, and "2nd leg
+          0–0" reads as a finished goalless game. No line beats a lie. */}
+      {otherLeg && otherLeg.status === 'ft' && (
         <Link data-testid="leg-link" to={`/match/${comp.id}/${otherLeg.id}`}
           className="flex items-center gap-2.5 mt-2">
           <span className="font-sans text-[9px] uppercase tracking-[.14em] text-muted">
@@ -532,6 +535,7 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings, oth
     <main>
       <p className="font-sans text-[10px] uppercase tracking-[.22em] text-muted">
         <Link to={`/competition/${comp.id}`}>{comp.name}</Link>{round && ` · ${round}`}
+        {fixture.leg != null && ` · ${legLabel(fixture.leg)}`}
       </p>
       <p className="text-[12px] text-muted mb-5">{fullDate(fixture.kickoff)}</p>
       <ScoreHeader fixture={headerFixture} comp={comp} gameInfo={detail?.gameInfo}
