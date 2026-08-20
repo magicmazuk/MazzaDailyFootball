@@ -1021,3 +1021,12 @@ detail is one tap).
 Verified live on Kairat 0-1 Levski (Q3, decided): verdict correct against the leg score,
 1st-leg link navigates, the reverse link navigates back. Celtic v LASK decides 2026-08-26 —
 the first tie this feature will report in anger.
+
+**Same-day follow-ups (user, 2026-08-20)**: the leg also reads on Next up ("Champions
+League · 2nd leg · Tue 25 Aug") and in the match page kicker ("UEFA Champions League ·
+Third round · 2nd leg") — both via legLabel in the existing context recipes. And the
+other-leg link renders for PLAYED legs only: a scheduled return leg carries ESPN's phantom
+score:"0" on both sides, so "2nd leg 0–0" read as a finished goalless game (user caught it
+live on the LASK first-leg page). A first-leg page therefore links forward only once the
+tie is done; a second-leg page always links back. Verified live on Today (Celtic's next-up)
+and the Kairat–Levski pages.

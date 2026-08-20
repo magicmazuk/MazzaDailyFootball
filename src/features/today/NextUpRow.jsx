@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { byId } from '../../domain/competitions.js';
+import { legLabel } from '../../domain/legs.js';
 import Crest from '../../ui/Crest.jsx';
 import TvBadge from '../../ui/TvBadge.jsx';
 import CalendarGlyph from '../../ui/CalendarGlyph.jsx';
@@ -33,7 +34,11 @@ export default function NextUpRow({ club, fixture }) {
           v {opponent.name} <span className="text-muted">({venue})</span>
         </span>
         <span className="mt-1 flex items-center gap-2 font-sans text-[10px] text-muted tabular-nums">
-          <span className="truncate">{comp && `${comp.shortName} · `}{when(fixture.kickoff)}</span>
+          <span className="truncate">
+            {comp && `${comp.shortName} · `}
+            {fixture.leg != null && `${legLabel(fixture.leg)} · `}
+            {when(fixture.kickoff)}
+          </span>
           <TvBadge tv={fixture.tv} />
         </span>
       </span>

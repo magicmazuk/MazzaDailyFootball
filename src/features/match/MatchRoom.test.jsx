@@ -1039,3 +1039,23 @@ test('no tie, no lines — an ordinary match heading is untouched', () => {
   expect(screen.queryByText(/on aggregate/)).not.toBeInTheDocument();
   expect(container.querySelector('[data-testid="leg-link"]')).toBeNull();
 });
+
+test("the page kicker names the leg beside the competition and round", () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={legFixture} comp={byId('uefa.champions')} detail={null} />
+  </MemoryRouter>);
+  const kicker = screen.getByText('UEFA Champions League').closest('p');
+  expect(kicker.textContent).toContain('· 2nd leg');
+});
+
+test("an unplayed other leg never renders a link — a scheduled leg's phantom 0-0 reads as a finished goalless game", () => {
+  const scheduledSecondLeg = { ...firstLeg, id: 'e2', leg: 2, status: 'scheduled',
+    kickoff: '2026-08-26T19:00:00Z',
+    home: { ...side('Rangers', 0), agg: null }, away: { ...side('Celtic', 0), agg: null } };
+  const firstLegPage = { ...legFixture, leg: 1, tieCompleted: false, tieWinnerId: null };
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={firstLegPage} comp={byId('uefa.champions')} detail={null}
+      otherLeg={scheduledSecondLeg} />
+  </MemoryRouter>);
+  expect(container.querySelector('[data-testid="leg-link"]')).toBeNull();
+});
