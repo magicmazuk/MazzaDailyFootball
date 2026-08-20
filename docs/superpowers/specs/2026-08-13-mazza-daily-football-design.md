@@ -1030,3 +1030,21 @@ score:"0" on both sides, so "2nd leg 0–0" read as a finished goalless game (us
 live on the LASK first-leg page). A first-leg page therefore links forward only once the
 tie is done; a second-leg page always links back. Verified live on Today (Celtic's next-up)
 and the Kairat–Levski pages.
+
+## 13.30 League siblings, told by the day (§13.13 hardening)
+
+User bug report (2026-08-20): a future league fixture's page (St Mirren v Celtic, 5 Sept)
+showed the season's opening results under "In this round". Root cause: siblingFixtures and
+the Siblings label tested RAW `fixture.round != null`, but a league fixture's round is never
+null — it is the YEAR_PREFIXED season slug ('2026-27-scottish-premiership', live-probed)
+that the entire season shares, so every league fixture matched the whole season and
+slice(0,8) served the earliest games. The fix is one discriminator, applied at both sites:
+`prettifyRound(fixture.round) != null` — the same YEAR_PREFIXED rejection the rest of the
+app already lives by (the derivation's own comment stated this intent; the code didn't).
+
+The user's ideal — grouping by MATCHDAY NUMBER — is not feed-available (`week: null` on
+league events, live-probed), so same-local-day stays the honest grouping and the "That day"
+label says exactly what it shows. Inferring matchday numbers from fixture sequence is
+possible but fragile (postponements reorder everything); backlogged, not faked.
+
+Verified live on the user's exact repro: 5 Sept page shows that Saturday's card.
