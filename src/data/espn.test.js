@@ -491,3 +491,56 @@ test('summary: liveScore is null when the header is absent', () => {
   expect(adaptSummary(summary).liveScore).toBeNull();
   expect(adaptSummary({}).liveScore).toBeNull();
 });
+
+// --- two-legged ties (spec §13.29): leg, aggregate and the tie's verdict
+// come straight off the scoreboard event — live-probed 2026-08-20 on the
+// UEFA qualifier feeds (leg.value, series.completed + winner flags,
+// competitors[].aggregateScore).
+const tieScoreboard = {
+  events: [{
+    id: 'L2', date: '2026-08-12T18:45Z',
+    season: { slug: 'third-qualifying-round' },
+    status: { type: { name: 'STATUS_FULL_TIME', state: 'post', completed: true } },
+    series: { completed: true, totalCompetitions: 2, competitors: [
+      { id: '2528', winner: false }, { id: '490', winner: true },
+    ] },
+    competitions: [{
+      leg: { value: 2, displayValue: '2nd Leg' },
+      competitors: [
+        { homeAway: 'home', score: '0', aggregateScore: 0.0,
+          team: { id: '2528', displayName: 'Kairat Almaty' } },
+        { homeAway: 'away', score: '1', aggregateScore: 2.0,
+          team: { id: '490', displayName: 'Levski Sofia' } },
+      ],
+    }],
+  }],
+};
+
+test('scoreboard: a tie leg carries leg number, per-side aggregates and the decided winner', () => {
+  const [f] = adaptScoreboard(tieScoreboard, 'uefa.champions');
+  expect(f.leg).toBe(2);
+  expect(f.home.agg).toBe(0);
+  expect(f.away.agg).toBe(2);
+  expect(f.tieCompleted).toBe(true);
+  expect(f.tieWinnerId).toBe('490');
+});
+
+test('scoreboard: an ordinary fixture carries null tie fields — nothing invented', () => {
+  const [f] = adaptScoreboard(scoreboard, 'sco.1');
+  expect(f.leg).toBeNull();
+  expect(f.home.agg).toBeNull();
+  expect(f.tieCompleted).toBeNull();
+  expect(f.tieWinnerId).toBeNull();
+});
+
+test('scoreboard: an undecided tie (leg 1 played) reports completed false and no winner', () => {
+  const undecided = JSON.parse(JSON.stringify(tieScoreboard));
+  undecided.events[0].series = { completed: false, totalCompetitions: 2, competitors: [
+    { id: '2528', winner: false }, { id: '490', winner: false },
+  ] };
+  undecided.events[0].competitions[0].leg = { value: 1, displayValue: '1st Leg' };
+  const [f] = adaptScoreboard(undecided, 'uefa.champions');
+  expect(f.leg).toBe(1);
+  expect(f.tieCompleted).toBe(false);
+  expect(f.tieWinnerId).toBeNull();
+});

@@ -13,6 +13,7 @@ import SectionLabel from '../../ui/SectionLabel.jsx';
 import Shirt from '../../ui/Shirt.jsx';
 import StatusWord from '../../ui/StatusWord.jsx';
 import TvBadge from '../../ui/TvBadge.jsx';
+import { legLabel, tieLine } from '../../domain/legs.js';
 import { prettifyRound } from '../../domain/round.js';
 import PlayerSheet from '../player/PlayerSheet.jsx';
 import VideoCard from './VideoCard.jsx';
@@ -102,8 +103,9 @@ function MetadataLine({ fixture, gameInfo }) {
   );
 }
 
-function ScoreHeader({ fixture, comp, gameInfo, events }) {
+function ScoreHeader({ fixture, comp, gameInfo, events, otherLeg }) {
   const pens = penaltyResult(fixture);
+  const tie = tieLine(fixture);
   // ESPN reports score:"0" before kickoff — a scheduled or postponed fixture
   // shows a dash, the same as a genuinely missing score, never a phantom 0-0.
   const showScore = fixture.status === 'live' || fixture.status === 'ft';
@@ -130,7 +132,32 @@ function ScoreHeader({ fixture, comp, gameInfo, events }) {
           {pens.winnerName} win {pens.winnerScore}–{pens.loserScore} on penalties
         </p>
       )}
+      {/* The tie's verdict (spec §13.29): the same accent recipe as the
+          shootout line — the truth of the TIE beside the score of the LEG,
+          because a won leg must never read as a won tie. */}
+      {tie && (
+        <p className="font-sans text-[10px] text-accent mt-1">
+          {tie.level
+            ? `${tie.winnerName} through — ${tie.winnerAgg}–${tie.loserAgg} on aggregate`
+            : `${tie.winnerName} through ${tie.winnerAgg}–${tie.loserAgg} on aggregate`}
+        </p>
+      )}
       <MetadataLine fixture={fixture} gameInfo={gameInfo} />
+      {/* The other leg, one tap away (spec §13.29): its label and score in
+          the meeting-ledger's muted recipes, linking to that leg's page. */}
+      {otherLeg && (
+        <Link data-testid="leg-link" to={`/match/${comp.id}/${otherLeg.id}`}
+          className="flex items-center gap-2.5 mt-2">
+          <span className="font-sans text-[9px] uppercase tracking-[.14em] text-muted">
+            {legLabel(otherLeg.leg)}
+          </span>
+          <span className="flex items-center gap-2 text-[13px] tabular-nums">
+            <Crest side={otherLeg.home} size={20} />
+            {otherLeg.home.score}–{otherLeg.away.score}
+            <Crest side={otherLeg.away} size={20} />
+          </span>
+        </Link>
+      )}
       {showScore && Array.isArray(events) && (
         <MatchLine points={timelinePoints(events, fixture)} fixture={fixture} />
       )}
@@ -491,7 +518,8 @@ function Siblings({ siblings, fixture, followedIds }) {
   );
 }
 
-export default function MatchRoom({ fixture, comp, detail, videos, siblings, followedIds = new Set() }) {
+export default function MatchRoom({ fixture, comp, detail, videos, siblings, otherLeg = null,
+  followedIds = new Set() }) {
   // The peek sheet's open/closed player (spec §13.16) — one instance lives
   // at the room's root rather than per tap-site, so standouts, lineups and
   // timeline names all share the same sheet instead of each mounting one.
@@ -507,7 +535,7 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings, fol
       </p>
       <p className="text-[12px] text-muted mb-5">{fullDate(fixture.kickoff)}</p>
       <ScoreHeader fixture={headerFixture} comp={comp} gameInfo={detail?.gameInfo}
-        events={detail?.events} />
+        events={detail?.events} otherLeg={otherLeg} />
       {comp.hasMatchDetail
         ? (<>
             <FormBlock form={detail?.form} fixture={fixture} />

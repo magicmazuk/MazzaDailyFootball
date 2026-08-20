@@ -1004,3 +1004,38 @@ test('the match page head-to-head shows ALL meetings most-recent-first with the 
   expect(screen.getByText('drawn 1')).toBeInTheDocument();
   expect(screen.getByText('Rangers 0')).toBeInTheDocument();
 });
+
+// --- two-legged ties on the match page (spec §13.29): the tie's verdict in
+// the heading, and the other leg one tap away.
+const legFixture = { ...fixture, status: 'ft', compId: 'uefa.champions',
+  round: 'third-qualifying-round', leg: 2, tieCompleted: true, tieWinnerId: 'Rangers',
+  home: { ...side('Celtic', 1), agg: 1 }, away: { ...side('Rangers', 0), agg: 2 } };
+const firstLeg = { id: 'e0', compId: 'uefa.champions', round: 'third-qualifying-round',
+  kickoff: '2026-08-12T18:45:00Z', status: 'ft', leg: 1,
+  home: { ...side('Rangers', 2), agg: null }, away: { ...side('Celtic', 0), agg: null } };
+
+test("the heading prints the tie's verdict beside the leg score it contradicts", () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={legFixture} comp={byId('uefa.champions')} detail={null} />
+  </MemoryRouter>);
+  expect(screen.getByText('Rangers through 2–1 on aggregate')).toBeInTheDocument();
+});
+
+test('the other leg renders as a linked line in the heading, and navigates by id', () => {
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={legFixture} comp={byId('uefa.champions')} detail={null}
+      otherLeg={firstLeg} />
+  </MemoryRouter>);
+  const link = container.querySelector('[data-testid="leg-link"]');
+  expect(link.textContent).toContain('1st leg');
+  expect(link.textContent).toContain('2–0');
+  expect(link.getAttribute('href')).toBe('/match/uefa.champions/e0');
+});
+
+test('no tie, no lines — an ordinary match heading is untouched', () => {
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={null} />
+  </MemoryRouter>);
+  expect(screen.queryByText(/on aggregate/)).not.toBeInTheDocument();
+  expect(container.querySelector('[data-testid="leg-link"]')).toBeNull();
+});
