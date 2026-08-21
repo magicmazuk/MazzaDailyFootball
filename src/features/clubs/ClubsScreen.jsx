@@ -8,10 +8,11 @@ import SectionLabel from '../../ui/SectionLabel.jsx';
 import { searchTeams } from './searchTeams.js';
 
 const ESPN_COMPS = COMPETITIONS.filter(c => c.source === 'espn');
-const BBC_COMPS = COMPETITIONS.filter(c => c.source === 'bbc');
+// BBC and WoSFL clubs both derive from season fixtures (neither source
+// has a /teams endpoint the app uses) — one shared path (spec §13.31).
+const FIXTURE_DERIVED_COMPS = COMPETITIONS.filter(c => c.source === 'bbc' || c.source === 'wosfl');
 
-// BBC teams have no /teams endpoint — derive them from season fixtures.
-function bbcTeams(seasonResults, comps) {
+function fixtureDerivedTeams(seasonResults, comps) {
   const seen = new Map();
   for (let i = 0; i < seasonResults.length; i++) {
     const r = seasonResults[i];
@@ -36,10 +37,10 @@ export default function ClubsScreen() {
   const hidden = usePrefs(s => s.hiddenComps);
 
   const espnTeamResults = useAllTeams(ESPN_COMPS);
-  const bbcSeasonResults = useAllSeasonFixtures(BBC_COMPS);
+  const derivedSeasonResults = useAllSeasonFixtures(FIXTURE_DERIVED_COMPS);
   const allTeams = [
     ...espnTeamResults.flatMap(r => r.data?.teams ?? []),
-    ...bbcTeams(bbcSeasonResults, BBC_COMPS),
+    ...fixtureDerivedTeams(derivedSeasonResults, FIXTURE_DERIVED_COMPS),
   ];
   const results = searchTeams(allTeams, q);
 

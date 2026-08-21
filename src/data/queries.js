@@ -9,6 +9,7 @@ import {
 } from './espn.js';
 import { adaptAthlete, adaptPlayerStats } from './player.js';
 import { adaptBbcFixtures } from './bbc.js';
+import { wosflSeasonFixtures } from './wosfl.js';
 import { adaptFeed } from './news.js';
 import { applyTv } from './tv.js';
 import { bbcUrl, espnUrl, getJson, getText, newsUrl } from './client.js';
@@ -151,6 +152,10 @@ export function seasonFixturesQuery(comp) {
     queryKey: ['season', comp.id],
     staleTime: HOUR,
     queryFn: async () => {
+      if (comp.source === 'wosfl') {
+        // The Local Club (spec §13.31): one call serves the whole season.
+        return wosflSeasonFixtures(comp);
+      }
       if (comp.source === 'bbc') {
         const { fixtures, asOf } = await bbcSeasonFixtures(comp.id, comp.id);
         return { fixtures: applyTv(fixtures), asOf };
@@ -195,6 +200,21 @@ export function todayWindowQuery(comp, now = new Date()) {
     staleTime: 30 * 1000,
     refetchInterval: visiblePoll,
     queryFn: async () => {
+      if (comp.source === 'wosfl') {
+        // No live-minute feed exists at this level — results land by hand
+        // after full time. The season call is edge-cached; filter it to
+        // the window rather than inventing a second endpoint.
+        const { fixtures, asOf } = await wosflSeasonFixtures(comp);
+        const from = new Date(`${isoDay(yesterday)}T00:00:00`);
+        const to = new Date(`${isoDay(now)}T23:59:59.999`);
+        return {
+          fixtures: fixtures.filter(f => {
+            const k = new Date(f.kickoff);
+            return k >= from && k <= to;
+          }),
+          asOf,
+        };
+      }
       if (comp.source === 'bbc') {
         const { fixtures, asOf } = await bbcTodayWindowFixtures(comp.id, comp.id, yesterday, now);
         return { fixtures: applyTv(fixtures), asOf };

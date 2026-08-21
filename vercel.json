@@ -1,7 +1,17 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
-    { "source": "/api/espn/(.*)", "destination": "/api/espn?_p=/$1" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/api/espn/(.*)",
+      "destination": "/api/espn?_p=/$1"
+    },
+    {
+      "source": "/api/wosfl/(.*)",
+      "destination": "/api/wosfl?_p=/$1"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }

@@ -11,6 +11,17 @@ export const SEASON = {
   bbcEnd: '2027-06-30',
 };
 
+// The Local Club (spec §13.31): LeagueRepublic ids for the West of
+// Scotland Football League. These roll ONCE a year exactly like SEASON —
+// read the new seasonID off wosfl.co.uk's season selector each July, then
+// getFixtureGroupsForSeason lists the new group ids in one call.
+export const WOSFL = {
+  season: '236635540', // 2026-27
+  groups: {
+    'wosfl.first': { typeID: 1, id: '4781136' },
+  },
+};
+
 const range = (from, to, zone) =>
   Object.fromEntries(Array.from({ length: to - from + 1 }, (_, i) => [from + i, zone]));
 
@@ -36,6 +47,9 @@ export const COMPETITIONS = [
   { ...league, id: 'sco.2', name: 'Scottish Championship', shortName: 'Championship',
     country: 'Scotland', source: 'espn',
     zones: { 1: 'promo', 9: 'po', 10: 'rel' } },
+  { ...league, id: 'wosfl.first', name: 'West of Scotland First Division', shortName: 'WoSFL First',
+    country: 'Scotland', source: 'wosfl', hasTable: 'computed', hasSquads: false,
+    hasMatchDetail: false, zones: { 1: 'promo' } },
   { ...league, id: 'scottish-league-one', name: 'Scottish League One', shortName: 'League One',
     country: 'Scotland', source: 'bbc', hasTable: 'computed', hasSquads: false, hasMatchDetail: false,
     zones: { 1: 'promo', 9: 'po', 10: 'rel' } },

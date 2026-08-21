@@ -14,6 +14,12 @@ export function newsUrl(feed) {
   return `/api/news?feed=${feed}`;
 }
 
+// The Local Club (spec §13.31): LeagueRepublic behind our own proxy —
+// same one-hop rule as ESPN and the BBC.
+export function wosflUrl(rest) {
+  return `/api/wosfl${rest}`;
+}
+
 export async function getJson(url) {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
