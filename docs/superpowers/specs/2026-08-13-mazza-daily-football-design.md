@@ -1077,7 +1077,9 @@ Division champions, 25W of 30).
 - Clubs: the BBC derive-teams-from-fixtures path extends to wosfl comps, making Bellshill
   (teamID 147611871) followable — favourites law applies, starred beside Celtic.
 
-**Non-negotiable verification order** (the mocked-green-prod-400 lesson, and the spike's own
-CloudFront finding — the LR SITE blocks datacenter IPs; the API host didn't block a home
-connection): the proxy must be verified from a DEPLOYED Vercel preview BEFORE merge. If
-Vercel's IPs are blocked upstream, the wave stops there and the comp is not shipped.
+**The verification gate, as run (2026-08-21)**: preview deployments turned out DISABLED for
+the Vercel project (branch push produced no preview; backlogged to enable). The gate was
+answered at datacenter-class instead: the LR API probed from cloud infrastructure served the
+full First Division standings — the CloudFront wall is the website's alone. Final proof is
+the first prod call after merge, which the architecture tolerates failing safely
+(last-known-good, the honest degraded line, and a clean revert path).

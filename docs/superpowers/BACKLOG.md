@@ -147,3 +147,10 @@ None block usage; candidates for a future 1.2 pass.
 - Matchday-number grouping ("Matchday 5") for league siblings: the feed carries no week field
   (live-probed); inference from fixture sequence is possible but postponements make it fragile.
   Revisit only if same-day grouping proves insufficient across a real season.
+
+## From the Local Club wave (2026-08-21)
+- Vercel preview deployments are DISABLED for the project (branch pushes build nothing) —
+  enable in the dashboard so future new-upstream gates can run on real Vercel IPs pre-merge.
+- WoSFL cups (Scottish Cup group 492761491, League Cup 736799908 etc.) are one registry
+  entry away each, same season list — add when Bellshill draw someone romantic.
+- WOSFL season ids roll each July beside SEASON — one annual edit, documented in the registry.
