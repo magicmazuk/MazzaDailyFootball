@@ -109,3 +109,12 @@ test('markTiesSeen after per-comp seeding adds additively', () => {
     'sco.tennents:1': true, 'sco.tennents:2': true, 'sco.tennents:3': true,
   });
 });
+
+// --- the Full Table preference (spec §13.33) ---
+test('fullTable defaults compact and toggles persistently', () => {
+  expect(usePrefs.getState().fullTable).toBe(false);
+  usePrefs.getState().toggleFullTable();
+  expect(usePrefs.getState().fullTable).toBe(true);
+  usePrefs.getState().toggleFullTable();
+  expect(usePrefs.getState().fullTable).toBe(false);
+});

@@ -104,3 +104,58 @@ test('the drawer renders inside a Collapse (collapse-glide) and never shows a sk
   expect(open).toBeTruthy();
   expect(container.querySelectorAll('.skeleton-pulse')).toHaveLength(0);
 });
+
+// --- the Full Table (spec §13.33): the accordion was a phone-width
+// compromise, never a philosophy — the broadsheet prints the full
+// classified. Toggled via props (CompetitionScreen wires the persisted
+// preference); drawers rest while the full print is on.
+test('full mode prints every column inline — P W D L GF GA GD Pts, no drawer needed', () => {
+  render(<MemoryRouter>
+    <LeagueTable comp={byId('sco.1')} rows={rows} followedIds={new Set()}
+      formByTeam={{}} full onToggleFull={() => {}} />
+  </MemoryRouter>);
+  for (const h of ['P', 'W', 'D', 'L', 'GF', 'GA', 'GD', 'Pts']) {
+    expect(screen.getByText(h)).toBeInTheDocument();
+  }
+  // Celtic's full record reads straight off the row (rows[0] fixture data).
+  const row = screen.getByText('Team1').closest('button');
+  expect(row.textContent).toContain(String(rows[0].won));
+  expect(row.textContent).toContain(String(rows[0].goalsAgainst));
+});
+
+test('full mode rests the drawers — tapping a row opens nothing', async () => {
+  const user = userEvent.setup();
+  const { container } = render(<MemoryRouter>
+    <LeagueTable comp={byId('sco.1')} rows={rows} followedIds={new Set()}
+      formByTeam={{}} full onToggleFull={() => {}} />
+  </MemoryRouter>);
+  await user.click(screen.getByText('Team1'));
+  expect(container.querySelector('.bg-drawer')).toBeNull();
+});
+
+test('the toggle control flips the preference both ways', async () => {
+  const user = userEvent.setup();
+  const onToggle = vi.fn();
+  const { rerender } = render(<MemoryRouter>
+    <LeagueTable comp={byId('sco.1')} rows={rows} followedIds={new Set()}
+      formByTeam={{}} full={false} onToggleFull={onToggle} />
+  </MemoryRouter>);
+  await user.click(screen.getByRole('button', { name: 'Full table' }));
+  expect(onToggle).toHaveBeenCalledOnce();
+  rerender(<MemoryRouter>
+    <LeagueTable comp={byId('sco.1')} rows={rows} followedIds={new Set()}
+      formByTeam={{}} full onToggleFull={onToggle} />
+  </MemoryRouter>);
+  expect(screen.getByRole('button', { name: 'Compact table' })).toBeInTheDocument();
+});
+
+test('compact mode is untouched by the feature — points only, drawers alive', async () => {
+  const user = userEvent.setup();
+  const { container } = render(<MemoryRouter>
+    <LeagueTable comp={byId('sco.1')} rows={rows} followedIds={new Set()}
+      formByTeam={{}} full={false} onToggleFull={() => {}} />
+  </MemoryRouter>);
+  expect(screen.queryByText('GD')).not.toBeInTheDocument();
+  await user.click(screen.getByText('Team1'));
+  expect(container.querySelector('.bg-drawer')).not.toBeNull();
+});

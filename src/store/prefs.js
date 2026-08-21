@@ -30,6 +30,10 @@ export const usePrefs = create(persist(
     // seeded under the old scheme (see there). A brand-new install never
     // has this true.
     seenSeeded: false,
+    // The Full Table preference (spec §13.33): the reader's standing choice
+    // between the compact points column and the full classified print.
+    fullTable: false,
+    toggleFullTable: () => set(s => ({ fullTable: !s.fullTable })),
     follow: club => set(s => ({ followed: { ...s.followed, [club.id]: club } })),
     unfollow: id => {
       if (id === CELTIC.id) return;
