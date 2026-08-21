@@ -1116,3 +1116,23 @@ The BBC fan-out test scoped its assertions to /api/bbc calls (intentional migrat
 
 Verified live: junior match page (no video card, gap restored), WoSFL page (both curated
 badges), League One (7 ESPN crests on BBC fixtures).
+
+## 13.33 The Full Table
+
+User request (2026-08-22, late): all table data at once, no accordion — offered with an
+apology the design didn't need. The accordion was a PHONE-WIDTH COMPROMISE, never a
+philosophy: the broadsheet prints the full classified when asked.
+
+**The toggle**: the team-page-link recipe, right-aligned above the rows ("Full table" /
+"Compact table"), wired through a persisted pref (fullTable + toggleFullTable in mdf-prefs)
+so the reader's standing choice survives. **The full print**: header row in the drawer's
+8.5px uppercase recipe over fixed-width columns (P W D L w-5; GF GA w-6; GD w-7 — the minus
+sign earns the width; Pts w-7 at 13px, it is the story); rows drop to 13px names, crest 18,
+rank-change glyph rests (compact keeps it); drawers rest entirely (Collapse unmounted, rows
+inert). GD PRINTS FOR THE FIRST TIME anywhere in the app. Compact mode is byte-identical to
+before — its pins stand untouched.
+
+The open design question (fit vs sideways scroll at 390px) was answered by MEASUREMENT, not
+taste: scrollWidth ≤ clientWidth live at phone width — the full print fits, no scroll
+container needed. Verified on the real Premiership table (Celtic 2 from 2; the split rule
+and zone ticks intact in both modes).

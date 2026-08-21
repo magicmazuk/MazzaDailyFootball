@@ -57,7 +57,17 @@ function Drawer({ row, form }) {
   );
 }
 
-export default function LeagueTable({ comp, rows, followedIds, formByTeam }) {
+// The full print's column set (spec §13.33) — fixed widths so the header
+// labels sit exactly over their columns. GD gets the widest cell (a
+// possible minus sign); Pts prints a point larger, it is the story.
+const FULL_COLS = [
+  ['P', 'played', 'w-5'], ['W', 'won', 'w-5'], ['D', 'drawn', 'w-5'],
+  ['L', 'lost', 'w-5'], ['GF', 'goalsFor', 'w-6'], ['GA', 'goalsAgainst', 'w-6'],
+  ['GD', 'goalDifference', 'w-7'],
+];
+
+export default function LeagueTable({ comp, rows, followedIds, formByTeam,
+  full = false, onToggleFull = null }) {
   const [openId, setOpenId] = useState(null);
   // Lazy-ONCE mounting (fix round 1, HIGH): a row's Drawer stays mounted
   // once it's been opened, even after openId moves to another row, so its
@@ -67,6 +77,31 @@ export default function LeagueTable({ comp, rows, followedIds, formByTeam }) {
   const usedZones = [...new Set(rows.map(r => zoneFor(comp, r.position)).filter(Boolean))];
   return (
     <div>
+      {/* The Full Table toggle (spec §13.33): the accordion was a phone-
+          width compromise, never a philosophy — the broadsheet prints the
+          full classified when asked. The team-page-link recipe. */}
+      {onToggleFull && (
+        <div className="flex justify-end mb-2">
+          <button type="button" onClick={onToggleFull}
+            className="font-sans text-[9.5px] uppercase tracking-[.14em] text-muted underline
+                       underline-offset-4">
+            {full ? 'Compact table' : 'Full table'}
+          </button>
+        </div>
+      )}
+      {full && (
+        <div className="flex items-center gap-1 py-1.5 border-b border-rule">
+          <span className="w-0.5 -mr-1" />
+          <span className="w-5 shrink-0" />
+          <span style={{ width: 18 }} className="shrink-0" />
+          <span className="flex-1 min-w-0" />
+          {FULL_COLS.map(([label, , w]) => (
+            <span key={label} className={`${w} shrink-0 text-right font-sans text-[8.5px]
+                                          uppercase tracking-[.1em] text-muted`}>{label}</span>
+          ))}
+          <span className="w-7 shrink-0 text-right font-sans text-[8.5px] uppercase tracking-[.1em] text-muted">Pts</span>
+        </div>
+      )}
       {rows.map(row => (
         <div key={row.teamId}>
           {comp.splitAfter === row.position - 1 && (
@@ -79,25 +114,44 @@ export default function LeagueTable({ comp, rows, followedIds, formByTeam }) {
             </div>
           )}
           <button type="button"
-            onClick={() => {
+            onClick={full ? undefined : () => {
               setOpenId(cur => (cur === row.teamId ? null : row.teamId));
               setEverOpenedIds(ids => (ids.has(row.teamId) ? ids : new Set(ids).add(row.teamId)));
             }}
-            className="w-full text-left flex items-center gap-3 py-3 border-b border-rule/70">
+            className={`w-full text-left flex items-center py-3 border-b border-rule/70 ${
+              full ? 'gap-1 cursor-default' : 'gap-3'}`}>
             <span className="w-0.5 self-stretch rounded-sm -mr-1"
               style={{ background: ZONE_META[zoneFor(comp, row.position)]?.colour ?? 'transparent' }} />
             <span className="w-5 font-sans text-[12px] text-muted tabular-nums shrink-0">
               {row.position}
             </span>
-            <Crest side={row} size={22} />
-            <span className="flex-1 min-w-0 truncate text-[15px]">
-              {row.name}
-              {followedIds.has(row.teamId) && (
-                <span className="text-accent text-[9px] align-middle ml-1.5">★</span>
-              )}
-              <RankChange rankChange={row.rankChange} />
-            </span>
-            <span className="text-[17px] tabular-nums">{row.points}</span>
+            <Crest side={row} size={full ? 18 : 22} />
+            {full ? (
+              <>
+                <span className="flex-1 min-w-0 truncate text-[13px]">
+                  {row.name}
+                  {followedIds.has(row.teamId) && (
+                    <span className="text-accent text-[9px] align-middle ml-1">★</span>
+                  )}
+                </span>
+                {FULL_COLS.map(([label, key, w]) => (
+                  <span key={label} className={`${w} shrink-0 text-right font-sans text-[11px]
+                                                text-muted tabular-nums`}>{row[key]}</span>
+                ))}
+                <span className="w-7 shrink-0 text-right text-[13px] tabular-nums">{row.points}</span>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 min-w-0 truncate text-[15px]">
+                  {row.name}
+                  {followedIds.has(row.teamId) && (
+                    <span className="text-accent text-[9px] align-middle ml-1.5">★</span>
+                  )}
+                  <RankChange rankChange={row.rankChange} />
+                </span>
+                <span className="text-[17px] tabular-nums">{row.points}</span>
+              </>
+            )}
           </button>
           {/* No fetch here — the row + form are already props (spec §13.21),
               so the drawer glides straight open to its content, never a
@@ -105,11 +159,13 @@ export default function LeagueTable({ comp, rows, followedIds, formByTeam }) {
           {/* -mx-5 on the Collapse, not the Drawer: Collapse's overflow-
               hidden would clip the drawer's own negative-margin bleed
               (v1.3.1 hotfix — same fix as FixtureRow). */}
-          <Collapse open={openId === row.teamId} className="-mx-5">
-            {everOpenedIds.has(row.teamId) && (
-              <Drawer row={{ ...row, compId: comp.id }} form={formByTeam[row.teamId]} />
-            )}
-          </Collapse>
+          {!full && (
+            <Collapse open={openId === row.teamId} className="-mx-5">
+              {everOpenedIds.has(row.teamId) && (
+                <Drawer row={{ ...row, compId: comp.id }} form={formByTeam[row.teamId]} />
+              )}
+            </Collapse>
+          )}
         </div>
       ))}
       {usedZones.length > 0 && (

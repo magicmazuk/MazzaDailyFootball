@@ -98,6 +98,8 @@ export default function CompetitionScreen() {
   const active = tabs.includes(tab) ? tab : tabs[0];
   const followedIds = new Set(Object.keys(usePrefs(s => s.followed)));
   const seenTies = usePrefs(s => s.seenTies);
+  const fullTable = usePrefs(s => s.fullTable);
+  const toggleFullTable = usePrefs(s => s.toggleFullTable);
   const table = useTable(comp ?? { id: 'none', hasTable: false, source: 'espn' });
   const season = useSeasonFixtures(comp ?? { id: 'none', source: 'espn' });
 
@@ -156,7 +158,8 @@ export default function CompetitionScreen() {
         <div className="rise-in rise-in-1">
           {table.data
             ? <LeagueTable comp={comp} rows={table.data.rows}
-                followedIds={followedIds} formByTeam={formByTeam} />
+                followedIds={followedIds} formByTeam={formByTeam}
+                full={fullTable} onToggleFull={toggleFullTable} />
             : <p className="text-muted">{table.isError ? 'Table unavailable.' : 'Loading table…'}</p>}
         </div>
       )}
