@@ -166,5 +166,6 @@ None block usage; candidates for a future 1.2 pass.
   strict identity matching (wrong man's biography = worst never-mislead violation available;
   honest "no reliable dossier" degrade when unsure). usePlayerVideos as useTeamVideos'
   sibling (lazy, cached, grift-filtered). FPL layer attaches free for EPL players; junior
-  players say so honestly. LAW FLAG: Wikipedia offers the player photo — no-portraits law
-  says no; text-only unless the user deliberately revisits the law itself.
+  players say so honestly. Portraits WELCOME (user rescinded the misread no-portraits line,
+  2026-08-22): the dossier can carry the Wikipedia lead image, and FPL's 250px photos serve
+  EPL players — with the ESPN-404 lore meaning faces come from those sources, never ESPN.

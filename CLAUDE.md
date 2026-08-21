@@ -50,7 +50,9 @@ fixtures stay unlisted. Blurbs are hand-written editorial — verify per season.
 - Dual-source cups merge by nameKeys with alias stripping; re-identify BEFORE dedupe.
 - Club `color` can be literally "ffffff" (Fulham/Spurs/Leeds) — every club-coloured shape needs
   the Shirt.jsx ink-outline idiom or it vanishes on paper/drawer tones.
-- No player headshots anywhere (404) — hence NO portraits/roundels ever.
+- ESPN player headshots 404 — never rely on that feed for faces. Portraits from GOOD
+  sources are permitted (user clarification 2026-08-22: the old "no portraits ever" line
+  was a data note that got read as policy — it never was one).
 
 ## Design law (user-validated; do not regress)
 
