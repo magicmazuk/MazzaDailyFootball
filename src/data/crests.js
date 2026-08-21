@@ -28,10 +28,9 @@ const WOSFL_CRESTS = {
   991683293: '/crests/wosfl/991683293.png', // Cambuslang Rangers
   168281523: '/crests/wosfl/168281523.png', // Neilston — the Farmer's Boys
   814140867: '/crests/wosfl/814140867.png', // Petershill
-  // Awaiting files (drop the PNG in, uncomment the line):
-  // 451833712: '/crests/wosfl/451833712.png', // Gartcairn
-  // 753004191: '/crests/wosfl/753004191.png', // Maybole Juniors
-  // 914146622: '/crests/wosfl/914146622.png', // Thorn Athletic
+  451833712: '/crests/wosfl/451833712.png', // Gartcairn — the editor's own drop
+  753004191: '/crests/wosfl/753004191.png', // Maybole Juniors — likewise
+  914146622: '/crests/wosfl/914146622.png', // Thorn Athletic — the set complete
 };
 
 export function wosflCrest(teamId) {

@@ -55,8 +55,11 @@ test('the shape matches the house Fixture: monogram fallback for crestless clubs
   // the honest monogram example.
   expect(f.home.crestUrl).toBe('/crests/wosfl/147611871.png');
   expect(f.away.crestUrl).toBe('/crests/wosfl/168281523.png');
-  const [sched] = adaptWosflFixtures([scheduled], 'wosfl.first');
-  expect(sched.home.crestUrl).toBeNull(); // Maybole Juniors — still monogram
+  // Every real D1 club now wears a badge (the editor finished the set) —
+  // the monogram fallback is pinned with a synthetic unmapped id instead.
+  const [unmapped] = adaptWosflFixtures(
+    [{ ...scheduled, homeTeam: 999999999 }], 'wosfl.first');
+  expect(unmapped.home.crestUrl).toBeNull();
   expect(f.home.monogram).toBe('BA');
   expect(f.home.colour).toBeNull();
   expect(f.home.penaltyScore).toBeNull();
