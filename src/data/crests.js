@@ -18,6 +18,18 @@ const WOSFL_CRESTS = {
   105928322: '/crests/wosfl/105928322.png', // Threave Rovers
   147611871: '/crests/wosfl/147611871.png', // Bellshill Athletic — HERE WE GO
   294941809: '/crests/wosfl/294941809.png', // Bonnyton Thistle
+  296840793: '/crests/wosfl/296840793.png', // Blantyre Victoria
+  411509046: '/crests/wosfl/411509046.png', // Thorniewood United
+  558460535: '/crests/wosfl/558460535.png', // Kilsyth Rangers
+  764779648: '/crests/wosfl/764779648.png', // Lesmahagow Juniors
+  853461137: '/crests/wosfl/853461137.png', // Maryhill — the ship since 1884
+  526691012: '/crests/wosfl/526691012.png', // Lanark United
+  394088753: '/crests/wosfl/394088753.png', // Whitletts Victoria
+  991683293: '/crests/wosfl/991683293.png', // Cambuslang Rangers
+  168281523: '/crests/wosfl/168281523.png', // Neilston — the Farmer's Boys
+  // Awaiting files (drop the PNG in, uncomment the line):
+  // 451833712: '/crests/wosfl/451833712.png', // Gartcairn
+  // 914146622: '/crests/wosfl/914146622.png', // Thorn Athletic
 };
 
 export function wosflCrest(teamId) {

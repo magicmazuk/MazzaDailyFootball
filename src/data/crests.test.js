@@ -5,6 +5,8 @@ test('curated WoSFL crests resolve by teamId; everyone else stays monogram-null'
   expect(wosflCrest('105928322')).toBe('/crests/wosfl/105928322.png'); // Threave Rovers
   expect(wosflCrest('294941809')).toBe('/crests/wosfl/294941809.png'); // Bonnyton Thistle
   expect(wosflCrest('147611871')).toBe('/crests/wosfl/147611871.png'); // Bellshill — badge supplied by the editor himself
+  expect(wosflCrest('411509046')).toBe('/crests/wosfl/411509046.png'); // Thorniewood, from the editor's second batch
+  expect(wosflCrest('451833712')).toBeNull(); // Gartcairn — awaiting the file drop
 });
 
 test('an ESPN teams payload becomes a normalised name→logo index', () => {
