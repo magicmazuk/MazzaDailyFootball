@@ -50,10 +50,16 @@ export default function ClubsScreen() {
 
       <section className="mb-9 rise-in rise-in-1">
         <SectionLabel>★ Following</SectionLabel>
-        {Object.values(followed).map(club => (
+        {Object.values(followed).map(club => {
+          // Same stale-snapshot heal as NextUpRow (spec §13.32): follow()
+          // froze the club at follow time — prefer the persisted crest,
+          // fall back to the live team lists already in scope.
+          const crestSide = club.crestUrl != null ? club
+            : { ...club, crestUrl: allTeams.find(t => t.id === club.id)?.crestUrl ?? null };
+          return (
           <div key={club.id} className="flex items-center gap-3 py-3 border-b border-rule/70">
             <Link to={`/team/${club.compId ?? 'sco.1'}/${club.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-              <Crest side={club} size={24} />
+              <Crest side={crestSide} size={24} />
               <span className="text-[16px] truncate">{club.name}</span>
             </Link>
             {club.id === CELTIC.id
@@ -67,7 +73,8 @@ export default function ClubsScreen() {
                   Unfollow
                 </button>}
           </div>
-        ))}
+          );
+        })}
       </section>
 
       <section className="mb-9 rise-in rise-in-2">

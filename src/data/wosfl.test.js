@@ -50,9 +50,13 @@ test('a postponed date status maps to postponed regardless of result flag', () =
 
 test('the shape matches the house Fixture: monogram fallback for crestless clubs, league nulls everywhere they belong', () => {
   const [f] = adaptWosflFixtures([played], 'wosfl.first');
-  // Bellshill wear their curated badge now; crestless peers stay monogram.
+  // Bellshill wear their curated badge now — and so do Neilston, since the
+  // editor's second badge batch. Maybole (scheduled row) hold the line as
+  // the honest monogram example.
   expect(f.home.crestUrl).toBe('/crests/wosfl/147611871.png');
-  expect(f.away.crestUrl).toBeNull(); // Neilston
+  expect(f.away.crestUrl).toBe('/crests/wosfl/168281523.png');
+  const [sched] = adaptWosflFixtures([scheduled], 'wosfl.first');
+  expect(sched.home.crestUrl).toBeNull(); // Maybole Juniors — still monogram
   expect(f.home.monogram).toBe('BA');
   expect(f.home.colour).toBeNull();
   expect(f.home.penaltyScore).toBeNull();

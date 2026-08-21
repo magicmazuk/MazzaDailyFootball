@@ -16,8 +16,15 @@ export default function NextUpRow({ club, fixture }) {
   // links to carries the interactive context line. Unknown compId (should
   // never happen) just omits the prefix rather than crashing.
   const comp = byId(fixture.compId);
+  const ownSide = fixture.home.teamId === club.id ? fixture.home : fixture.away;
   const opponent = fixture.home.teamId === club.id ? fixture.away : fixture.home;
   const venue = fixture.home.teamId === club.id ? 'H' : 'A';
+  // Stale-snapshot heal (spec §13.32): follow() persists the club object
+  // as it was at follow time, so a club followed before its crest existed
+  // would wear the monogram here forever. The fixture side is the fresh
+  // record — borrow its crest, never overwrite a snapshot that has one.
+  const crestSide = club.crestUrl != null ? club
+    : { ...club, crestUrl: ownSide?.crestUrl ?? null };
   const toTeam = e => { e.preventDefault(); e.stopPropagation();
     navigate(`/team/${fixture.compId}/${club.id}`); };
   const toCalendar = e => { e.preventDefault(); e.stopPropagation();
@@ -27,7 +34,7 @@ export default function NextUpRow({ club, fixture }) {
       className="flex items-start gap-2.5 py-3 border-b border-rule/60">
       <button type="button" onClick={toTeam} aria-label={`${club.name} team page`}
         className="shrink-0 mt-[1px]">
-        <Crest side={club} size={20} />
+        <Crest side={crestSide} size={20} />
       </button>
       <span className="flex-1 min-w-0">
         <span className="block font-serif text-[15px] leading-snug">
