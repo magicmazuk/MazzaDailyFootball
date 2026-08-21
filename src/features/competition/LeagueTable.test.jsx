@@ -159,3 +159,29 @@ test('compact mode is untouched by the feature — points only, drawers alive', 
   await user.click(screen.getByText('Team1'));
   expect(container.querySelector('.bg-drawer')).not.toBeNull();
 });
+
+// --- user polish (spec §13.33): the position number crowded the zone tick
+// in the full print — and order plus the tick already tell that story
+// there. Full mode drops the number; compact keeps it.
+test('full mode prints no position number; compact still does', () => {
+  const { rerender } = render(<MemoryRouter>
+    <LeagueTable comp={byId('sco.1')} rows={rows} followedIds={new Set()}
+      formByTeam={{}} full onToggleFull={() => {}} />
+  </MemoryRouter>);
+  expect(screen.queryAllByTestId('table-pos')).toHaveLength(0);
+  rerender(<MemoryRouter>
+    <LeagueTable comp={byId('sco.1')} rows={rows} followedIds={new Set()}
+      formByTeam={{}} full={false} onToggleFull={() => {}} />
+  </MemoryRouter>);
+  expect(screen.queryAllByTestId('table-pos')).toHaveLength(12);
+});
+
+test('the zone tick keeps its distance from the crest in the full print', () => {
+  render(<MemoryRouter>
+    <LeagueTable comp={byId('sco.1')} rows={rows} followedIds={new Set()}
+      formByTeam={{}} full onToggleFull={() => {}} />
+  </MemoryRouter>);
+  const tick = screen.getAllByTestId('zone-tick')[0];
+  expect(tick.className).toContain('mr-1.5');
+  expect(tick.className).not.toContain('-mr-1');
+});
