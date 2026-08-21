@@ -1059,3 +1059,14 @@ test("an unplayed other leg never renders a link — a scheduled leg's phantom 0
   </MemoryRouter>);
   expect(container.querySelector('[data-testid="leg-link"]')).toBeNull();
 });
+
+// --- the degraded line breathes (spec §13.32): a bare unmargined <p> let
+// "That day" land on its shoulder on junior/BBC match pages.
+test('the no-detail line carries the section rhythm so the next label never squashes against it', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, compId: 'wosfl.first', status: 'ft' }}
+      comp={byId('wosfl.first')} detail={null} />
+  </MemoryRouter>);
+  const line = screen.getByText(/Detailed stats aren't published/);
+  expect(line.className).toContain('mb-8');
+});

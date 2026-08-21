@@ -40,8 +40,8 @@ test('searchVideos maps items to {videoId, title}, skipping entries with no id.v
   const result = await searchVideos('Kilmarnock vs Celtic highlights', 'test-key');
 
   expect(result).toEqual([
-    { videoId: 'abc123', title: 'Kilmarnock 2-1 Celtic highlights' },
-    { videoId: 'def456', title: 'Full match replay' },
+    { videoId: 'abc123', title: 'Kilmarnock 2-1 Celtic highlights', channelTitle: '' },
+    { videoId: 'def456', title: 'Full match replay', channelTitle: '' },
   ]);
   const requestedUrl = fetchSpy.mock.calls[0][0];
   expect(requestedUrl).toContain('https://www.googleapis.com/youtube/v3/search');
@@ -109,7 +109,7 @@ test('useMatchVideos fetches and resolves videos for a finished fixture with a k
 
   const { result } = renderHook(() => useMatchVideos(ftFixture), { wrapper });
 
-  await waitFor(() => expect(result.current.data).toEqual([{ videoId: 'v1', title: 'Highlights' }]));
+  await waitFor(() => expect(result.current.data).toEqual([{ videoId: 'v1', title: 'Highlights', channelTitle: '' }]));
 });
 
 test('the match-video request never carries order=date — that param is additive-only for the team query', async () => {
@@ -164,8 +164,42 @@ test('useTeamVideos fetches and resolves videos when enabled and a key is set, o
 
   const { result } = renderHook(() => useTeamVideos(scoutTeam, true), { wrapper });
 
-  await waitFor(() => expect(result.current.data).toEqual([{ videoId: 'v1', title: 'Sturm Graz highlights' }]));
+  await waitFor(() => expect(result.current.data).toEqual([{ videoId: 'v1', title: 'Sturm Graz highlights', channelTitle: '' }]));
   const requestedUrl = fetchSpy.mock.calls[0][0];
   expect(requestedUrl).toContain(`q=${encodeURIComponent('"Sturm Graz" highlights')}`);
   expect(requestedUrl).toContain('order=date');
+});
+
+// --- the lower leagues, looked after (spec §13.32) ---
+import { filterVideos } from './video.js';
+import { byId } from '../../domain/competitions.js';
+
+test('the grift vocabulary is dropped by title or channel — FIFA-engine "highlights" never reach a card', () => {
+  const items = [
+    { videoId: 'a', title: 'Celtic vs Rangers Highlights | Premiership', channelTitle: 'Sky Sports Football' },
+    { videoId: 'b', title: 'Celtic vs Rangers FIFA 26 Gameplay Highlights', channelTitle: 'ProSimGoals' },
+    { videoId: 'c', title: 'Celtic v Rangers | eFootball simulation', channelTitle: 'Match Sims' },
+    { videoId: 'd', title: 'Rangers career mode rebuild!', channelTitle: 'FCFan' },
+    { videoId: 'e', title: 'Celtic vs Rangers score prediction', channelTitle: 'PredictorTV' },
+    { videoId: 'f', title: 'Hearts 6-2 Inverness CT | League Cup highlights', channelTitle: 'FC 25 Zone' },
+  ];
+  expect(filterVideos(items).map(v => v.videoId)).toEqual(['a']);
+});
+
+test('real titles containing innocent substrings survive the blocklist', () => {
+  const items = [
+    { videoId: 'a', title: 'Gameplay analysis: how Celtic pressed', channelTitle: 'Tactics Desk' },
+    { videoId: 'b', title: 'Bonnyrigg Rose vs Gala Fairydean highlights', channelTitle: 'Lowland League TV' },
+  ];
+  // 'Gameplay' IS blocked vocabulary — dropped by design (the farm uses it
+  // constantly; a genuine tactics channel losing one card is the cheap side
+  // of the trade). The second survives untouched.
+  expect(filterVideos(items).map(v => v.videoId)).toEqual(['b']);
+});
+
+test('video search never fires for a comp flagged hasVideo false', () => {
+  expect(byId('wosfl.first').hasVideo).toBe(false);
+  expect(byId('scottish-league-one').hasVideo).toBe(false);
+  expect(byId('scottish-league-two').hasVideo).toBe(false);
+  expect(byId('sco.1').hasVideo).not.toBe(false);
 });

@@ -2,6 +2,7 @@
 // fixture's highlights. The one place the app talks to a third-party API
 // with a client-side key — everything else goes through our own proxy.
 import { useQuery } from '@tanstack/react-query';
+import { byId } from '../../domain/competitions.js';
 
 // Single accessor over the one client-side API key this app carries
 // (referrer-locked in Google Cloud) — kept behind a function so every
@@ -27,9 +28,24 @@ export async function searchVideos(query, key, params = {}) {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`HTTP ${r.status} for YouTube search`);
   const data = await r.json();
-  return (data.items ?? [])
+  return filterVideos((data.items ?? [])
     .filter(item => item?.id?.videoId)
-    .map(item => ({ videoId: item.id.videoId, title: item.snippet?.title ?? '' }));
+    .map(item => ({
+      videoId: item.id.videoId,
+      title: item.snippet?.title ?? '',
+      channelTitle: item.snippet?.channelTitle ?? '',
+    })));
+}
+
+// The grift filter (spec §13.32): game-engine "highlights" farmed for
+// views — FIFA/eFootball footage uploaded minutes after full time — are
+// dropped by vocabulary, checked against BOTH title and channel name.
+// A blocklist, so a novel disguise can slip through; this vocabulary
+// catches the overwhelming bulk of the pattern, and losing the odd
+// genuine "gameplay analysis" card is the cheap side of the trade.
+const GRIFT = /\b(fifa|fc\s?2[4-9]|efootball|pes\s?2\d|gameplay|career mode|simulation|score prediction|predictions?)\b/i;
+export function filterVideos(items) {
+  return (items ?? []).filter(v => !GRIFT.test(v.title) && !GRIFT.test(v.channelTitle ?? ''));
 }
 
 // A finished match's highlights don't change — cache forever once fetched
@@ -38,7 +54,10 @@ export async function searchVideos(query, key, params = {}) {
 export function useMatchVideos(fixture) {
   return useQuery({
     queryKey: ['videos', fixture?.compId, fixture?.id],
-    enabled: fixture?.status === 'ft' && !!youtubeKey(),
+    // hasVideo:false comps (the lower leagues, spec §13.32) never search —
+    // YouTube resolves to nothing but noise for junior fixtures.
+    enabled: fixture?.status === 'ft' && !!youtubeKey()
+      && byId(fixture?.compId)?.hasVideo !== false,
     staleTime: Infinity,
     retry: false,
     queryFn: () => searchVideos(buildVideoQuery(fixture), youtubeKey()),

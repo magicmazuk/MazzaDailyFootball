@@ -552,7 +552,7 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings, oth
             <HeadToHead headToHead={detail?.headToHead} fixture={fixture} />
           </>)
         : (
-          <p className="font-sans text-[11px] text-muted">
+          <p className="font-sans text-[11px] text-muted mb-8">
             Detailed stats aren't published for {comp.name}.
           </p>
         )}

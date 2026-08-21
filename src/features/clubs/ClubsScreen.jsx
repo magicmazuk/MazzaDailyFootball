@@ -21,7 +21,7 @@ function fixtureDerivedTeams(seasonResults, comps) {
       for (const side of [f.home, f.away]) {
         if (side.teamId && !seen.has(side.teamId)) {
           seen.set(side.teamId, { id: side.teamId, name: side.name,
-            shortName: side.shortName, crestUrl: null,
+            shortName: side.shortName, crestUrl: side.crestUrl ?? null,
             monogram: side.monogram, colour: null, compId });
         }
       }
