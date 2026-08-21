@@ -154,3 +154,17 @@ None block usage; candidates for a future 1.2 pass.
 - WoSFL cups (Scottish Cup group 492761491, League Cup 736799908 etc.) are one registry
   entry away each, same season list — add when Bellshill draw someone romantic.
 - WOSFL season ids roll each July beside SEASON — one annual edit, documented in the registry.
+
+## The unbuilt shortlist grows two (2026-08-22, late — user dreaming in-app)
+- THE FULL TABLE (next quick session, bounded): a quiet "Full table" toggle on league tables —
+  every column inline (P W D L GF GA GD Pts), row drawers resting while on, preference
+  persisted in prefs. The accordion was a phone-width compromise, not a philosophy; the
+  broadsheet prints full classifieds. One mockup decision: sideways-scroll container vs
+  compressed columns on narrow screens.
+- THE SCOUT'S DOSSIER (full wave, daylight hours): completes the scout trilogy (line, film,
+  dossier). Wikipedia REST potted bio inline on the player sheet/page — the design HINGES on
+  strict identity matching (wrong man's biography = worst never-mislead violation available;
+  honest "no reliable dossier" degrade when unsure). usePlayerVideos as useTeamVideos'
+  sibling (lazy, cached, grift-filtered). FPL layer attaches free for EPL players; junior
+  players say so honestly. LAW FLAG: Wikipedia offers the player photo — no-portraits law
+  says no; text-only unless the user deliberately revisits the law itself.
