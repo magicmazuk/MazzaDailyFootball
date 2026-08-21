@@ -7,7 +7,7 @@ function apiShim() {
     name: 'api-shim',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
-        const mount = ['/api/espn', '/api/bbc', '/api/news'].find(p => req.url.startsWith(p));
+        const mount = ['/api/espn', '/api/bbc', '/api/news', '/api/wosfl'].find(p => req.url.startsWith(p));
         if (!mount) return next();
         const file = `${mount.slice(1)}.js`; // api/espn.js
         if (!fs.existsSync(file)) { res.statusCode = 404; return res.end('not built yet'); }

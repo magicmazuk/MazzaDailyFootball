@@ -1,7 +1,7 @@
 import { COMPETITIONS, byId, COMPETITION_GROUPS, SEASON } from './competitions.js';
 
 test('registry holds exactly the 13 competitions of spec §3.1', () => {
-  expect(COMPETITIONS).toHaveLength(13);
+  expect(COMPETITIONS).toHaveLength(14); // 13 + the Local Club (spec §13.31)
   expect(COMPETITIONS.filter(c => c.source === 'bbc').map(c => c.id)).toEqual([
     'scottish-league-one', 'scottish-league-two',
   ]);
@@ -48,7 +48,7 @@ test('every cup has a non-empty blurb; leagues have none', () => {
   const cups = COMPETITIONS.filter(c => c.type === 'cup');
   const leagues = COMPETITIONS.filter(c => c.type === 'league');
   expect(cups).toHaveLength(8);
-  expect(leagues).toHaveLength(5);
+  expect(leagues).toHaveLength(6) // + wosfl.first, the Local Club (spec §13.31);
   for (const c of cups) {
     expect(typeof c.blurb).toBe('string');
     expect(c.blurb.length).toBeGreaterThan(0);

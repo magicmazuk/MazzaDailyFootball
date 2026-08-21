@@ -1048,3 +1048,38 @@ label says exactly what it shows. Inferring matchday numbers from fixture sequen
 possible but fragile (postponements reorder everything); backlogged, not faked.
 
 Verified live on the user's exact repro: 5 Sept page shows that Saturday's card.
+
+## 13.31 The Local Club (Bellshill Athletic, WoSFL)
+
+User request (2026-08-21): follow Bellshill Athletic — fixtures, results, table — "in any
+way possible", with a hard allergy to churn-maintenance. Feasibility spike proved the clean
+path (see .superpowers/brainstorm/2026-08-21-bellshill-athletic.md): the WoSFL's official
+site runs on LeagueRepublic, whose PUBLIC, KEYLESS, DOCUMENTED JSON API serves the whole
+season. £0 law intact. Bellshill are in the FIRST DIVISION 2026-27 (promoted as Second
+Division champions, 25W of 30).
+
+**A third source, 'wosfl'**, beside 'espn' and 'bbc':
+- `api/wosfl.js`: the espn.js proxy pattern verbatim — anchored allowlist over exactly four
+  LeagueRepublic routes (fixtureGroupsForSeason, teams/standings/fixturesForFixtureGroup,
+  all ids strictly numeric), edge cache + last-known-good, never cache an error body.
+- `src/data/wosfl.js`: adapter to the standard Fixture shape. LR dialect: away is `road*`;
+  kickoff from `fixtureDateInMilliseconds` (no timezone maths); status from the two status
+  descs (played→ft, Postponed→postponed, else scheduled); `round: null` ALWAYS — a league,
+  so siblings group by "That day" and no phantom rounds print. No crests in the feed →
+  the Crest monogram fallback wears the club initials. hasMatchDetail:false → the honest
+  degraded line already built. Table: hasTable 'computed' — the BBC computed-table path,
+  zero standings adapter.
+- Registry: `wosfl.first` (source 'wosfl', country Scotland, zones {1:'promo'} only — the
+  champions go up; relegation mechanics at tier 8+ vary, so nothing is painted that isn't
+  known). WOSFL ids beside SEASON: season 236635540, group 4781136/type 1, ONE annual bump
+  exactly like SEASON itself. NO blurb: the registry's own invariant (leagues carry
+  none — blurbs are cup-overview furniture) caught the draft entry carrying one.
+- Clubs: the BBC derive-teams-from-fixtures path extends to wosfl comps, making Bellshill
+  (teamID 147611871) followable — favourites law applies, starred beside Celtic.
+
+**The verification gate, as run (2026-08-21)**: preview deployments turned out DISABLED for
+the Vercel project (branch push produced no preview; backlogged to enable). The gate was
+answered at datacenter-class instead: the LR API probed from cloud infrastructure served the
+full First Division standings — the CloudFront wall is the website's alone. Final proof is
+the first prod call after merge, which the architecture tolerates failing safely
+(last-known-good, the honest degraded line, and a clean revert path).
