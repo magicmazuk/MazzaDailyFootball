@@ -50,7 +50,9 @@ test('a postponed date status maps to postponed regardless of result flag', () =
 
 test('the shape matches the house Fixture: monogram fallback for crestless clubs, league nulls everywhere they belong', () => {
   const [f] = adaptWosflFixtures([played], 'wosfl.first');
-  expect(f.home.crestUrl).toBeNull();
+  // Bellshill wear their curated badge now; crestless peers stay monogram.
+  expect(f.home.crestUrl).toBe('/crests/wosfl/147611871.png');
+  expect(f.away.crestUrl).toBeNull(); // Neilston
   expect(f.home.monogram).toBe('BA');
   expect(f.home.colour).toBeNull();
   expect(f.home.penaltyScore).toBeNull();

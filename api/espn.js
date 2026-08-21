@@ -17,7 +17,7 @@ const UPSTREAM = 'https://site.api.espn.com';
 const UPSTREAM_CORE = 'https://sports.core.api.espn.com';
 
 const LEAGUE =
-  '(sco\\.1|sco\\.2|sco\\.tennents|sco\\.cis|sco\\.challenge|eng\\.1|eng\\.fa|eng\\.league_cup|uefa\\.champions|uefa\\.europa|uefa\\.europa\\.conf)';
+  '(sco\\.1|sco\\.2|sco\\.3|sco\\.4|sco\\.tennents|sco\\.cis|sco\\.challenge|eng\\.1|eng\\.fa|eng\\.league_cup|uefa\\.champions|uefa\\.europa|uefa\\.europa\\.conf)';
 // The three UEFA club competitions' qualifying rounds (spec §13.11) live
 // under their own ESPN league code. queries.js only ever fetches the
 // qualifier code's scoreboard directly (adapted under the parent comp's

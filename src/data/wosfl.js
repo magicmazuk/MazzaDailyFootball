@@ -7,6 +7,7 @@
 // detected defensively by desc. round stays null ALWAYS: a league, so
 // siblings group by "That day" and no phantom round prints anywhere.
 import { monogram } from '../domain/monogram.js';
+import { wosflCrest } from './crests.js';
 import { wosflUrl, getJson } from './client.js';
 import { WOSFL } from '../domain/competitions.js';
 
@@ -17,7 +18,9 @@ function side(teamId, name, score) {
     teamId: teamId != null ? String(teamId) : null,
     name,
     shortName: name,
-    crestUrl: null, // no crests at this level — the Crest monogram fallback wears the initials
+    // Curated self-hosted badges where they exist (spec §13.32);
+    // the monogram wears everything else.
+    crestUrl: teamId != null ? wosflCrest(String(teamId)) : null,
     monogram: monogram(name),
     colour: null,
     score: num(score),

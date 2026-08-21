@@ -10,6 +10,7 @@ import {
 import { adaptAthlete, adaptPlayerStats } from './player.js';
 import { adaptBbcFixtures } from './bbc.js';
 import { wosflSeasonFixtures } from './wosfl.js';
+import { crestIndexFrom, enrichCrests } from './crests.js';
 import { adaptFeed } from './news.js';
 import { applyTv } from './tv.js';
 import { bbcUrl, espnUrl, getJson, getText, newsUrl } from './client.js';
@@ -147,6 +148,25 @@ async function settledCupFixtures(espnPromise, bbcPromise, teamsPromise, compId)
   };
 }
 
+// BBC lower-league crests (spec §13.32): ESPN carries sco.3/sco.4 with
+// real logos. One fetch per session, memoised at module level — a failed
+// fetch resolves to an empty index (monograms, honest) and never breaks
+// the fixtures that were fetching alongside it.
+let bbcCrestIndexPromise = null;
+function bbcCrestIndex() {
+  if (!bbcCrestIndexPromise) {
+    bbcCrestIndexPromise = Promise.all(
+      ['sco.3', 'sco.4'].map(lg =>
+        getJson(espnUrl(`${SOCCER}/${lg}/teams`)).then(r => crestIndexFrom(r.data)).catch(() => new Map())),
+    ).then(indexes => {
+      const merged = new Map();
+      for (const idx of indexes) for (const [k, v] of idx) merged.set(k, v);
+      return merged;
+    });
+  }
+  return bbcCrestIndexPromise;
+}
+
 export function seasonFixturesQuery(comp) {
   return {
     queryKey: ['season', comp.id],
@@ -158,7 +178,7 @@ export function seasonFixturesQuery(comp) {
       }
       if (comp.source === 'bbc') {
         const { fixtures, asOf } = await bbcSeasonFixtures(comp.id, comp.id);
-        return { fixtures: applyTv(fixtures), asOf };
+        return { fixtures: enrichCrests(applyTv(fixtures), await bbcCrestIndex()), asOf };
       }
       if (comp.bbcTournament) {
         return settledCupFixtures(
@@ -217,7 +237,7 @@ export function todayWindowQuery(comp, now = new Date()) {
       }
       if (comp.source === 'bbc') {
         const { fixtures, asOf } = await bbcTodayWindowFixtures(comp.id, comp.id, yesterday, now);
-        return { fixtures: applyTv(fixtures), asOf };
+        return { fixtures: enrichCrests(applyTv(fixtures), await bbcCrestIndex()), asOf };
       }
       if (comp.bbcTournament) {
         return settledCupFixtures(

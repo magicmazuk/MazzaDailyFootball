@@ -1083,3 +1083,36 @@ answered at datacenter-class instead: the LR API probed from cloud infrastructur
 full First Division standings — the CloudFront wall is the website's alone. Final proof is
 the first prod call after merge, which the architecture tolerates failing safely
 (last-known-good, the honest degraded line, and a clean revert path).
+
+## 13.32 The lower leagues, looked after
+
+User observations (2026-08-22, the morning after following Bellshill): four fixes, one wave.
+
+**Video gated by the registry**: `hasVideo: false` on wosfl.first and both BBC leagues —
+YouTube resolves to nothing but noise for junior fixtures, so those pages never search at
+all (useMatchVideos' enabled checks the flag via byId; quota saved, noise gone).
+
+**The grift filter**: game-engine "highlights" farmed for views (FIFA/FC-2x/eFootball
+footage uploaded minutes after full time — the user spotted the pattern live). One pure
+`filterVideos` at the search seam drops items whose title OR channel matches the grift
+vocabulary. A blocklist, honestly: a novel disguise can slip through, and a genuine
+"gameplay analysis" tactics card is knowingly sacrificed — the cheap side of the trade.
+The searchVideos map gained channelTitle; two exact shape pins migrated.
+
+**Crests for the crestless** (src/data/crests.js): two mechanisms, both strict —
+a wrong crest is worse than a monogram. (1) WoSFL: curated self-hosted badges
+(public/crests/wosfl/{teamId}.png, the tvListings precedent). TheSportsDB covered only
+2 of 16 First Division clubs (Threave Rovers, Bonnyton Thistle — the famous junior badges
+live up in the Premier), so the MECHANISM is the deliverable: drop a PNG in, add its map
+line, the paper wears it. Bellshill's own crest (147611871.png) is the user's to source.
+(2) BBC League One/Two: ESPN quietly carries sco.3/sco.4 with real logos (10/10 and 6/10,
+live-probed) — LEAGUE allowlist widened, one memoised teams fetch per session builds a
+normalised-name index applied over BBC fixtures; a failed fetch degrades to monograms and
+never breaks the fixtures beside it. ClubsScreen's derived teams carry crests through.
+The BBC fan-out test scoped its assertions to /api/bbc calls (intentional migration).
+
+**The degraded line breathes**: the bare no-detail <p> gained the section rhythm's mb-8 —
+"That day" no longer lands on its shoulder (32px live-measured, was ~8).
+
+Verified live: junior match page (no video card, gap restored), WoSFL page (both curated
+badges), League One (7 ESPN crests on BBC fixtures).
