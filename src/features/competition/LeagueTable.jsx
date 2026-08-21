@@ -91,8 +91,7 @@ export default function LeagueTable({ comp, rows, followedIds, formByTeam,
       )}
       {full && (
         <div className="flex items-center gap-1 py-1.5 border-b border-rule">
-          <span className="w-0.5 -mr-1" />
-          <span className="w-5 shrink-0" />
+          <span className="w-0.5 mr-1.5" />
           <span style={{ width: 18 }} className="shrink-0" />
           <span className="flex-1 min-w-0" />
           {FULL_COLS.map(([label, , w]) => (
@@ -120,11 +119,20 @@ export default function LeagueTable({ comp, rows, followedIds, formByTeam,
             }}
             className={`w-full text-left flex items-center py-3 border-b border-rule/70 ${
               full ? 'gap-1 cursor-default' : 'gap-3'}`}>
-            <span className="w-0.5 self-stretch rounded-sm -mr-1"
+            {/* -mr-1 was sized for the compact layout's position number;
+                the full print breathes instead (user polish, spec §13.33). */}
+            <span data-testid="zone-tick"
+              className={`w-0.5 self-stretch rounded-sm ${full ? 'mr-1.5' : '-mr-1'}`}
               style={{ background: ZONE_META[zoneFor(comp, row.position)]?.colour ?? 'transparent' }} />
-            <span className="w-5 font-sans text-[12px] text-muted tabular-nums shrink-0">
-              {row.position}
-            </span>
+            {/* The position number rests in the full print (user polish,
+                spec §13.33): it crowded the zone tick, and there the order
+                plus the tick already tell that story. Compact keeps it. */}
+            {!full && (
+              <span data-testid="table-pos"
+                className="w-5 font-sans text-[12px] text-muted tabular-nums shrink-0">
+                {row.position}
+              </span>
+            )}
             <Crest side={row} size={full ? 18 : 22} />
             {full ? (
               <>
