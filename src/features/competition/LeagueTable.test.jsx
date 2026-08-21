@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import LeagueTable from './LeagueTable.jsx';
 import { byId } from '../../domain/competitions.js';
 
@@ -184,4 +184,22 @@ test('the zone tick keeps its distance from the crest in the full print', () => 
   const tick = screen.getAllByTestId('zone-tick')[0];
   expect(tick.className).toContain('mr-1.5');
   expect(tick.className).not.toContain('-mr-1');
+});
+
+// --- full print rows link through (user request, spec §13.33): with the
+// drawers resting, the row itself becomes the way to the club page.
+test('tapping a full-print row navigates to the team page', async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter initialEntries={['/']}>
+      <Routes>
+        <Route path="/" element={
+          <LeagueTable comp={byId('sco.1')} rows={rows} followedIds={new Set()}
+            formByTeam={{}} full onToggleFull={() => {}} />} />
+        <Route path="/team/:compId/:teamId" element={<p>team page stub</p>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByText('Team3'));
+  expect(screen.getByText('team page stub')).toBeInTheDocument();
 });

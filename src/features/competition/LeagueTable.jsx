@@ -1,7 +1,7 @@
 // The T1 table (spec §7.3): four permanent columns, tap a row to open
 // its full record in a drawer. The split is drawn as a real event.
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Collapse from '../../ui/Collapse.jsx';
 import Crest from '../../ui/Crest.jsx';
 import FormGlyphs from '../../ui/FormGlyphs.jsx';
@@ -68,6 +68,7 @@ const FULL_COLS = [
 
 export default function LeagueTable({ comp, rows, followedIds, formByTeam,
   full = false, onToggleFull = null }) {
+  const navigate = useNavigate();
   const [openId, setOpenId] = useState(null);
   // Lazy-ONCE mounting (fix round 1, HIGH): a row's Drawer stays mounted
   // once it's been opened, even after openId moves to another row, so its
@@ -113,12 +114,17 @@ export default function LeagueTable({ comp, rows, followedIds, formByTeam,
             </div>
           )}
           <button type="button"
-            onClick={full ? undefined : () => {
-              setOpenId(cur => (cur === row.teamId ? null : row.teamId));
-              setEverOpenedIds(ids => (ids.has(row.teamId) ? ids : new Set(ids).add(row.teamId)));
-            }}
+            // Full print: the drawers rest, so the row IS the team link
+            // (user request, spec §13.33). Compact keeps the drawer toggle —
+            // its own Team page link lives inside the drawer.
+            onClick={full
+              ? () => navigate(`/team/${comp.id}/${row.teamId}`)
+              : () => {
+                setOpenId(cur => (cur === row.teamId ? null : row.teamId));
+                setEverOpenedIds(ids => (ids.has(row.teamId) ? ids : new Set(ids).add(row.teamId)));
+              }}
             className={`w-full text-left flex items-center py-3 border-b border-rule/70 ${
-              full ? 'gap-1 cursor-default' : 'gap-3'}`}>
+              full ? 'gap-1' : 'gap-3'}`}>
             {/* -mr-1 was sized for the compact layout's position number;
                 the full print breathes instead (user polish, spec §13.33). */}
             <span data-testid="zone-tick"
