@@ -2,7 +2,7 @@
 // Client staleTimes mirror the proxy's edge TTLs (spec §4.2) so the two
 // cache layers agree about freshness.
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { SEASON } from '../domain/competitions.js';
+import { COMPETITIONS, SEASON } from '../domain/competitions.js';
 import { computeTable } from '../domain/table.js';
 import {
   adaptScoreboard, adaptStandings, adaptSquad, adaptSummary, adaptTeams, adaptTeamRecord,
@@ -12,8 +12,9 @@ import { adaptBbcFixtures } from './bbc.js';
 import { wosflSeasonFixtures } from './wosfl.js';
 import { crestIndexFrom, enrichCrests } from './crests.js';
 import { adaptFeed } from './news.js';
+import { adaptEpisode, adaptLastEpisode, episodeUrl } from './iplayer.js';
 import { applyTv } from './tv.js';
-import { bbcUrl, espnUrl, getJson, getText, newsUrl } from './client.js';
+import { bbcUrl, espnUrl, getJson, getText, iplayerUrl, newsUrl } from './client.js';
 import { buildTeamIndex, mergeCupFixtures } from './mergeCup.js';
 
 const SOCCER = '/apis/site/v2/sports/soccer';
@@ -323,6 +324,54 @@ export function useNews(feed) {
       const { text, asOf } = await getText(newsUrl(feed));
       return { items: adaptFeed(text), asOf };
     },
+  });
+}
+
+// The Highlights Reel (spec §13.36): the latest MOTD/Sportscene episode
+// for every comp carrying an iplayer brand. Two tiers per comp — the
+// brand's episodes/last.json for the episode itself, then the pid's
+// detail for the LONG synopsis (MOTD's names the featured matches; the
+// last.json programme carries only the short one). Either tier failing
+// or adapting null simply drops that comp from the reel — coverage was
+// never promised, so absence is not degradation here (§13.36).
+export function useHighlights() {
+  const comps = COMPETITIONS.filter(c => c.iplayer);
+  const lasts = useQueries({
+    queries: comps.map(comp => ({
+      queryKey: ['iplayer-last', comp.iplayer.brand],
+      staleTime: 30 * MIN,
+      retry: 1,
+      queryFn: async () => {
+        const { data } = await getJson(iplayerUrl(`/${comp.iplayer.brand}/episodes/last.json`));
+        return adaptLastEpisode(data);
+      },
+    })),
+  });
+  const details = useQueries({
+    queries: lasts.map(last => ({
+      queryKey: ['iplayer-ep', last.data?.pid ?? null],
+      staleTime: 30 * MIN,
+      retry: 1,
+      enabled: !!last.data?.pid,
+      queryFn: async () => {
+        const { data } = await getJson(iplayerUrl(`/${last.data.pid}.json`));
+        return adaptEpisode(data);
+      },
+    })),
+  });
+  return comps.flatMap((comp, i) => {
+    const last = lasts[i].data;
+    if (!last?.pid) return [];
+    return [{
+      comp,
+      show: comp.iplayer.show,
+      pid: last.pid,
+      date: last.date,
+      firstBroadcast: last.firstBroadcast,
+      availableUntil: last.availableUntil,
+      synopsis: details[i].data?.synopsis ?? last.synopsis,
+      url: episodeUrl(last.pid),
+    }];
   });
 }
 

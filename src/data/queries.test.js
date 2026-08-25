@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, expect, test, vi } from 'vitest';
-import { seasonFixturesQuery, todayWindowQuery, useNews, usePlayer, useSquad } from './queries.js';
+import { seasonFixturesQuery, todayWindowQuery, useHighlights, useNews, usePlayer, useSquad } from './queries.js';
 
 // No JSX in this file — the QueryClientProvider wrapper is built with
 // createElement instead (matches src/features/match/video.test.js).
@@ -729,4 +729,82 @@ test('useNews surfaces isError on a failed fetch rather than throwing past the h
   const { result } = renderHook(() => useNews('football'), { wrapper });
 
   await waitFor(() => expect(result.current.isError).toBe(true));
+});
+
+// --- useHighlights (spec §13.36): one episodes/last.json per iplayer
+// brand in the registry (b007t9y1 MOTD on eng.1, m002jryr Sportscene on
+// sco.1), then the pid's detail for the long synopsis. A failed or null
+// comp is simply omitted — absence is not degradation here. ---
+
+const lastJson = (pid, short) => JSON.stringify({
+  broadcasts: [{
+    is_repeat: true, schedule_date: '2026-08-24',
+    programme: {
+      pid, first_broadcast_date: '2026-08-23T22:30:00+01:00',
+      available_until: '2026-09-22T22:59:00+01:00', short_synopsis: short,
+    },
+  }],
+});
+
+const episodeJson = (pid, long) => JSON.stringify({
+  programme: { pid, first_broadcast_date: '2026-08-23T22:30:00+01:00', long_synopsis: long },
+});
+
+test('useHighlights fetches both brands via the proxy, upgrades to the long synopsis, and builds iPlayer deep links', async () => {
+  const calls = [];
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    calls.push(url);
+    if (url === '/api/iplayer/b007t9y1/episodes/last.json') return new Response(lastJson('m002motd', 'MOTD short'), { status: 200 });
+    if (url === '/api/iplayer/m002jryr/episodes/last.json') return new Response(lastJson('m002scen', 'Sportscene short'), { status: 200 });
+    if (url === '/api/iplayer/m002motd.json') return new Response(episodeJson('m002motd', 'Arsenal host Manchester City.'), { status: 200 });
+    if (url === '/api/iplayer/m002scen.json') return new Response(episodeJson('m002scen', 'Premiership highlights in full.'), { status: 200 });
+    throw new Error(`unexpected url ${url}`);
+  }));
+
+  const { result } = renderHook(() => useHighlights(), { wrapper });
+
+  await waitFor(() => expect(result.current).toHaveLength(2));
+  await waitFor(() => expect(result.current.every(e => e.synopsis?.includes('short') === false)).toBe(true));
+
+  const motd = result.current.find(e => e.pid === 'm002motd');
+  expect(motd.comp.id).toBe('eng.1');
+  expect(motd.show).toBe('Match of the Day');
+  expect(motd.date).toBe('2026-08-23');
+  expect(motd.availableUntil).toBe('2026-09-22T22:59:00+01:00');
+  expect(motd.synopsis).toBe('Arsenal host Manchester City.'); // long preferred over short
+  expect(motd.url).toBe('https://www.bbc.co.uk/iplayer/episode/m002motd');
+  const scene = result.current.find(e => e.pid === 'm002scen');
+  expect(scene.comp.id).toBe('sco.1');
+  expect(scene.show).toBe('Sportscene');
+  // Every request went through our proxy — never to bbc.co.uk directly.
+  expect(calls.every(u => u.startsWith('/api/iplayer/'))).toBe(true);
+});
+
+test('useHighlights omits a brand whose fetch fails and keeps the other — never all-or-nothing', async () => {
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    if (url === '/api/iplayer/b007t9y1/episodes/last.json') return new Response('<html>BBC error page</html>', { status: 500 });
+    if (url === '/api/iplayer/m002jryr/episodes/last.json') return new Response(lastJson('m002scen', 'Sportscene short'), { status: 200 });
+    if (url === '/api/iplayer/m002scen.json') return new Response(episodeJson('m002scen', 'Premiership highlights.'), { status: 200 });
+    throw new Error(`unexpected url ${url}`);
+  }));
+
+  const { result } = renderHook(() => useHighlights(), { wrapper });
+
+  await waitFor(() => expect(result.current).toHaveLength(1));
+  expect(result.current[0].pid).toBe('m002scen');
+});
+
+test('useHighlights keeps the short synopsis when the episode-detail tier fails', async () => {
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    if (url.endsWith('/episodes/last.json')) {
+      const pid = url.includes('b007t9y1') ? 'm002motd' : 'm002scen';
+      return new Response(lastJson(pid, 'the short synopsis'), { status: 200 });
+    }
+    return new Response('<html>gone</html>', { status: 500 }); // detail tier down
+  }));
+
+  const { result } = renderHook(() => useHighlights(), { wrapper });
+
+  await waitFor(() => expect(result.current).toHaveLength(2));
+  expect(result.current.every(e => e.synopsis === 'the short synopsis')).toBe(true);
 });

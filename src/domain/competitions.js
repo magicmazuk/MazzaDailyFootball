@@ -43,6 +43,7 @@ const UEFA_BLURB = 'Thirty-six clubs, one league phase. The top 8 go straight to
 export const COMPETITIONS = [
   { ...league, id: 'sco.1', name: 'Scottish Premiership', shortName: 'Premiership',
     country: 'Scotland', source: 'espn', splitAfter: 6,
+    iplayer: { brand: 'm002jryr', show: 'Sportscene' },
     zones: { 1: 'ucl', 2: 'uecl', 3: 'uecl', 11: 'po', 12: 'rel' } },
   { ...league, id: 'sco.2', name: 'Scottish Championship', shortName: 'Championship',
     country: 'Scotland', source: 'espn',
@@ -67,6 +68,7 @@ export const COMPETITIONS = [
     blurb: 'The cup for the game below the Premiership — colt sides and Highland and Lowland clubs included. A league phase of three games each, then a straight knockout to the final.' },
   { ...league, id: 'eng.1', name: 'English Premier League', shortName: 'Premier League',
     country: 'England', source: 'espn',
+    iplayer: { brand: 'b007t9y1', show: 'Match of the Day' },
     zones: { ...range(1, 4, 'ucl'), 5: 'uecl', ...range(18, 20, 'rel') } },
   { ...cup, id: 'eng.fa', name: 'FA Cup', shortName: 'FA Cup',
     country: 'England', source: 'espn',
