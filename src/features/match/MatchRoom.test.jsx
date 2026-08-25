@@ -15,6 +15,14 @@ vi.mock('../../data/queries.js', () => ({
   // and a cold season cache by default.
   useHighlights: vi.fn(() => []),
   useSeasonFixtures: vi.fn(() => ({ data: undefined })),
+  // The Scout's Dossier (spec §13.37): PlayerSheet calls these four raw
+  // fetch hooks unconditionally (enabled-gated). MatchRoom hands the sheet
+  // no club (a tapped player could be on either side — never guess), so
+  // disabled-shaped stubs are the permanent truth here.
+  useWikiSummary: vi.fn(() => ({ data: undefined })),
+  useWikiSearch: vi.fn(() => ({ data: undefined })),
+  useFplIndex: vi.fn(() => ({ data: undefined })),
+  useTsdbPlayers: vi.fn(() => ({ data: undefined })),
 }));
 // PlayerSheet also scouts (spec §13.35) via a real react-query hook —
 // stubbed here for the same no-QueryClientProvider reason as usePlayer.
@@ -1168,4 +1176,65 @@ test('the no-detail line carries the section rhythm so the next label never squa
   </MemoryRouter>);
   const line = screen.getByText(/Detailed stats aren't published/);
   expect(line.className).toContain('mb-8');
+});
+
+// --- the dossier's club context (spec §13.37 review fix) ---
+// MatchRoom KNOWS each tapped player's club: standout cells carry their
+// side's teamName, lineup columns their side, and the timeline its event
+// attribution (own goals inverted — e.teamId is the BENEFITING side, the
+// scorer plays for the other one). The sheet must receive that club, and
+// useDossier is the observable seam.
+vi.mock('../player/dossier.js', () => ({
+  useDossier: vi.fn(() => ({ bio: null, face: null, credit: null })),
+}));
+import { useDossier } from '../player/dossier.js';
+
+const lastDossierClub = () =>
+  useDossier.mock.calls[useDossier.mock.calls.length - 1][2];
+
+test('tapping a standout hands the sheet that cell\'s club', async () => {
+  const withId = [{ ...standoutsData[0],
+    entries: [{ ...standoutsData[0].entries[0], playerId: 'p1' }] }];
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')}
+      detail={{ ...detail, standouts: withId }} />
+  </MemoryRouter>);
+  await userEvent.click(screen.getByRole('button', { name: 'Maeda' }));
+  expect(lastDossierClub()).toBe('Celtic');
+});
+
+test('tapping a timeline scorer hands the sheet the scoring side\'s club', async () => {
+  const goalDetail = { ...detail, events: [
+    { minute: "12'", type: 'Goal', player: 'Daizen Maeda', playerId: 'p1',
+      playerOff: null, teamId: 'Celtic', scoringPlay: true },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={goalDetail} />
+  </MemoryRouter>);
+  await userEvent.click(screen.getByRole('button', { name: 'Daizen Maeda' }));
+  expect(lastDossierClub()).toBe('Celtic');
+});
+
+test('an own-goal scorer belongs to the OTHER side — the club inverts (feed lore)', async () => {
+  const ogDetail = { ...detail, events: [
+    { minute: "30'", type: 'Own Goal', player: 'Connor Goldson', playerId: 'p9',
+      playerOff: null, teamId: 'Celtic', scoringPlay: true },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={ogDetail} />
+  </MemoryRouter>);
+  await userEvent.click(screen.getByRole('button', { name: 'Connor Goldson' }));
+  expect(lastDossierClub()).toBe('Rangers');
+});
+
+test('tapping a lineup name hands the sheet that column\'s club', async () => {
+  const xi = { ...detail, lineups: [
+    { homeAway: 'home', players: [{ id: 'p1', name: 'Daizen Maeda', shirt: 38, starter: true }] },
+    { homeAway: 'away', players: [{ id: 'p2', name: 'Jack Butland', shirt: 1, starter: true }] },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={xi} />
+  </MemoryRouter>);
+  await userEvent.click(screen.getByRole('button', { name: 'Jack Butland' }));
+  expect(lastDossierClub()).toBe('Rangers');
 });

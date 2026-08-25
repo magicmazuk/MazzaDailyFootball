@@ -1,7 +1,13 @@
 // The peek sheet (spec §13.16): a match-context preview that answers
 // "who is this?" one tap deep, without losing your place in the match —
-// mark · name · three headline numbers · "Full profile →". Identity stays
-// typographic throughout (no portrait/roundel/mark), matching PlayerScreen.
+// mark · name · three headline numbers. Identity is typographic UNTIL the
+// Scout's Dossier (spec §13.37) verifies a portrait — then a 72×92 plate
+// prints left of the name block, with the bio paragraph below the
+// Headline numbers (box-clamped to two lines until the sheet expands).
+// The dossier only arms when a caller hands down a `club` it genuinely
+// knows (TeamScreen's squad context); no club, no dossier — never a
+// guessed club, and an unverified identity leaves the sheet exactly as
+// the typographic original.
 //
 // Presentational shell + a tiny controller: fetches via usePlayer
 // internally, gated the same way usePlayer always gates itself (on
@@ -16,8 +22,15 @@ import { isKeeper } from '../../data/player.js';
 import Collapse from '../../ui/Collapse.jsx';
 import { SkeletonBlock, SkeletonLines } from '../../ui/Skeleton.jsx';
 import { Splits } from './PlayerScreen.jsx';
+import { useDossier } from './dossier.js';
 import { usePlayerVideos, youtubeKey } from '../match/video.js';
 import VideoCard from '../match/VideoCard.jsx';
+
+// 2-line bio clamp until the sheet expands — the same plain CSS box-clamp
+// technique Papers/FieldBoard use (no line-clamp plugin installed here).
+const clampStyle = {
+  display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+};
 
 // A swipe's vertical distance (px) past which touchend commits to
 // expand/collapse rather than being read as a tap or a scroll nudge.
@@ -75,9 +88,12 @@ function HeadlineSkeleton() {
   );
 }
 
-export default function PlayerSheet({ comp, playerId, onClose }) {
+export default function PlayerSheet({ comp, playerId, onClose, club = null }) {
   const open = playerId != null;
   const { bio, stats, isLoading, isError } = usePlayer(comp, playerId);
+  // The Scout's Dossier (spec §13.37): with no bio yet or no club handed
+  // down, this arms nothing and returns all nulls.
+  const { bio: dossierBio, face, credit } = useDossier(bio, comp, club);
   const reducedMotion = usePrefersReducedMotion();
 
   // The grab handle's real job (spec §13.18.3): swipe up (or tap the
@@ -95,7 +111,7 @@ export default function PlayerSheet({ comp, playerId, onClose }) {
   // The Scout Player reel (spec §13.35): lazy by design — the tap flips
   // this true and only then does the hook spend quota. Resets per player.
   const [scouting, setScouting] = useState(false);
-  const reel = usePlayerVideos(bio, scouting);
+  const reel = usePlayerVideos(bio, scouting, club);
   useEffect(() => { setExpanded(false); setEverExpanded(false); setScouting(false); }, [playerId]);
 
   // Body scroll lock while open (gold review): without it a swipe on the
@@ -194,6 +210,14 @@ export default function PlayerSheet({ comp, playerId, onClose }) {
         {bio && (
           <div className="xfade-in">
             <div className="flex items-start gap-3">
+              {face != null && (
+                // The plate, a size down (spec §13.37): same printed-photo
+                // treatment as the page's 96×122 column, on the xfade —
+                // enrichment arrives, never reserves space.
+                <img src={face.src} alt="" loading="lazy" referrerPolicy="no-referrer"
+                  className="xfade-in w-[72px] h-[92px] rounded-[4px] border border-ink/35
+                             object-cover bg-drawer shrink-0" />
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2">
                   <span className="text-[19px] truncate">{bio.name}</span>
@@ -211,6 +235,21 @@ export default function PlayerSheet({ comp, playerId, onClose }) {
               </button>
             </div>
             <Headline items={headline} />
+
+            {/* The dossier bio (spec §13.37), below the Headline numbers —
+                box-clamped to two lines in the peek; the clamp lifts when
+                the sheet expands. Credit only when a plate renders. */}
+            {dossierBio != null && (
+              <p style={expanded ? undefined : clampStyle}
+                className="xfade-in font-serif text-[13.5px] leading-relaxed mt-4">
+                {dossierBio}
+              </p>
+            )}
+            {face != null && (
+              <p className="xfade-in font-sans text-[8.5px] uppercase tracking-[.14em] text-muted mt-2">
+                Photograph · {credit}
+              </p>
+            )}
 
             {/* "Full profile →" retired (user trim, 2026-08-25): the anchor
                 bar already says a flip-up awaits — one affordance, not two. */}
@@ -246,7 +285,9 @@ export default function PlayerSheet({ comp, playerId, onClose }) {
               {everExpanded && (
                 <div ref={scrollRef} className="mt-4 max-h-[60vh] overflow-y-auto overscroll-contain">
                   <Splits bio={bio} stats={stats} comp={comp} />
-                  <Link to={`/player/${comp?.id}/${playerId}`} onClick={onClose}
+                  {/* The club rides along as location state so the full
+                      page's dossier keeps the verified context (§13.37). */}
+                  <Link to={`/player/${comp?.id}/${playerId}`} state={{ club }} onClick={onClose}
                     className="block text-center font-sans text-[10px] uppercase tracking-[.14em] text-muted mt-2 mb-1">
                     Open as page →
                   </Link>

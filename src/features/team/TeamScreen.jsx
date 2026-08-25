@@ -315,7 +315,12 @@ export default function TeamScreen() {
             followedIds={followedIds} />)}
         </section>
       </div>
-      <PlayerSheet comp={sheetComp} playerId={sheetPlayerId} onClose={() => setSheetPlayerId(null)} />
+      {/* club (spec §13.37): every squad-row tap is a tap on THIS team's
+          squad, so the team name is a club the sheet genuinely knows —
+          it arms the dossier's verification. MatchRoom passes none (a
+          tapped player could be on either side — never guess a club). */}
+      <PlayerSheet comp={sheetComp} playerId={sheetPlayerId} club={team.name}
+        onClose={() => setSheetPlayerId(null)} />
     </main>
   );
 }

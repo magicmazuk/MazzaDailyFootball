@@ -235,6 +235,14 @@ function TimelineRow({ e, fixture, comp, onOpenPlayer }) {
   const isYellow = type === 'Yellow Card';
   const isRed = type === 'Red Card';
   const isPlainGoal = type === 'Goal';
+  // The tapped player's club, for the dossier (spec §13.37): the event's
+  // side — INVERTED for own goals, where e.teamId is already the
+  // benefiting side (feed lore) and the scorer plays for the other one.
+  const ownSide = /own goal/i.test(type)
+    ? (teamSide === fixture.home ? fixture.away
+      : teamSide === fixture.away ? fixture.home : null)
+    : teamSide;
+  const open = id => onOpenPlayer(id, ownSide?.name ?? null);
 
   let content;
   if (e.player == null) {
@@ -249,7 +257,7 @@ function TimelineRow({ e, fixture, comp, onOpenPlayer }) {
     // plain text, one fewer tap target cluttering a substitution row.
     content = (
       <>
-        <PlayerTap name={e.player} playerId={e.playerId} comp={comp} onOpen={onOpenPlayer}
+        <PlayerTap name={e.player} playerId={e.playerId} comp={comp} onOpen={open}
           className="text-[15px]" />
         <span className="text-[15px]">{' ↑'}</span>
         {e.playerOff && (
@@ -261,13 +269,13 @@ function TimelineRow({ e, fixture, comp, onOpenPlayer }) {
     // A plain 'Goal' needs no redundant type word — the bold-ish serif
     // name alone says everything, with no accent colour and no ⚽.
     content = (
-      <PlayerTap name={e.player} playerId={e.playerId} comp={comp} onOpen={onOpenPlayer}
+      <PlayerTap name={e.player} playerId={e.playerId} comp={comp} onOpen={open}
         className="text-[15px] font-semibold" />
     );
   } else if (isYellow || isRed) {
     content = (
       <>
-        <PlayerTap name={e.player} playerId={e.playerId} comp={comp} onOpen={onOpenPlayer}
+        <PlayerTap name={e.player} playerId={e.playerId} comp={comp} onOpen={open}
           className="text-[15px]" />
         <span className="font-sans text-[9.5px] uppercase tracking-[.12em] text-muted ml-2.5">
           {type}
@@ -284,7 +292,7 @@ function TimelineRow({ e, fixture, comp, onOpenPlayer }) {
     // named moment (kickoff subs aside, cards aside).
     content = (
       <>
-        <PlayerTap name={e.player} playerId={e.playerId} comp={comp} onOpen={onOpenPlayer}
+        <PlayerTap name={e.player} playerId={e.playerId} comp={comp} onOpen={open}
           className="text-[15px]" />
         <span className="font-sans text-[9.5px] uppercase tracking-[.12em] text-muted ml-2.5">
           {type}
@@ -449,7 +457,7 @@ function Standouts({ standouts, fixture, comp, lineups, onOpenPlayer }) {
                     <Shirt colour={clubSide?.colour ?? null}
                       number={shirtFor(en.playerId, en.player)} size={15} />
                     {canTapPlayer(comp, en.playerId)
-                      ? <button type="button" onClick={() => onOpenPlayer(en.playerId)}>
+                      ? <button type="button" onClick={() => onOpenPlayer(en.playerId, s.teamName)}>
                           {surnameOf(en.player)}
                         </button>
                       : surnameOf(en.player)}
@@ -482,7 +490,8 @@ function LineupColumn({ side, players, comp, onOpenPlayer, testId }) {
       {players.map(p => (
         <div key={p.id ?? p.name} className="flex items-center gap-2.5 py-1.5 min-w-0">
           <Shirt colour={side.colour ?? null} number={p.shirt} size={20} />
-          <PlayerTap name={p.name} playerId={p.id} comp={comp} onOpen={onOpenPlayer}
+          <PlayerTap name={p.name} playerId={p.id} comp={comp}
+            onOpen={id => onOpenPlayer(id, side.name)}
             className="text-[13px] truncate min-w-0 flex-1 text-left" />
         </div>
       ))}
@@ -590,7 +599,12 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings, oth
   // The peek sheet's open/closed player (spec §13.16) — one instance lives
   // at the room's root rather than per tap-site, so standouts, lineups and
   // timeline names all share the same sheet instead of each mounting one.
-  const [sheetPlayerId, setSheetPlayerId] = useState(null);
+  // { id, club } — every tap site knows its player's club (standout cells
+  // their teamName, lineup columns their side, the timeline its event
+  // attribution, own goals inverted), so the sheet's dossier can verify
+  // against it (spec §13.37). Club may still be null (unattributed event).
+  const [sheetPlayer, setSheetPlayer] = useState(null);
+  const openPlayer = (id, club = null) => setSheetPlayer({ id, club });
   const headerFixture = fixture.status === 'live'
     ? withLiveScore(fixture, detail?.liveScore)
     : fixture;
@@ -607,11 +621,11 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings, oth
       {comp.hasMatchDetail
         ? (<>
             <FormBlock form={detail?.form} fixture={fixture} />
-            <Timeline events={detail?.events} fixture={fixture} comp={comp} onOpenPlayer={setSheetPlayerId} />
+            <Timeline events={detail?.events} fixture={fixture} comp={comp} onOpenPlayer={openPlayer} />
             <Stats teamStats={detail?.teamStats} fixture={fixture} />
             <Standouts standouts={detail?.standouts} fixture={fixture} comp={comp}
-              lineups={detail?.lineups} onOpenPlayer={setSheetPlayerId} />
-            <Lineups lineups={detail?.lineups} fixture={fixture} comp={comp} onOpenPlayer={setSheetPlayerId} />
+              lineups={detail?.lineups} onOpenPlayer={openPlayer} />
+            <Lineups lineups={detail?.lineups} fixture={fixture} comp={comp} onOpenPlayer={openPlayer} />
             <HeadToHead headToHead={detail?.headToHead} fixture={fixture} />
           </>)
         : (
@@ -624,7 +638,8 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings, oth
           still surface highlights even with no match detail to show. */}
       <VideoCard videos={videos} />
       <Siblings siblings={siblings} fixture={fixture} followedIds={followedIds} />
-      <PlayerSheet comp={comp} playerId={sheetPlayerId} onClose={() => setSheetPlayerId(null)} />
+      <PlayerSheet comp={comp} playerId={sheetPlayer?.id ?? null} club={sheetPlayer?.club ?? null}
+        onClose={() => setSheetPlayer(null)} />
     </main>
   );
 }

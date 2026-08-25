@@ -71,21 +71,23 @@ export function useMatchVideos(fixture) {
 // so this never spends quota just from the team page mounting. Cached
 // forever once fetched and never retried, same reasoning as match videos.
 // The Scout Player reel (spec §13.35): the scout film's sibling for one
-// player. The name is quoted and anchored to football (the bio carries no
-// club name — the sharper club-scoped query arrives with the full
-// dossier wave). Lazy, cached forever, never retried; the grift filter
-// applies automatically at the shared searchVideos seam.
-export function buildPlayerVideoQuery(name) {
-  return `"${name}" football highlights`;
+// player. The name is quoted; with the dossier wave (spec §13.37) the
+// query sharpens to the club when the caller knows it (PlayerScreen's
+// router-state club, PlayerSheet's handed-down squad club), anchoring to
+// 'football' otherwise — the bio itself carries no club name. Lazy,
+// cached forever, never retried; the grift filter applies automatically
+// at the shared searchVideos seam.
+export function buildPlayerVideoQuery(name, club = null) {
+  return club ? `"${name}" ${club} highlights` : `"${name}" football highlights`;
 }
 
-export function usePlayerVideos(player, enabled) {
+export function usePlayerVideos(player, enabled, club = null) {
   return useQuery({
-    queryKey: ['player-videos', player?.id],
+    queryKey: ['player-videos', player?.id, club ?? null],
     enabled: Boolean(enabled) && !!player?.name && !!youtubeKey(),
     staleTime: Infinity,
     retry: false,
-    queryFn: () => searchVideos(buildPlayerVideoQuery(player.name), youtubeKey(), { order: 'relevance' }),
+    queryFn: () => searchVideos(buildPlayerVideoQuery(player.name, club), youtubeKey(), { order: 'relevance' }),
   });
 }
 
