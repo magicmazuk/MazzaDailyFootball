@@ -10,6 +10,10 @@
       "destination": "/api/wosfl?_p=/$1"
     },
     {
+      "source": "/api/iplayer/(.*)",
+      "destination": "/api/iplayer?_p=/$1"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

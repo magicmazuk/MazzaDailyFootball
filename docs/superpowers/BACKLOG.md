@@ -169,3 +169,5 @@ None block usage; candidates for a future 1.2 pass.
   players say so honestly. Portraits WELCOME (user rescinded the misread no-portraits line,
   2026-08-22): the dossier can carry the Wikipedia lead image, and FPL's 250px photos serve
   EPL players — with the ESPN-404 lore meaning faces come from those sources, never ESPN.
+
+- **Highlights reel, featured-tier misses (spec 13.36, minor):** clubs whose spoken name is a prefix of the registry name (Brighton & Hove Albion, Wolverhampton Wanderers) always print the plain tier - the synopsis never says the full name. Honest, never wrong; a uniqueness-checked first-token match could lift them if it rankles. Also scope: only each brand's LATEST episode joins - Saturday's results lose their line when Sunday's episode lands (episodes.json archive would extend it).

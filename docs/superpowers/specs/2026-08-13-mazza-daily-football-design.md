@@ -1186,3 +1186,43 @@ mocks; consolidated to one). Live-verified: five ST-D cells with real shirt numb
 Hearts 4-0 DUFC; the scout control present in the sheet. The reel itself cannot play on
 localhost (the key is referrer-locked to prod BY CHOICE) — prod verification follows the
 merge, per the standing pattern.
+
+## 13.36 The highlights reel (MOTD and Sportscene on iPlayer)
+
+The user's ask (2026-08-25, spiked then shaped): Match of the Day is part of how he watches
+football — surface it. The spike (.superpowers/brainstorm/2026-08-25-motd-iplayer.md) proved
+the BBC /programmes JSON service free, keyless and alive, that MOTD's long synopsis NAMES the
+featured matches, and that iplayer episode deep-links work. Picks from the mockup sheet:
+**H-A + R-A + R-B** — the listing on Today, and the link printed in the result drawer AND on
+the full match page.
+
+**The data spine.** `api/iplayer.js`, the wosfl proxy's pattern verbatim (dual-mode
+extractRest, last-known-good, s-maxage=1800/swr 86400): upstream www.bbc.co.uk/programmes,
+TWO route shapes — `/{brand}/episodes/last.json` for brand in {b007t9y1 MOTD, m002jryr
+Sportscene: Premiership Highlights} and `/{pid}.json` episode detail (pid `[a-z0-9]{8}`,
+the LEAGUE_ANY precedent). BBC 403s non-browser callers, so the proxy sends a browser UA —
+the exact INVERSE of the ESPN rule; never let one proxy's UA discipline leak into the other.
+Never cache a body that doesn't parse as JSON (BBC errors arrive as HTML with 200s possible).
+vercel.json rewrite + vite api-shim mount ride along. Registry: `iplayer: { brand, show }`
+on eng.1 and sco.1 only. £0 stands.
+
+**The join, honest by tier.** An episode covers a fixture when the fixture is FT, in the
+show's league, and kicked off on the episode's broadcast date (Europe/London — a 22:30
+Saturday MOTD covers Saturday's games). Within a covered day, a fixture is FEATURED only
+when the episode synopsis names BOTH clubs — generic-token-stripped word matching
+("Newcastle United" → "newcastle"), with the derby guard: when two same-day clubs strip to
+the same tokens (both Manchesters), only the full name matches. Featured copy: "Featured on
+Match of the Day"; covered-not-featured (and ALL Sportscene — its synopses never name games):
+"Highlights · Match of the Day". A result with no episode simply carries no line — absence
+is not degradation here, because coverage was never promised; this is the one place the
+one-line law does not bite.
+
+**The surfaces.** (1) Today: "The highlights" section in the On TV row form (H-A) between
+Earlier and The Papers, rise-in-5 — one row per FRESH episode (broadcast within 36h, not a
+repeat): show name in serif 15px, context line (relative day · league) beneath, "iPlayer →"
+in the accent caps recipe at the right margin. The notice IS the notification; it expires by
+itself, no push, no badge. (2) The result drawer: one line after venue·attendance in the
+tie-line's register (R-A). (3) The match page: the muted-link recipe under the header meta
+(R-B). All three are external links (target _blank, rel noopener) — link out only, never
+embed (DRM). If the feed dies the reel rests silently, last-known-good absorbing the
+transition.

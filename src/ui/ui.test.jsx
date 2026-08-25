@@ -12,16 +12,23 @@ import StatusWord from './StatusWord.jsx';
 // assertion has a call count to inspect.
 vi.mock('../data/queries.js', () => ({
   useMatchDetail: vi.fn(() => ({ data: undefined, isLoading: false, isError: false })),
+  // The result drawer's highlight line (spec §13.36) joins via
+  // useFixtureHighlight, which reads these two — stubbed to a silent reel
+  // and a cold season cache by default.
+  useHighlights: vi.fn(() => []),
+  useSeasonFixtures: vi.fn(() => ({ data: undefined })),
 }));
 
 import FixtureRow, { timelinePoints, meetingBalance } from './FixtureRow.jsx';
-import { useMatchDetail } from '../data/queries.js';
+import { useMatchDetail, useHighlights } from '../data/queries.js';
 import AppShell from './AppShell.jsx';
 import FitbaMark from './FitbaMark.jsx';
 
 beforeEach(() => {
   useMatchDetail.mockReset();
   useMatchDetail.mockReturnValue({ data: undefined, isLoading: false, isError: false });
+  useHighlights.mockReset();
+  useHighlights.mockReturnValue([]);
 });
 
 const side = (over = {}) => ({
@@ -247,6 +254,66 @@ test('FixtureRow: an own goal stays under its event teamId — ESPN already cred
   expect(homeCol.textContent).toContain('Defender');
   expect(homeCol.textContent).toContain('(og)');
   expect(awayCol.textContent).not.toContain('Defender');
+});
+
+// --- the highlight line (spec §13.36, R-A) ---
+
+const sportsceneEpisode = (over = {}) => ({
+  comp: byId('sco.1'), show: 'Sportscene', pid: 'm0030s0h', date: '2026-08-22',
+  firstBroadcast: '2026-08-22T22:30:00+01:00', availableUntil: null,
+  synopsis: 'Highlights of the day\'s Premiership action.',
+  url: 'https://www.bbc.co.uk/iplayer/episode/m0030s0h', ...over,
+});
+
+test('FixtureRow: the result drawer prints the covered episode\'s line after the meta, in the accent caps recipe, linking out', async () => {
+  const user = userEvent.setup();
+  useHighlights.mockReturnValue([sportsceneEpisode()]);
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { events: [], gameInfo: { venue: 'Celtic Park', attendance: 58876 } } },
+  });
+  render(
+    <MemoryRouter><FixtureRow fixture={fixture('ft')} followedIds={new Set()} /></MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  const line = screen.getByTestId('highlight-line');
+  // Sportscene synopses never name games — the covered tier, never Featured.
+  expect(line.textContent).toBe('Highlights · Sportscene — iPlayer →');
+  expect(line).toHaveAttribute('href', 'https://www.bbc.co.uk/iplayer/episode/m0030s0h');
+  expect(line).toHaveAttribute('target', '_blank');
+  expect(line).toHaveAttribute('rel', 'noopener noreferrer');
+  // The Full-table accent recipe verbatim, in the tie-line's placement.
+  expect(line.className).toContain('font-sans text-[10px] uppercase tracking-[.16em] text-accent');
+  expect(line.className).toContain('mt-2 block');
+  // Placement: after the venue·attendance meta line.
+  const meta = screen.getByText('Celtic Park · Attendance 58,876');
+  // eslint-disable-next-line no-bitwise
+  expect(meta.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test('FixtureRow: a synopsis naming both clubs upgrades the drawer line to the Featured tier', async () => {
+  const user = userEvent.setup();
+  useHighlights.mockReturnValue([sportsceneEpisode({
+    synopsis: 'Celtic and St Johnstone share the honours at Celtic Park.' })]);
+  useMatchDetail.mockReturnValue({ isLoading: false, isError: false, data: { detail: { events: [] } } });
+  render(
+    <MemoryRouter><FixtureRow fixture={fixture('ft')} followedIds={new Set()} /></MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  expect(screen.getByTestId('highlight-line').textContent)
+    .toBe('Featured on Sportscene — iPlayer →');
+});
+
+test('FixtureRow: no covering episode means no line at all — absence is not degradation here (§13.36)', async () => {
+  const user = userEvent.setup();
+  useHighlights.mockReturnValue([sportsceneEpisode({ date: '2026-08-15' })]);
+  useMatchDetail.mockReturnValue({ isLoading: false, isError: false, data: { detail: { events: [] } } });
+  render(
+    <MemoryRouter><FixtureRow fixture={fixture('ft')} followedIds={new Set()} /></MemoryRouter>,
+  );
+  await user.click(screen.getByRole('button', { expanded: false }));
+  expect(screen.queryByTestId('highlight-line')).not.toBeInTheDocument();
+  expect(screen.queryByText(/iPlayer/)).not.toBeInTheDocument();
 });
 
 // --- the match line (spec §13.22, task 1) ---

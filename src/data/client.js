@@ -20,6 +20,12 @@ export function wosflUrl(rest) {
   return `/api/wosfl${rest}`;
 }
 
+// The Highlights Reel (spec §13.36): BBC /programmes behind our own
+// proxy — same one-hop rule.
+export function iplayerUrl(rest) {
+  return `/api/iplayer${rest}`;
+}
+
 export async function getJson(url) {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);

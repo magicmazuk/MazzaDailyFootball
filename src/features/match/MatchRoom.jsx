@@ -15,6 +15,7 @@ import StatusWord from '../../ui/StatusWord.jsx';
 import TvBadge from '../../ui/TvBadge.jsx';
 import { legLabel, tieLine } from '../../domain/legs.js';
 import { prettifyRound } from '../../domain/round.js';
+import { useFixtureHighlight } from './highlight.js';
 import PlayerSheet from '../player/PlayerSheet.jsx';
 import VideoCard from './VideoCard.jsx';
 
@@ -104,6 +105,9 @@ function MetadataLine({ fixture, gameInfo }) {
 }
 
 function ScoreHeader({ fixture, comp, gameInfo, events, otherLeg }) {
+  // The highlight line (spec §13.36, R-B) — hooks run unconditionally,
+  // the render is gated on FT below (covers() only matches FT anyway).
+  const highlight = useFixtureHighlight(fixture, comp);
   const pens = penaltyResult(fixture);
   const tie = tieLine(fixture);
   // ESPN reports score:"0" before kickoff — a scheduled or postponed fixture
@@ -143,6 +147,19 @@ function ScoreHeader({ fixture, comp, gameInfo, events, otherLeg }) {
         </p>
       )}
       <MetadataLine fixture={fixture} gameInfo={gameInfo} />
+      {/* Watch it back (spec §13.36, R-B): the covered episode's line in
+          the muted-link recipe, under the header meta and beside the
+          tie-line/leg-link furniture — an external link out to iPlayer,
+          never an embed (DRM). No episode, no line: §13.36 exempts absence
+          here from the one-line law. */}
+      {fixture.status === 'ft' && highlight && (
+        <a data-testid="highlight-line" href={highlight.url}
+          target="_blank" rel="noopener noreferrer"
+          className="font-sans text-[9.5px] uppercase tracking-[.14em] text-muted underline
+                     underline-offset-4 inline-block mt-2">
+          {highlight.line} — watch on iPlayer →
+        </a>
+      )}
       {/* The other leg, one tap away (spec §13.29): its label and score in
           the meeting-ledger's muted recipes, linking to that leg's page.
           PLAYED legs only (user report, 2026-08-20): a scheduled return

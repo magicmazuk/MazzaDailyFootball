@@ -19,6 +19,9 @@ vi.mock('../../data/queries.js', () => ({
   // directly — stubbed so these TodayScreen wiring tests don't need real
   // news data of their own.
   useNews: vi.fn(() => ({ isLoading: false, data: { items: [] } })),
+  // ...and the highlights reel (spec §13.36), which fetches for itself the
+  // same way — an empty reel renders nothing.
+  useHighlights: vi.fn(() => []),
 }));
 
 import TodayScreen from './TodayScreen.jsx';
