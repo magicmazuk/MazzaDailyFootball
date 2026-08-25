@@ -23,17 +23,20 @@
 // suits FPL and TSDB. Never let one proxy's UA discipline leak into another.
 const UA = 'MazzaDailyFootball/1.0 (personal football app)';
 
-// Every dynamic path segment must fit this set — URL-encoded unicode
-// arrives as %XX, so % is in-alphabet. Anything else is a 400.
-const SAFE = /^[A-Za-z0-9_%().,'-]+$/;
+// One alphabet for every dynamic value, checked in DECODED form: letters,
+// digits, the name punctuation, literal spaces and unicode. Two hard-won
+// rules live here (both caught live, 2026-08-25): never test a safe-chars
+// regex against encodeURIComponent's output (it is itself always
+// %-and-alphanumerics - the check becomes vacuous), and never assume a
+// path segment arrives encoded - the dev shim passes %20 through RAW, but
+// Vercel's rewrite substitutes $1 DECODED, so "Callum McGregor" reaches
+// prod with a literal space (v1.12.0's first prod probe 400d on exactly
+// this). Decode tolerantly, validate decoded, re-encode on forwarding.
+const SAFE_DECODED = /^[A-Za-z0-9_().,' À-￿-]+$/;
 
-// The same check for /wiki/search's q — which arrives DECODED from
-// URLSearchParams, so the alphabet is the decoded twin of SAFE: literal
-// spaces instead of %20, literal unicode instead of %XX (re-encoded on
-// forwarding). Never test SAFE against encodeURIComponent(q): encoding
-// output is itself always %-and-alphanumerics, which would wave anything
-// through (caught by live smoke, 2026-08-25).
-const SAFE_QUERY = /^[A-Za-z0-9_().,' \u00C0-\uFFFF-]+$/;
+function decodeSegment(raw) {
+  try { return decodeURIComponent(raw); } catch { return raw; }
+}
 
 // Bios and TSDB records change rarely — and TSDB's free tier rate-limits,
 // so cache hard: a day fresh, a week stale-while-revalidate. FPL squads
@@ -72,17 +75,22 @@ function extractRest(reqUrl) {
 // everywhere means 400. The last-known-good key includes the query for
 // /wiki/search so different searches never serve each other's fallback.
 function resolveRoute(rest, params) {
-  let m = rest.match(/^\/wiki\/summary\/([A-Za-z0-9_%().,'-]+)$/);
+  let m = rest.match(/^\/wiki\/summary\/([^/]+)$/);
   if (m) {
+    const title = decodeSegment(m[1]);
+    if (!SAFE_DECODED.test(title)) return null;
+    // Spaces become underscores — Wikipedia's canonical title form — so
+    // both arrival shapes share one upstream URL and one fallback key.
+    const enc = encodeURIComponent(title.replace(/ /g, '_'));
     return {
-      key: rest,
-      url: `https://en.wikipedia.org/api/rest_v1/page/summary/${m[1]}`,
+      key: `/wiki/summary/${enc}`,
+      url: `https://en.wikipedia.org/api/rest_v1/page/summary/${enc}`,
       cache: CACHE_DAY,
     };
   }
   if (rest === '/wiki/search') {
     const q = params.get('q');
-    if (!q || !SAFE_QUERY.test(q)) return null;
+    if (!q || !SAFE_DECODED.test(q)) return null;
     const enc = encodeURIComponent(q);
     return {
       key: `/wiki/search?q=${enc}`,
@@ -98,11 +106,14 @@ function resolveRoute(rest, params) {
       trim: trimFplIndex,
     };
   }
-  m = rest.match(/^\/tsdb\/([A-Za-z0-9_%().,'-]+)$/);
+  m = rest.match(/^\/tsdb\/([^/]+)$/);
   if (m) {
+    const name = decodeSegment(m[1]);
+    if (!SAFE_DECODED.test(name)) return null;
+    const enc = encodeURIComponent(name);
     return {
-      key: rest,
-      url: `https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=${m[1]}`,
+      key: `/tsdb/${enc}`,
+      url: `https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=${enc}`,
       cache: CACHE_DAY,
     };
   }
