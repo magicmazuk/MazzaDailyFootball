@@ -1158,3 +1158,31 @@ season fixtures Today already keeps warm.
 Verified live: both classifieds render in full with real matchday-3/matchday-2 data; the
 desk wrote itself — Carabao Cup Second round tonight, Champions League play-off 2nd legs
 (Celtic in Linz) tomorrow.
+
+## 13.35 The standouts, re-set — and the scout's first tool
+
+Two user asks (2026-08-25), one release.
+
+**ST-D standouts**: the user MIXED two mockups — ST-B's value-led layout with ST-A's club
+colour — and the composition is theirs: the number carries the cell (24px serif tabular,
+the drawer-cell recipe), the club-coloured shirt carries the man (press tone, real number
+via the scorer-row roster lookup), SURNAMES only, and breathing room above the name line
+(mt-2 — the user tuned the padding by eye off the addendum mock). Grid per club, up to
+three cells; names stay tappable under the §13.16 gate. Three legacy pins migrated from
+the retired "Shots: Full Name 5" text format.
+
+**Scout Player**: the scout film's per-player sibling. A quiet control on the player sheet
+AND page (the muted link recipe, offered only when a key exists — junior surfaces never see
+it); the tap flips a lazy usePlayerVideos (cached forever, never retried, grift-filtered at
+the shared searchVideos seam) whose query quotes the name and anchors it to football
+('"Cláudio Braga" football highlights' — the bio carries NO club name; the club-scoped
+query and richer identity arrive with the full Dossier wave, and PlayerScreen's
+location.state club is noted as an early source for it). The reel renders as VideoCards
+with the earned dismiss behaviour and "The scout's reel is empty." when exhausted.
+
+Test-harness lore hardened along the way: every screen that mounts PlayerSheet must stub
+video.js beside queries.js (MatchRoom, TeamScreen — whose file had TWO competing video
+mocks; consolidated to one). Live-verified: five ST-D cells with real shirt numbers on
+Hearts 4-0 DUFC; the scout control present in the sheet. The reel itself cannot play on
+localhost (the key is referrer-locked to prod BY CHOICE) — prod verification follows the
+merge, per the standing pattern.

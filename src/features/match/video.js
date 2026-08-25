@@ -70,6 +70,25 @@ export function useMatchVideos(fixture) {
 // `enabled` is caller-controlled (the card only flips it true once tapped),
 // so this never spends quota just from the team page mounting. Cached
 // forever once fetched and never retried, same reasoning as match videos.
+// The Scout Player reel (spec §13.35): the scout film's sibling for one
+// player. The name is quoted and anchored to football (the bio carries no
+// club name — the sharper club-scoped query arrives with the full
+// dossier wave). Lazy, cached forever, never retried; the grift filter
+// applies automatically at the shared searchVideos seam.
+export function buildPlayerVideoQuery(name) {
+  return `"${name}" football highlights`;
+}
+
+export function usePlayerVideos(player, enabled) {
+  return useQuery({
+    queryKey: ['player-videos', player?.id],
+    enabled: Boolean(enabled) && !!player?.name && !!youtubeKey(),
+    staleTime: Infinity,
+    retry: false,
+    queryFn: () => searchVideos(buildPlayerVideoQuery(player.name), youtubeKey(), { order: 'relevance' }),
+  });
+}
+
 export function buildTeamVideoQuery(team) {
   return `"${team.name}" highlights`;
 }

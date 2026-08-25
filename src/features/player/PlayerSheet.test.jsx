@@ -329,3 +329,29 @@ test('opening the sheet locks body scroll and closing restores the prior value',
   expect(document.body.style.overflow).toBe('scroll');
   document.body.style.overflow = '';
 });
+
+// --- the Scout Player reel (spec §13.35) ---
+vi.mock('../match/video.js', () => ({
+  usePlayerVideos: vi.fn(() => ({ data: undefined, isLoading: false })),
+  youtubeKey: vi.fn(() => 'k'),
+}));
+const videoMod = await import('../match/video.js');
+
+test("a 'Scout player' control shows once the bio lands, and tapping it opens the reel", async () => {
+  const user = userEvent.setup();
+  usePlayer.mockReturnValue({
+    bio: { id: 'p1', name: 'Cláudio Braga', position: 'Forward' },
+    stats: null, isLoading: false, isError: false,
+  });
+  videoMod.usePlayerVideos.mockImplementation((player, enabled) => (
+    enabled
+      ? { data: [{ videoId: 'v1', title: 'Braga highlights' }], isLoading: false }
+      : { data: undefined, isLoading: false }
+  ));
+  render(<MemoryRouter>
+    <PlayerSheet comp={byId('sco.1')} playerId="p1" onClose={() => {}} />
+  </MemoryRouter>);
+  const scout = await screen.findByRole('button', { name: /Scout player/ });
+  await user.click(scout);
+  expect(await screen.findByTitle('Braga highlights')).toBeInTheDocument();
+});

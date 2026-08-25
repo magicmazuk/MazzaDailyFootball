@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Crest from '../../ui/Crest.jsx';
 import FixtureRow, { BalanceBar, MatchLine, MeetingRow, meetingBalance, pressFill,
-  timelinePoints } from '../../ui/FixtureRow.jsx';
+  shirtLookup, surnameOf, timelinePoints } from '../../ui/FixtureRow.jsx';
 import FormGlyphs from '../../ui/FormGlyphs.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
 import Shirt from '../../ui/Shirt.jsx';
@@ -376,28 +376,52 @@ function Stats({ teamStats, fixture }) {
 // data presence: ESPN's leaders endpoint publishes season-to-date numbers
 // even for a fixture that hasn't kicked off yet, which would mislead if
 // shown as if they were "this match's" standouts.
-function Standouts({ standouts, fixture, comp, onOpenPlayer }) {
+// The standouts, ST-D (spec §13.35, the user's own mix of two mockups):
+// value-led cells in the drawer-cell recipe — the number carries the cell,
+// the club-coloured shirt carries the man. Shirt numbers come from the
+// same payload's rosters (the scorer-row lookup); surnames only, breathing
+// room above the name line (the user asked for the padding by eye).
+function Standouts({ standouts, fixture, comp, lineups, onOpenPlayer }) {
   if (fixture.status !== 'ft' || !standouts?.length) return null;
+  const shirtFor = shirtLookup(lineups);
+  const GRID = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' };
+  const sideFor = teamId =>
+    (String(teamId) === String(fixture.home.teamId) ? fixture.home
+      : String(teamId) === String(fixture.away.teamId) ? fixture.away : null);
   return (
     <section className="mb-8 rise-in rise-in-5">
       <SectionLabel muted>Standouts</SectionLabel>
-      {standouts.map(s => (
-        <div key={s.teamId ?? s.teamName} className="mb-4 last:mb-0">
-          <p className="font-sans text-[10px] uppercase tracking-[.14em] text-muted mb-2">
-            {s.teamName}
-          </p>
-          {s.entries.slice(0, 3).map((en, i) => (
-            <p key={i} className="text-[13px] text-muted">
-              {/* Bare-text interpolation when not tappable (no playerId, or a
-                  BBC comp) keeps this exactly the single text node it always
-                  was; only the tappable case introduces a nested <button>. */}
-              {en.label}: {canTapPlayer(comp, en.playerId)
-                ? <button type="button" onClick={() => onOpenPlayer(en.playerId)}>{en.player}</button>
-                : en.player} {en.value}
+      {standouts.map(s => {
+        const entries = s.entries.slice(0, 3);
+        const clubSide = sideFor(s.teamId);
+        return (
+          <div key={s.teamId ?? s.teamName} className="mb-5 last:mb-0">
+            <p className="font-sans text-[10px] uppercase tracking-[.14em] text-muted mb-2.5">
+              {s.teamName}
             </p>
-          ))}
-        </div>
-      ))}
+            <div className={`grid ${GRID[entries.length] ?? 'grid-cols-3'} gap-x-2 gap-y-3 text-center`}>
+              {entries.map((en, i) => (
+                <div key={i} data-testid={`standout-cell-${en.label}-${s.teamName}`}>
+                  <div className="text-[24px] tabular-nums leading-none">{en.value}</div>
+                  <div className="font-sans text-[8.5px] uppercase tracking-[.14em] text-muted mt-1">
+                    {en.label}
+                  </div>
+                  <div data-testid="standout-name"
+                    className="mt-2 flex items-center justify-center gap-1.5 text-[12.5px]">
+                    <Shirt colour={clubSide?.colour ?? null}
+                      number={shirtFor(en.playerId, en.player)} size={15} />
+                    {canTapPlayer(comp, en.playerId)
+                      ? <button type="button" onClick={() => onOpenPlayer(en.playerId)}>
+                          {surnameOf(en.player)}
+                        </button>
+                      : surnameOf(en.player)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </section>
   );
 }
@@ -547,7 +571,8 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings, oth
             <FormBlock form={detail?.form} fixture={fixture} />
             <Timeline events={detail?.events} fixture={fixture} comp={comp} onOpenPlayer={setSheetPlayerId} />
             <Stats teamStats={detail?.teamStats} fixture={fixture} />
-            <Standouts standouts={detail?.standouts} fixture={fixture} comp={comp} onOpenPlayer={setSheetPlayerId} />
+            <Standouts standouts={detail?.standouts} fixture={fixture} comp={comp}
+              lineups={detail?.lineups} onOpenPlayer={setSheetPlayerId} />
             <Lineups lineups={detail?.lineups} fixture={fixture} comp={comp} onOpenPlayer={setSheetPlayerId} />
             <HeadToHead headToHead={detail?.headToHead} fixture={fixture} />
           </>)

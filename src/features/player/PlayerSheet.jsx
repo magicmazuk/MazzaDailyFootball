@@ -16,6 +16,8 @@ import { isKeeper } from '../../data/player.js';
 import Collapse from '../../ui/Collapse.jsx';
 import { SkeletonBlock, SkeletonLines } from '../../ui/Skeleton.jsx';
 import { Splits } from './PlayerScreen.jsx';
+import { usePlayerVideos, youtubeKey } from '../match/video.js';
+import VideoCard from '../match/VideoCard.jsx';
 
 // A swipe's vertical distance (px) past which touchend commits to
 // expand/collapse rather than being read as a tap or a scroll nudge.
@@ -90,7 +92,11 @@ export default function PlayerSheet({ comp, playerId, onClose }) {
   // comment on the same fix. Reset alongside `expanded` on playerId change
   // so a new player's sheet never inherits the old player's mounted Splits.
   const [everExpanded, setEverExpanded] = useState(false);
-  useEffect(() => { setExpanded(false); setEverExpanded(false); }, [playerId]);
+  // The Scout Player reel (spec §13.35): lazy by design — the tap flips
+  // this true and only then does the hook spend quota. Resets per player.
+  const [scouting, setScouting] = useState(false);
+  const reel = usePlayerVideos(bio, scouting);
+  useEffect(() => { setExpanded(false); setEverExpanded(false); setScouting(false); }, [playerId]);
 
   // Body scroll lock while open (gold review): without it a swipe on the
   // sheet also scrolls the page behind, so dismissing left the reader
@@ -213,6 +219,26 @@ export default function PlayerSheet({ comp, playerId, onClose }) {
                   tracking-[.16em] text-accent mt-4">
                 Full profile →
               </button>
+            )}
+
+            {/* Scout player (spec §13.35): the scout film's per-player
+                sibling. Only offered where video exists at all (key
+                present; the sheet is espn-only by §13.16's own gate). */}
+            {youtubeKey() && !scouting && (
+              <button type="button" onClick={() => setScouting(true)}
+                className="block w-full text-center font-sans text-[9.5px] uppercase
+                  tracking-[.14em] text-muted underline underline-offset-4 mt-3">
+                Scout player →
+              </button>
+            )}
+            {scouting && (
+              <div className="mt-4">
+                <VideoCard videos={reel.data ?? []}
+                  exhaustedLine="The scout's reel is empty." />
+                {reel.isLoading && (
+                  <p className="font-sans text-[11px] text-muted">Scouting…</p>
+                )}
+              </div>
             )}
 
             {/* Peek <-> expanded (spec §13.21, retires the parked v1.0
