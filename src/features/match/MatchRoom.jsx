@@ -13,7 +13,7 @@ import SectionLabel from '../../ui/SectionLabel.jsx';
 import Shirt from '../../ui/Shirt.jsx';
 import StatusWord from '../../ui/StatusWord.jsx';
 import TvBadge from '../../ui/TvBadge.jsx';
-import { legLabel, tieLine } from '../../domain/legs.js';
+import { aggScores, legLabel, tieLine } from '../../domain/legs.js';
 import { prettifyRound } from '../../domain/round.js';
 import { useFixtureHighlight } from './highlight.js';
 import PlayerSheet from '../player/PlayerSheet.jsx';
@@ -131,18 +131,26 @@ function ScoreHeader({ fixture, comp, gameInfo, events, otherLeg }) {
   const highlight = useFixtureHighlight(fixture, comp);
   const pens = penaltyResult(fixture);
   const tie = tieLine(fixture);
+  // The aggregate in hand (user ask 2026-08-25, sketched mid-match): on a
+  // decider leg the tie's running total sits muted before each score. The
+  // PLAYED other leg makes the total computed, so a live header's aggregate
+  // moves with the overlaid live score rather than the hour-stale cache.
+  const aggs = aggScores(fixture, otherLeg);
   // ESPN reports score:"0" before kickoff — a scheduled or postponed fixture
   // shows a dash, the same as a genuinely missing score, never a phantom 0-0.
   const showScore = fixture.status === 'live' || fixture.status === 'ft';
   return (
     <header className="mb-8 rise-in rise-in-1">
-      {[fixture.home, fixture.away].map(side => (
+      {[['home', fixture.home], ['away', fixture.away]].map(([ha, side]) => (
         <div key={side.teamId} className="flex items-center gap-3 py-1.5">
           <Link to={`/team/${comp.id}/${side.teamId}`}
             className="flex items-center gap-3 flex-1 min-w-0">
             <Crest side={side} size={26} />
             <span className="text-[19px] truncate">{side.name}</span>
           </Link>
+          {showScore && side.score != null && aggs != null && (
+            <span className="font-serif text-[17px] text-muted tabular-nums">({aggs[ha]})</span>
+          )}
           <span className="text-[30px] tabular-nums">
             {showScore && side.score != null ? side.score : '–'}
           </span>

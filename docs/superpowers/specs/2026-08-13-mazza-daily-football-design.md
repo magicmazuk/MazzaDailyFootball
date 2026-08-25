@@ -1271,3 +1271,16 @@ its plates. The scout reel's query sharpens to `"{name}" {club} highlights` when
 known (§13.35's deferred item). The stale "no portrait" design note in PlayerScreen's header
 comment is rewritten — it described a feed fact, never a law. Dossier content arrives on the
 xfade, never a skeleton (enrichment, not structure).
+
+## 13.38 The aggregate in hand (§13.29 completed)
+
+Asked mid-match from Linz (2026-08-25, Celtic's decider leg live on the user's phone, sketch
+supplied): a decider leg's score line carries the tie's running total — "LASK (0) 0 · Celtic
+(3) 0" — muted serif before each score, the leg score staying the loudest number. EVERYWHERE
+results surface: one seam each — FixtureRow's TeamLine (every list in the app) and the match
+header. Leg 2 only (leg 1's aggregate IS its score); the feed's per-side aggregateScore
+updates LIVE (probed at 28′ in the actual match — Celtic's goal moved it within the minute).
+The header computes other-leg + overlaid-live-score when the played twin is at hand, so its
+aggregate can never lag the fresh score beside it; rows read score and agg from one payload
+and agree by construction. The meetings ledger stays as printed — ESPN's h2h events carry no
+aggregate fields, and we never guess.

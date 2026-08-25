@@ -1067,3 +1067,26 @@ test('FixtureRow: an ordinary result renders no tie line and no leg on the conte
   await user.click(screen.getByRole('button', { expanded: false }));
   expect(container.querySelector('[data-testid="tie-line"]')).toBeNull();
 });
+
+// --- the aggregate in hand (user ask 2026-08-25): every result row ---
+
+test('FixtureRow: a decider leg prints each side\'s aggregate, muted, before its score', () => {
+  const fx = fixture('ft', { leg: 2 });
+  fx.home = { ...fx.home, score: 0, agg: 0 };
+  fx.away = { ...fx.away, score: 1, agg: 4 };
+  render(<MemoryRouter><FixtureRow fixture={fx} followedIds={new Set()} /></MemoryRouter>);
+  const aggHome = screen.getByText('(0)');
+  const aggAway = screen.getByText('(4)');
+  expect(aggHome.className).toBe('font-serif text-[13px] text-muted tabular-nums');
+  expect(aggAway.className).toBe('font-serif text-[13px] text-muted tabular-nums');
+});
+
+test('FixtureRow: a first leg and a normal match print no aggregate at all', () => {
+  const one = fixture('ft', { leg: 1 });
+  one.home = { ...one.home, score: 3, agg: 3 };
+  one.away = { ...one.away, score: 0, agg: 0 };
+  const { rerender } = render(<MemoryRouter><FixtureRow fixture={one} followedIds={new Set()} /></MemoryRouter>);
+  expect(screen.queryByText(/^\(\d+\)$/)).not.toBeInTheDocument();
+  rerender(<MemoryRouter><FixtureRow fixture={fixture('ft')} followedIds={new Set()} /></MemoryRouter>);
+  expect(screen.queryByText(/^\(\d+\)$/)).not.toBeInTheDocument();
+});
