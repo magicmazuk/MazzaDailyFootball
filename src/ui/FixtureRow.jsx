@@ -115,7 +115,7 @@ function creditedSide(event, fixture) {
 // A player's surname (spec §13.22, task 1: the match line's scorer
 // columns) — the last word of their full name, so "Daizen Maeda" reads as
 // "Maeda" beside its minutes fragment, matching a scorecard's convention.
-function surnameOf(name) {
+export function surnameOf(name) {
   const parts = (name ?? '').trim().split(/\s+/).filter(Boolean);
   return parts.length > 0 ? parts[parts.length - 1] : (name ?? '');
 }
@@ -133,7 +133,7 @@ function surnameOf(name) {
 // benefiting column but plays for the other club — the number is real, the
 // (og) marker carries the story). No match: null, and the Shirt renders
 // numberless rather than wrong.
-function shirtLookup(lineups) {
+export function shirtLookup(lineups) {
   const byId = new Map();
   const byName = new Map();
   for (const l of lineups ?? []) {

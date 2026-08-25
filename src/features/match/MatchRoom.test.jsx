@@ -11,6 +11,12 @@ import { beforeEach, expect, test, vi } from 'vitest';
 vi.mock('../../data/queries.js', () => ({
   usePlayer: vi.fn(() => ({ bio: null, stats: null, isLoading: false, isError: false })),
 }));
+// PlayerSheet also scouts (spec §13.35) via a real react-query hook —
+// stubbed here for the same no-QueryClientProvider reason as usePlayer.
+vi.mock('./video.js', () => ({
+  usePlayerVideos: vi.fn(() => ({ data: undefined, isLoading: false })),
+  youtubeKey: vi.fn(() => null),
+}));
 
 import MatchRoom, { statSplit } from './MatchRoom.jsx';
 import { byId } from '../../domain/competitions.js';
@@ -352,8 +358,16 @@ test('standouts render per side on a full-time fixture', () => {
   render(<MemoryRouter>
     <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={standoutsDetail} />
   </MemoryRouter>);
-  expect(screen.getByText(/Shots: Daizen Maeda 5/)).toBeInTheDocument();
-  expect(screen.getByText(/Saves: Jack Butland 4/)).toBeInTheDocument();
+  // ST-D (spec §13.35): value-led cells — big number, caps label, then
+  // shirt + SURNAME with breathing room above the name line.
+  const cell = screen.getByTestId('standout-cell-Shots-Celtic');
+  expect(cell.textContent).toContain('5');
+  expect(cell.textContent).toContain('Shots');
+  expect(cell.textContent).toContain('Maeda');
+  expect(cell.textContent).not.toContain('Daizen Maeda'); // surname only in the cell
+  expect(cell.querySelector('[data-testid="shirt-shape"]')).toBeTruthy();
+  // The user asked for padding around the count above the name — pinned.
+  expect(cell.querySelector('[data-testid="standout-name"]').className).toContain('mt-2');
 });
 
 test('standouts section is absent without data', () => {
@@ -371,16 +385,16 @@ test('standouts are withheld pre-match even when the source already publishes th
   </MemoryRouter>);
   expect(screen.queryByText('Standouts')).not.toBeInTheDocument();
   // 'Daizen Maeda' also scores in the shared `detail.events` timeline
-  // fixture, so assert on the formatted standout row specifically rather
-  // than the bare name, which would collide with that unrelated timeline row.
-  expect(screen.queryByText(/Shots: Daizen Maeda 5/)).not.toBeInTheDocument();
+  // fixture, so assert on the standout cell specifically rather than the
+  // bare name, which would collide with that unrelated timeline row.
+  expect(screen.queryByTestId('standout-cell-Shots-Celtic')).not.toBeInTheDocument();
 });
 
 // --- tappable player names / the peek sheet (spec §13.16) ---
 
 test('a standout entry with a playerId on an ESPN comp is a button that opens the sheet', async () => {
   usePlayer.mockReturnValue({
-    bio: { id: 'p1', name: 'Daizen Maeda', position: 'Forward', shirt: '9',
+    bio: { id: 'p1', name: 'Maeda', position: 'Forward', shirt: '9',
       age: 27, nationality: 'Japan', heightDisplay: null, birthDate: null, birthPlace: null },
     stats: { appearances: 5, minutes: 450, goals: 5, assists: 0, shotsOnTarget: null,
       shotsOffTarget: null, totalShots: null, accuratePasses: null, inaccuratePasses: null,
@@ -395,12 +409,14 @@ test('a standout entry with a playerId on an ESPN comp is a button that opens th
     <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={standoutsDetail} />
   </MemoryRouter>);
 
-  const button = screen.getByRole('button', { name: 'Daizen Maeda' });
+  const button = screen.getByRole('button', { name: 'Maeda' });
   // the row still reads the same sentence even though the name is now
   // nested inside a <button> (getByText's default direct-text-node match
   // doesn't reach across that boundary, so this checks the row's full
   // textContent directly instead).
-  expect(button.closest('p').textContent).toBe('Shots: Daizen Maeda 5');
+  const cell = button.closest('[data-testid^="standout-cell"]');
+  expect(cell.textContent).toContain('5');
+  expect(cell.textContent).toContain('Shots');
   await userEvent.click(button);
   expect(screen.getByText('Full profile →')).toBeInTheDocument();
 });
@@ -410,8 +426,9 @@ test('a standout entry with no playerId stays plain text, not a button', () => {
   render(<MemoryRouter>
     <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={standoutsDetail} />
   </MemoryRouter>);
-  expect(screen.queryByRole('button', { name: 'Daizen Maeda' })).not.toBeInTheDocument();
-  expect(screen.getByText(/Shots: Daizen Maeda 5/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Maeda' })).not.toBeInTheDocument();
+  const cell = screen.getByTestId('standout-cell-Shots-Celtic');
+  expect(cell.textContent).toContain('Maeda'); // plain text, not a button
 });
 
 test('a standout entry with a playerId on a BBC comp stays plain text (no player data at all)', () => {
@@ -421,7 +438,7 @@ test('a standout entry with a playerId on a BBC comp stays plain text (no player
     <MatchRoom fixture={{ ...bbcFixture, status: 'ft' }} comp={byId('scottish-league-one')}
       detail={{ ...detail, standouts: withId }} />
   </MemoryRouter>);
-  expect(screen.queryByRole('button', { name: 'Daizen Maeda' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Maeda' })).not.toBeInTheDocument();
 });
 
 test('a lineup player with an id on an ESPN comp is a tappable button', () => {

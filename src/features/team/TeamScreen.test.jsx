@@ -24,12 +24,13 @@ vi.mock('../../data/queries.js', () => ({
   // existed.
   useMatchDetail: vi.fn(() => ({ isLoading: false, isError: false, data: undefined })),
 }));
-
 // The scout film (spec §13.20.3): video.js's own hook + key accessor, mocked
 // the same way as everything above — no QueryClientProvider needed, and
 // each test controls whether a key is "present" and what the hook returns.
 vi.mock('../match/video.js', () => ({
   useTeamVideos: vi.fn(() => ({ isLoading: false, isError: false, data: undefined })),
+  // The sheet scouts too (spec §13.35) — same stub discipline.
+  usePlayerVideos: vi.fn(() => ({ data: undefined, isLoading: false })),
   youtubeKey: vi.fn(() => null),
 }));
 

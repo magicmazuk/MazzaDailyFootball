@@ -5,6 +5,9 @@
 // initials mark anywhere (binding design note: no player photos exist in
 // any feed).
 import { Link, useLocation, useParams } from 'react-router-dom';
+import { useState } from 'react';
+import { usePlayerVideos, youtubeKey } from '../match/video.js';
+import VideoCard from '../match/VideoCard.jsx';
 import { byId } from '../../domain/competitions.js';
 import { usePlayer } from '../../data/queries.js';
 import { isKeeper } from '../../data/player.js';
@@ -170,6 +173,7 @@ export function Splits({ bio, stats }) {
 
 export default function PlayerScreen() {
   const { compId, playerId } = useParams();
+  const [scouting, setScouting] = useState(false);
   const location = useLocation();
   // The scout (spec §13.20.2, review fix): a foreign discovered league
   // (e.g. aut.1) has no registry entry — byId returns undefined. That used
@@ -184,6 +188,7 @@ export default function PlayerScreen() {
   // page — every stat section below already null-renders when stats is
   // absent, so there is a full page to show as long as bio resolved.
   const { bio, stats, isLoading } = usePlayer(comp, playerId);
+  const reel = usePlayerVideos(bio, scouting);
 
   if (isLoading) return <p className="text-muted">Loading player…</p>;
   if (!bio) return <p className="text-muted">Player unavailable right now.</p>;
@@ -206,6 +211,22 @@ export default function PlayerScreen() {
       </div>
       {bioParts.length > 0 && (
         <p className="font-sans text-[11px] text-muted mt-1 mb-6">{bioParts.join(' · ')}</p>
+      )}
+
+      {/* The Scout Player reel (spec §13.35) — lazy: quota is spent on
+          the tap, never on the page mounting. */}
+      {youtubeKey() && !scouting && (
+        <button type="button" onClick={() => setScouting(true)}
+          className="font-sans text-[9.5px] uppercase tracking-[.14em] text-muted underline
+                     underline-offset-4 mb-6">
+          Scout player →
+        </button>
+      )}
+      {scouting && (
+        <div className="mb-6">
+          <VideoCard videos={reel.data ?? []} exhaustedLine="The scout's reel is empty." />
+          {reel.isLoading && <p className="font-sans text-[11px] text-muted">Scouting…</p>}
+        </div>
       )}
 
       <Splits bio={bio} stats={stats} comp={comp} />

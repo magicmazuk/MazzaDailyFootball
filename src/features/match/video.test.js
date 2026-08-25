@@ -203,3 +203,31 @@ test('video search never fires for a comp flagged hasVideo false', () => {
   expect(byId('scottish-league-two').hasVideo).toBe(false);
   expect(byId('sco.1').hasVideo).not.toBe(false);
 });
+
+// --- the Scout Player reel (spec §13.35): the scout film's sibling for a
+// single player — lazy, cached forever, grift-filtered at the shared seam.
+import { buildPlayerVideoQuery, usePlayerVideos } from './video.js';
+
+test('the player query quotes the name and anchors it to football', () => {
+  expect(buildPlayerVideoQuery('Cláudio Braga')).toBe('"Cláudio Braga" football highlights');
+});
+
+test('usePlayerVideos never fetches until enabled, even with a key set', async () => {
+  vi.stubEnv('VITE_YOUTUBE_API_KEY', 'k');
+  const fetcher = vi.fn();
+  vi.stubGlobal('fetch', fetcher);
+  renderHook(() => usePlayerVideos({ id: 'p1', name: 'Cláudio Braga' }, false), { wrapper });
+  await new Promise(r => setTimeout(r, 50));
+  expect(fetcher).not.toHaveBeenCalled();
+});
+
+test('usePlayerVideos fetches once enabled and resolves through the shared (grift-filtered) seam', async () => {
+  vi.stubEnv('VITE_YOUTUBE_API_KEY', 'k');
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ items: [
+    { id: { videoId: 'real' }, snippet: { title: 'Braga skills', channelTitle: 'Hearts TV' } },
+    { id: { videoId: 'fake' }, snippet: { title: 'Braga FIFA 26 gameplay', channelTitle: 'SimZone' } },
+  ] }), { status: 200 })));
+  const { result } = renderHook(() => usePlayerVideos({ id: 'p1', name: 'Braga' }, true), { wrapper });
+  await waitFor(() => expect(result.current.data).toBeDefined());
+  expect(result.current.data.map(v => v.videoId)).toEqual(['real']);
+});

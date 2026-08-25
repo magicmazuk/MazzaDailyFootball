@@ -3,6 +3,12 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { expect, test, vi } from 'vitest';
 
 vi.mock('../../data/queries.js', () => ({ usePlayer: vi.fn() }));
+// The page scouts too (spec §13.35) — stubbed like the sheet's harness.
+vi.mock('../match/video.js', () => ({
+  usePlayerVideos: vi.fn(() => ({ data: undefined, isLoading: false })),
+  youtubeKey: vi.fn(() => 'k'),
+}));
+import userEvent from '@testing-library/user-event';
 
 import PlayerScreen, { Splits } from './PlayerScreen.jsx';
 import { usePlayer } from '../../data/queries.js';
@@ -224,4 +230,23 @@ test('the Splits root carries the entrance crossfade (.xfade-in)', () => {
     <Splits bio={outfieldBio} stats={outfieldStats} comp={{ id: 'sco.1', name: 'Scottish Premiership' }} />,
   );
   expect(container.firstChild).toHaveClass('xfade-in');
+});
+
+test("the page carries the 'Scout player' control and opens the reel on tap (spec §13.35)", async () => {
+  const videoMod = await import('../match/video.js');
+  videoMod.usePlayerVideos.mockImplementation((player, enabled) => (
+    enabled ? { data: [{ videoId: 'v9', title: 'Reel one' }], isLoading: false }
+      : { data: undefined, isLoading: false }));
+  usePlayer.mockReturnValue({
+    bio: { id: 'p1', name: 'Daizen Maeda', position: 'Forward' },
+    stats: null, isLoading: false, isError: false,
+  });
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter initialEntries={['/player/sco.1/p1']}>
+      <Routes><Route path="/player/:compId/:playerId" element={<PlayerScreen />} /></Routes>
+    </MemoryRouter>,
+  );
+  await user.click(await screen.findByRole('button', { name: /Scout player/ }));
+  expect(await screen.findByTitle('Reel one')).toBeInTheDocument();
 });
