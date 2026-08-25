@@ -1226,3 +1226,11 @@ tie-line's register (R-A). (3) The match page: the muted-link recipe under the h
 (R-B). All three are external links (target _blank, rel noopener) — link out only, never
 embed (DRM). If the feed dies the reel rests silently, last-known-good absorbing the
 transition.
+
+**Polish (same day, the user's eye):** the R-B match-page line trimmed to plain "Watch on
+iPlayer →" — the tier copy lives in the drawer; up top the venue line already crowds the
+width. The player sheet's "Full profile →" control retired: the anchor bar alone says a
+flip-up awaits — one affordance, not two. Riding along, two things the user's screenshot
+exposed: attendance 0 is "not reported", never a crowd of none (both meta lines now gate on
+> 0), and the referee now carries a small pea-whistle mark (currentColor SVG, plain shapes)
+in the match-page meta line.

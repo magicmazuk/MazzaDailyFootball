@@ -170,7 +170,7 @@ test('a squad row is a button (not a link) that opens the player sheet', async (
 
   await userEvent.click(row);
 
-  await userEvent.click(screen.getByRole('button', { name: 'Full profile →' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
   expect(screen.getByRole('link', { name: 'Open as page →' })).toHaveAttribute('href', '/player/sco.1/p1');
 });
 
@@ -198,7 +198,7 @@ test('a squad row opens the sheet under the resolved league, not the route comp,
 
   await userEvent.click(screen.getByRole('button', { name: lbl('Kasper Høgh', '9') }));
 
-  await userEvent.click(screen.getByRole('button', { name: 'Full profile →' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
   expect(screen.getByRole('link', { name: 'Open as page →' })).toHaveAttribute('href', '/player/sco.1/p1');
 });
 
@@ -444,7 +444,7 @@ test('a discovered foreign squad shirt opens the sheet with a synthetic comp des
   expect(lastCallArgs[0]).toEqual({ id: 'aut.1', name: 'Austrian Bundesliga', source: 'espn' });
   expect(lastCallArgs[1]).toBe('p1');
 
-  await userEvent.click(screen.getByRole('button', { name: 'Full profile →' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
   expect(screen.getByRole('link', { name: 'Open as page →' })).toHaveAttribute('href', '/player/aut.1/p1');
 });
 

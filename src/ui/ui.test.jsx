@@ -448,6 +448,18 @@ test('FixtureRow: the result drawer\'s meta line renders venue alone when attend
   expect(screen.queryByText(/Attendance/)).not.toBeInTheDocument();
 });
 
+test('FixtureRow: an attendance of zero is unreported, not a crowd of none — the drawer omits it', async () => {
+  const user = userEvent.setup();
+  useMatchDetail.mockReturnValue({
+    isLoading: false, isError: false,
+    data: { detail: { events: [], gameInfo: { venue: 'Tannadice Park', attendance: 0 } } },
+  });
+  render(<MemoryRouter><FixtureRow fixture={fixture('ft')} followedIds={new Set()} /></MemoryRouter>);
+  await user.click(screen.getByRole('button', { expanded: false }));
+  expect(screen.getByText('Tannadice Park')).toBeInTheDocument();
+  expect(screen.queryByText(/Attendance/)).not.toBeInTheDocument();
+});
+
 test('FixtureRow: the result drawer renders no meta line when neither venue nor attendance exist', async () => {
   const user = userEvent.setup();
   useMatchDetail.mockReturnValue({ isLoading: false, isError: false, data: { detail: { events: [] } } });

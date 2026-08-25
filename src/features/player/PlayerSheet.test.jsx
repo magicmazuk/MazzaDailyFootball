@@ -211,11 +211,11 @@ test('a horizontal-dominant swipe on the sheet is ignored', () => {
   expect(onClose).not.toHaveBeenCalled();
 });
 
-test('tapping "Full profile →" expands the sheet without navigating', async () => {
+test('the Full profile control is retired — the anchor bar alone expands (user trim, 2026-08-25)', async () => {
   usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
   render(<MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>);
-  expect(screen.queryByRole('link', { name: /Full profile/ })).not.toBeInTheDocument();
-  await userEvent.click(screen.getByRole('button', { name: /Full profile/ }));
+  expect(screen.queryByText(/Full profile/)).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
   expect(screen.getByText('Attacking')).toBeInTheDocument();
 });
 

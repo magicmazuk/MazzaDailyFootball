@@ -91,16 +91,37 @@ function penaltyResult(fixture) {
 // source actually published, joined with ' · '. gameInfo.venue (which
 // carries the city too) is preferred over the fixture's bare venue name;
 // the whole line is absent when there's no gameInfo to draw from.
+// The referee's whistle (user ask, 2026-08-25): a pea-whistle silhouette
+// at currentColor — plain shapes, no path data, sized to sit in the 10px
+// meta line's muted ink.
+function Whistle() {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" fill="currentColor"
+      className="inline-block w-[11px] h-[11px] -mt-px mr-1 align-[-1.5px]">
+      <rect x="2" y="8.5" width="9" height="4.5" rx="1.2" />
+      <circle cx="15.5" cy="14.5" r="6" />
+    </svg>
+  );
+}
+
 function MetadataLine({ fixture, gameInfo }) {
   if (!gameInfo) return null;
   const venue = gameInfo.venue ?? fixture.venue;
-  const attendance = gameInfo.attendance != null
+  // An attendance of 0 is "not reported", never a crowd of none — the feed
+  // publishes 0 before the count lands (never-mislead; user report 2026-08-25).
+  const attendance = Number(gameInfo.attendance) > 0
     ? Number(gameInfo.attendance).toLocaleString('en-GB')
     : null;
-  const parts = [venue, attendance, gameInfo.referee].filter(Boolean);
-  if (!parts.length) return null;
+  const head = [venue, attendance].filter(Boolean).join(' · ');
+  if (!head && !gameInfo.referee) return null;
   return (
-    <p className="font-sans text-[10px] text-muted mt-1.5">{parts.join(' · ')}</p>
+    <p data-testid="meta-line" className="font-sans text-[10px] text-muted mt-1.5">
+      {head}
+      {head && gameInfo.referee ? ' · ' : ''}
+      {gameInfo.referee && (
+        <span className="whitespace-nowrap"><Whistle />{gameInfo.referee}</span>
+      )}
+    </p>
   );
 }
 
@@ -157,7 +178,7 @@ function ScoreHeader({ fixture, comp, gameInfo, events, otherLeg }) {
           target="_blank" rel="noopener noreferrer"
           className="font-sans text-[9.5px] uppercase tracking-[.14em] text-muted underline
                      underline-offset-4 inline-block mt-2">
-          {highlight.line} — watch on iPlayer →
+          Watch on iPlayer →
         </a>
       )}
       {/* The other leg, one tap away (spec §13.29): its label and score in
