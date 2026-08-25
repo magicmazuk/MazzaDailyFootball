@@ -1238,3 +1238,27 @@ test('tapping a lineup name hands the sheet that column\'s club', async () => {
   await userEvent.click(screen.getByRole('button', { name: 'Jack Butland' }));
   expect(lastDossierClub()).toBe('Rangers');
 });
+
+// --- the aggregate in hand (user ask 2026-08-25): the match header ---
+
+test('the header prints each side\'s aggregate, muted, before a decider leg\'s score', () => {
+  const fx = { ...fixture, status: 'live', leg: 2 };
+  fx.home = { ...fx.home, score: 0, agg: 0 };
+  fx.away = { ...fx.away, score: 1, agg: 4 };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fx} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  const agg = screen.getByText('(4)');
+  expect(agg.className).toBe('font-serif text-[17px] text-muted tabular-nums');
+  expect(screen.getByText('(0)')).toBeInTheDocument();
+});
+
+test('the header shows no aggregate on a first leg', () => {
+  const fx = { ...fixture, status: 'ft', leg: 1 };
+  fx.home = { ...fx.home, score: 3, agg: 3 };
+  fx.away = { ...fx.away, score: 0, agg: 0 };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fx} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  expect(screen.queryByText(/^\(\d+\)$/)).not.toBeInTheDocument();
+});

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { otherLeg, tieLine } from './legs.js';
+import { aggScores, otherLeg, tieLine } from './legs.js';
 
 const side = (teamId, name, score, agg) => ({ teamId, name, shortName: name, score, agg });
 const leg2 = {
@@ -47,4 +47,47 @@ test('otherLeg: null for ordinary fixtures, unpaired legs, and same-clubs-differ
   expect(otherLeg({ ...leg2, leg: null }, [leg1, leg2])).toBeNull();
   expect(otherLeg(leg2, [leg2])).toBeNull();
   expect(otherLeg(leg2, [leg2, { ...leg1, round: 'playoff-round' }])).toBeNull();
+});
+
+// --- aggScores (the aggregate in hand, user ask 2026-08-25) ---
+
+const legFx = (over = {}) => ({
+  id: 'L2', leg: 2, status: 'live',
+  home: { teamId: 'lask', name: 'LASK Linz', score: '0', agg: 0 },
+  away: { teamId: '256', name: 'Celtic', score: '1', agg: 4 },
+  ...over,
+});
+
+test('aggScores: a decider leg with published aggregates reads them per side', () => {
+  expect(aggScores(legFx())).toEqual({ home: 0, away: 4 });
+});
+
+test('aggScores: leg one shows nothing — its aggregate IS its score', () => {
+  expect(aggScores(legFx({ leg: 1 }))).toBeNull();
+});
+
+test('aggScores: no leg at all (a normal match) shows nothing', () => {
+  expect(aggScores(legFx({ leg: null }))).toBeNull();
+});
+
+test('aggScores: a missing aggregate on either side renders nothing, never a guess', () => {
+  const fx = legFx();
+  fx.home = { ...fx.home, agg: null };
+  expect(aggScores(fx)).toBeNull();
+});
+
+test('aggScores: with the played other leg in hand, the total is COMPUTED so a live leg moves with the fresh score', () => {
+  const other = { id: 'L1', leg: 1, status: 'ft',
+    home: { teamId: '256', name: 'Celtic', score: '3' },
+    away: { teamId: 'lask', name: 'LASK Linz', score: '0' } };
+  // stale feed aggs (3/0) but the live score already says 1 — computed wins
+  const live = legFx({ home: { teamId: 'lask', name: 'LASK Linz', score: '0', agg: 0 },
+    away: { teamId: '256', name: 'Celtic', score: '1', agg: 3 } });
+  expect(aggScores(live, other)).toEqual({ home: 0, away: 4 });
+});
+
+test('aggScores: an unplayed other leg never joins the sum — feed aggregates stand', () => {
+  const other = { id: 'L1', leg: 1, status: 'scheduled',
+    home: { teamId: '256', score: '0' }, away: { teamId: 'lask', score: '0' } };
+  expect(aggScores(legFx(), other)).toEqual({ home: 0, away: 4 });
 });

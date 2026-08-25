@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { byId } from '../domain/competitions.js';
 import { monogram } from '../domain/monogram.js';
-import { legLabel, tieLine } from '../domain/legs.js';
+import { aggScores, legLabel, tieLine } from '../domain/legs.js';
 import { prettifyRound } from '../domain/round.js';
 import { useMatchDetail } from '../data/queries.js';
 import { useFixtureHighlight } from '../features/match/highlight.js';
@@ -41,7 +41,7 @@ function ContextLine({ fixture }) {
 // The club-link rule (spec §13.2): the crest is the team link, the rest
 // of the row is the match link. No nested anchors — the inner control
 // navigates programmatically.
-function TeamLine({ side, compId, followed, dim, showScore }) {
+function TeamLine({ side, compId, followed, dim, showScore, agg = null }) {
   const navigate = useNavigate();
   const toTeam = e => {
     e.preventDefault();
@@ -58,6 +58,12 @@ function TeamLine({ side, compId, followed, dim, showScore }) {
         {side.name}
         {followed && <span className="text-accent text-[9px] align-middle ml-1.5">★</span>}
       </span>
+      {/* The aggregate in hand (user ask 2026-08-25): on a decider leg the
+          tie's running total sits muted before the leg score — the score
+          stays the loudest number, the tie's truth is one glance left. */}
+      {showScore && side.score != null && agg != null && (
+        <span className="font-serif text-[13px] text-muted tabular-nums">({agg})</span>
+      )}
       {showScore && side.score != null && (
         <span className="font-serif text-[17px] tabular-nums">{side.score}</span>
       )}
@@ -69,6 +75,7 @@ function TeamLine({ side, compId, followed, dim, showScore }) {
 // up wrapped in a Link (navigate) or a button (toggle the drawer), so the
 // two wrapper branches below share this rather than duplicating it.
 function RowBody({ fixture, followedIds, showContext, dim, showScore }) {
+  const aggs = aggScores(fixture);
   return (
     <div className="flex items-start gap-3">
       <div className="w-12 shrink-0 pt-1 space-y-1.5">
@@ -78,9 +85,9 @@ function RowBody({ fixture, followedIds, showContext, dim, showScore }) {
       <div className="flex-1 min-w-0 space-y-1.5">
         {showContext && <ContextLine fixture={fixture} />}
         <TeamLine side={fixture.home} compId={fixture.compId} showScore={showScore}
-          followed={followedIds.has(fixture.home.teamId)} dim={dim} />
+          followed={followedIds.has(fixture.home.teamId)} dim={dim} agg={aggs?.home ?? null} />
         <TeamLine side={fixture.away} compId={fixture.compId} showScore={showScore}
-          followed={followedIds.has(fixture.away.teamId)} dim={dim} />
+          followed={followedIds.has(fixture.away.teamId)} dim={dim} agg={aggs?.away ?? null} />
       </div>
     </div>
   );
