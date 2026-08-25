@@ -354,10 +354,12 @@ function ResultDrawer({ detail, fixture, comp }) {
   const points = timelinePoints(detail.events, fixture);
   const scorers = scorersBySide(detail.events, fixture, detail.lineups);
   const tie = tieLine(fixture);
+  // Attendance 0 is "not reported", never a crowd of none (never-mislead;
+  // user report 2026-08-25) — the feed publishes 0 before the count lands.
   const attendance = detail.gameInfo?.attendance;
   const metaParts = [
     detail.gameInfo?.venue,
-    attendance != null ? `Attendance ${Number(attendance).toLocaleString('en-GB')}` : null,
+    Number(attendance) > 0 ? `Attendance ${Number(attendance).toLocaleString('en-GB')}` : null,
   ].filter(Boolean);
   return (
     <>

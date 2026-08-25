@@ -233,14 +233,17 @@ test('the date line shows the full en-GB date under the kicker', () => {
 
 // --- metadata line (venue · attendance · referee) ---
 
-test('the metadata line renders venue, attendance and referee from gameInfo', () => {
+test('the metadata line renders venue, attendance and referee from gameInfo, whistle before the name', () => {
   const gameInfoDetail = { ...detail, gameInfo: {
     venue: 'Hampden Park', attendance: 8353, referee: 'Nick Walsh',
   } };
   render(<MemoryRouter>
     <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={gameInfoDetail} />
   </MemoryRouter>);
-  expect(screen.getByText('Hampden Park · 8,353 · Nick Walsh')).toBeInTheDocument();
+  const line = screen.getByTestId('meta-line');
+  expect(line.textContent).toBe('Hampden Park · 8,353 · Nick Walsh');
+  // The referee's whistle (user ask, 2026-08-25) — marks the name, muted ink.
+  expect(line.querySelector('svg')).not.toBeNull();
 });
 
 test('the metadata line falls back to fixture.venue when gameInfo carries none', () => {
@@ -249,7 +252,25 @@ test('the metadata line falls back to fixture.venue when gameInfo carries none',
     <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={gameInfoDetail} />
   </MemoryRouter>);
   // fixture.venue is 'Celtic Park'; only the parts that exist are joined
-  expect(screen.getByText('Celtic Park · Nick Walsh')).toBeInTheDocument();
+  expect(screen.getByTestId('meta-line').textContent).toBe('Celtic Park · Nick Walsh');
+});
+
+test('an attendance of zero is unreported, not a fact — it never prints (never-mislead)', () => {
+  const gameInfoDetail = { ...detail, gameInfo: {
+    venue: 'Tannadice Park', attendance: 0, referee: 'David Dickinson',
+  } };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={gameInfoDetail} />
+  </MemoryRouter>);
+  expect(screen.getByTestId('meta-line').textContent).toBe('Tannadice Park · David Dickinson');
+});
+
+test('the whistle rests when no referee is published', () => {
+  const gameInfoDetail = { ...detail, gameInfo: { venue: 'Hampden Park', attendance: 8353, referee: null } };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={gameInfoDetail} />
+  </MemoryRouter>);
+  expect(screen.getByTestId('meta-line').querySelector('svg')).toBeNull();
 });
 
 test('the metadata line is absent when gameInfo is absent', () => {
@@ -425,7 +446,8 @@ test('a standout entry with a playerId on an ESPN comp is a button that opens th
   expect(cell.textContent).toContain('5');
   expect(cell.textContent).toContain('Shots');
   await userEvent.click(button);
-  expect(screen.getByText('Full profile →')).toBeInTheDocument();
+  // the sheet's anchor bar is its opened-signal (Full profile retired 2026-08-25)
+  expect(screen.getByRole('button', { name: 'Expand profile' })).toBeInTheDocument();
 });
 
 test('a standout entry with no playerId stays plain text, not a button', () => {
@@ -1046,8 +1068,9 @@ test('a covered FT fixture prints the highlight line in the muted-link recipe in
   </MemoryRouter>);
   const line = screen.getByTestId('highlight-line');
   expect(container.querySelector('header')).toContainElement(line);
-  // Sportscene synopses never name games — the covered tier, never Featured.
-  expect(line.textContent).toBe('Highlights · Sportscene — watch on iPlayer →');
+  // The header link stays short (user trim, 2026-08-25) — the tier copy
+  // lives in the drawer; up here the venue line already crowds the width.
+  expect(line.textContent).toBe('Watch on iPlayer →');
   expect(line).toHaveAttribute('href', 'https://www.bbc.co.uk/iplayer/episode/m0030s0h');
   expect(line).toHaveAttribute('target', '_blank');
   expect(line).toHaveAttribute('rel', 'noopener noreferrer');
@@ -1056,14 +1079,13 @@ test('a covered FT fixture prints the highlight line in the muted-link recipe in
     'text-muted', 'underline', 'underline-offset-4');
 });
 
-test('a synopsis naming both clubs upgrades the header line to the Featured tier', () => {
+test('the header line stays short even on the Featured tier — the drawer carries the copy', () => {
   useHighlights.mockReturnValue([sportsceneEpisode({
     synopsis: 'Celtic edge Rangers in the derby.' })]);
   render(<MemoryRouter>
     <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={detail} />
   </MemoryRouter>);
-  expect(screen.getByTestId('highlight-line').textContent)
-    .toBe('Featured on Sportscene — watch on iPlayer →');
+  expect(screen.getByTestId('highlight-line').textContent).toBe('Watch on iPlayer →');
 });
 
 test('no covering episode means no header line at all — absence is not degradation here (§13.36)', () => {

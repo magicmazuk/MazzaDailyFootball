@@ -212,14 +212,8 @@ export default function PlayerSheet({ comp, playerId, onClose }) {
             </div>
             <Headline items={headline} />
 
-            {!expanded && (
-              <button type="button"
-                onClick={() => { setExpanded(true); setEverExpanded(true); }}
-                className="block w-full text-center font-sans text-[10px] uppercase
-                  tracking-[.16em] text-accent mt-4">
-                Full profile →
-              </button>
-            )}
+            {/* "Full profile →" retired (user trim, 2026-08-25): the anchor
+                bar already says a flip-up awaits — one affordance, not two. */}
 
             {/* Scout player (spec §13.35): the scout film's per-player
                 sibling. Only offered where video exists at all (key
