@@ -26,6 +26,12 @@ export function iplayerUrl(rest) {
   return `/api/iplayer${rest}`;
 }
 
+// The Scout's Dossier (spec §13.37): Wikipedia, FPL and TheSportsDB
+// behind our own proxy — same one-hop rule. Images are never proxied.
+export function dossierUrl(rest) {
+  return `/api/dossier${rest}`;
+}
+
 export async function getJson(url) {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);

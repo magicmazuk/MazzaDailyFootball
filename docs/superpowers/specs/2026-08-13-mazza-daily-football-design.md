@@ -1234,3 +1234,40 @@ flip-up awaits — one affordance, not two. Riding along, two things the user's 
 exposed: attendance 0 is "not reported", never a crowd of none (both meta lines now gate on
 > 0), and the referee now carries a small pea-whistle mark (currentColor SVG, plain shapes)
 in the match-page meta line.
+
+## 13.37 The Scout's Dossier (a face and a paragraph)
+
+The long-agreed wave, de-risked by the 2026-08-25 spike
+(.superpowers/brainstorm/2026-08-25-player-pictures.md) and shaped by two user constraints:
+portraits are WELCOME (the rescinded-law clarification of 2026-08-22 stands), and the data is
+**100% remote, fetched when required — nothing stored, no update scripts, ever**. Squads stay
+ESPN-live; the dossier enriches a player only at the moment they're opened. Pick: **D-B, the
+profile column** — a proper plate on the left (3:4, hairline border, the printed-photo
+weight), name, meta and bio setting beside it; the sheet takes the same treatment a size
+down with the bio clamped until the sheet expands.
+
+**The sources (all £0, keyless, live-probed).** One proxy, `api/dossier.js` (house pattern:
+dual-mode extractRest, last-known-good, long edge cache — bios change rarely), fronting
+three JSON upstreams by prefix: `/wiki/summary/{title}` and `/wiki/search?q=` (en.wikipedia
+.org REST + api.php), `/fpl/index` (fantasy.premierleague.com bootstrap-static, TRIMMED in
+the proxy to {code, names, team} — the raw payload is ~700KB), `/tsdb/{name}`
+(thesportsdb.com public dev key '123', rate-limited: cache hard). IMAGES are never proxied —
+Commons, resources.premierleague.com and TSDB's r2 CDN serve <img> directly.
+
+**The law of this feature: never show an unverified identity.** A wrong face on the right
+name is worse than no face. Identity resolution: direct title lookup; a `type:
+"disambiguation"` response (detectable, probed) falls back to search
+(`"{name} footballer {club}"`, top hit); and NOTHING renders unless the summary's extract
+names the player's current club (normalised token match). The FPL face joins by name within
+the matched team only; the TSDB face requires strTeam to match the club. Face fallback:
+verified Wikipedia portrait → FPL headshot (eng.1) → TSDB cutout → none. Bio and portrait
+degrade independently; with neither, the page prints exactly as today — identity by type
+alone, no placeholder plate, no one-liner (the §13.36 absence precedent: enrichment was
+never promised).
+
+**The page carries a small photograph credit** (the muted 8.5px caps register): "Photograph ·
+Wikimedia Commons" / "· Premier League" / "· TheSportsDB" per source — a broadsheet credits
+its plates. The scout reel's query sharpens to `"{name}" {club} highlights` when the club is
+known (§13.35's deferred item). The stale "no portrait" design note in PlayerScreen's header
+comment is rewritten — it described a feed fact, never a law. Dossier content arrives on the
+xfade, never a skeleton (enrichment, not structure).

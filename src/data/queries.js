@@ -13,8 +13,9 @@ import { wosflSeasonFixtures } from './wosfl.js';
 import { crestIndexFrom, enrichCrests } from './crests.js';
 import { adaptFeed } from './news.js';
 import { adaptEpisode, adaptLastEpisode, episodeUrl } from './iplayer.js';
+import { adaptFplIndex, adaptTsdbPlayers, adaptWikiSearch, adaptWikiSummary } from './dossier.js';
 import { applyTv } from './tv.js';
-import { bbcUrl, espnUrl, getJson, getText, iplayerUrl, newsUrl } from './client.js';
+import { bbcUrl, dossierUrl, espnUrl, getJson, getText, iplayerUrl, newsUrl } from './client.js';
 import { buildTeamIndex, mergeCupFixtures } from './mergeCup.js';
 
 const SOCCER = '/apis/site/v2/sports/soccer';
@@ -373,6 +374,64 @@ export function useHighlights() {
       synopsis: details[i].data?.synopsis ?? last.synopsis,
       url: episodeUrl(last.pid),
     }];
+  });
+}
+
+// The Scout's Dossier (spec §13.37) — raw fetch hooks ONLY. Identity
+// resolution (disambiguation fallback, extract-verifies-club, the
+// FPL/TSDB joins) lives in src/domain/dossier.js, never here. All four
+// are lazy (enabled-gated: enrichment fetches only when a player is
+// opened) and settled content barely moves — bios and TSDB records get
+// staleTime Infinity with retry off (a miss is a miss for the session);
+// the FPL index follows the proxy's six-hour edge TTL.
+export function useWikiSummary(title, enabled = true) {
+  return useQuery({
+    queryKey: ['wiki-summary', title ?? null],
+    enabled: Boolean(enabled && title),
+    staleTime: Infinity,
+    retry: false,
+    queryFn: async () => {
+      const { data } = await getJson(dossierUrl(`/wiki/summary/${encodeURIComponent(title)}`));
+      return adaptWikiSummary(data);
+    },
+  });
+}
+
+export function useWikiSearch(query, enabled = true) {
+  return useQuery({
+    queryKey: ['wiki-search', query ?? null],
+    enabled: Boolean(enabled && query),
+    staleTime: Infinity,
+    retry: false,
+    queryFn: async () => {
+      const { data } = await getJson(dossierUrl(`/wiki/search?q=${encodeURIComponent(query)}`));
+      return adaptWikiSearch(data);
+    },
+  });
+}
+
+export function useFplIndex(enabled = true) {
+  return useQuery({
+    queryKey: ['fpl-index'],
+    enabled: Boolean(enabled),
+    staleTime: 6 * HOUR,
+    queryFn: async () => {
+      const { data } = await getJson(dossierUrl('/fpl/index'));
+      return adaptFplIndex(data);
+    },
+  });
+}
+
+export function useTsdbPlayers(name, enabled = true) {
+  return useQuery({
+    queryKey: ['tsdb', name ?? null],
+    enabled: Boolean(enabled && name),
+    staleTime: Infinity,
+    retry: false,
+    queryFn: async () => {
+      const { data } = await getJson(dossierUrl(`/tsdb/${encodeURIComponent(name)}`));
+      return adaptTsdbPlayers(data);
+    },
   });
 }
 

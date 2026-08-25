@@ -1,8 +1,17 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { expect, test, vi } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 
-vi.mock('../../data/queries.js', () => ({ usePlayer: vi.fn() }));
+// The dossier's four raw fetch hooks (spec §13.37) join usePlayer in the
+// factory — disabled-shaped stubs by default, so every pre-dossier test
+// still sees today's page exactly.
+vi.mock('../../data/queries.js', () => ({
+  usePlayer: vi.fn(),
+  useWikiSummary: vi.fn(() => ({ data: undefined })),
+  useWikiSearch: vi.fn(() => ({ data: undefined })),
+  useFplIndex: vi.fn(() => ({ data: undefined })),
+  useTsdbPlayers: vi.fn(() => ({ data: undefined })),
+}));
 // The page scouts too (spec §13.35) — stubbed like the sheet's harness.
 vi.mock('../match/video.js', () => ({
   usePlayerVideos: vi.fn(() => ({ data: undefined, isLoading: false })),
@@ -11,7 +20,16 @@ vi.mock('../match/video.js', () => ({
 import userEvent from '@testing-library/user-event';
 
 import PlayerScreen, { Splits } from './PlayerScreen.jsx';
-import { usePlayer } from '../../data/queries.js';
+import {
+  usePlayer, useFplIndex, useTsdbPlayers, useWikiSearch, useWikiSummary,
+} from '../../data/queries.js';
+
+beforeEach(() => {
+  useWikiSummary.mockReset().mockReturnValue({ data: undefined });
+  useWikiSearch.mockReset().mockReturnValue({ data: undefined });
+  useFplIndex.mockReset().mockReturnValue({ data: undefined });
+  useTsdbPlayers.mockReset().mockReturnValue({ data: undefined });
+});
 
 const outfieldBio = {
   id: '272624', name: 'Kasper Høgh', position: 'Forward', shirt: '9', age: 25,
@@ -230,6 +248,101 @@ test('the Splits root carries the entrance crossfade (.xfade-in)', () => {
     <Splits bio={outfieldBio} stats={outfieldStats} comp={{ id: 'sco.1', name: 'Scottish Premiership' }} />,
   );
   expect(container.firstChild).toHaveClass('xfade-in');
+});
+
+// --- the Scout's Dossier (spec §13.37, pick D-B: the profile column) ---
+// A verified identity prints a plate + bio paragraph + credit; a face-less
+// verified bio prints full-width; anything unverified leaves the page
+// byte-identical to today — THE LAW.
+
+const hoeghSummary = {
+  title: 'Kasper Høgh',
+  kind: 'standard',
+  extract: 'Kasper Høgh is a Danish professional footballer who plays as a '
+    + 'striker for Scottish Premiership club Celtic.',
+  portrait: 'https://upload.wikimedia.org/thumb/hoegh.jpg',
+  original: 'https://upload.wikimedia.org/hoegh.jpg',
+};
+
+function armVerifiedSummary(summary) {
+  useWikiSummary.mockImplementation(title => (
+    title === summary.title ? { data: summary, isSuccess: true } : { data: undefined }));
+}
+
+test('a verified face renders the profile column: plate beside the name/meta/bio text column', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  armVerifiedSummary(hoeghSummary);
+  const { container } = renderAt('sco.1', '272624', { club: 'Celtic' });
+
+  const img = container.querySelector('img');
+  expect(img).toBeTruthy();
+  expect(img).toHaveAttribute('src', hoeghSummary.portrait);
+  expect(img).toHaveAttribute('alt', '');
+  expect(img).toHaveAttribute('loading', 'lazy');
+  expect(img).toHaveAttribute('referrerpolicy', 'no-referrer');
+  expect(img.className).toContain('w-[96px]');
+  expect(img.className).toContain('h-[122px]');
+  expect(img.className).toContain('rounded-[4px]');
+  expect(img.className).toContain('border-ink/35');
+  expect(img.className).toContain('object-cover');
+  expect(img.className).toContain('bg-drawer');
+
+  // The flex row: plate left, min-w-0 text column with name + meta + bio.
+  const row = img.parentElement;
+  expect(row.className).toContain('flex');
+  expect(row.className).toContain('items-start');
+  expect(row.className).toContain('gap-4');
+  const textCol = row.querySelector('.min-w-0');
+  expect(textCol).toContainElement(screen.getByText('Kasper Høgh'));
+  const para = screen.getByText(hoeghSummary.extract);
+  expect(textCol).toContainElement(para);
+  expect(para.className).toContain('font-serif');
+  expect(para.className).toContain('text-[13.5px]');
+  expect(para.className).toContain('leading-relaxed');
+
+  // The credit, in the muted 8.5px caps register, and the xfade arrival.
+  const credit = screen.getByText('Photograph · Wikimedia Commons');
+  expect(credit.className).toContain('text-[8.5px]');
+  expect(credit.className).toContain('uppercase');
+  expect(credit.className).toContain('tracking-[.14em]');
+  expect(credit.className).toContain('text-muted');
+  expect(container.querySelector('.xfade-in')).toContainElement(img);
+});
+
+test('bio verified but no face: the paragraph prints full-width, no plate, no credit', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  armVerifiedSummary({ ...hoeghSummary, portrait: null, original: null });
+  const { container } = renderAt('sco.1', '272624', { club: 'Celtic' });
+
+  expect(container.querySelector('img')).toBeNull();
+  expect(screen.queryByText(/^Photograph ·/)).not.toBeInTheDocument();
+  const para = screen.getByText(hoeghSummary.extract);
+  expect(para.className).toContain('font-serif');
+  expect(para.className).toContain('text-[13.5px]');
+  // Full-width: no flex profile row wraps the paragraph.
+  expect(para.closest('.items-start.gap-4')).toBeNull();
+});
+
+test('THE LAW: an unverified extract leaves the page byte-identical to today', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  armVerifiedSummary({
+    ...hoeghSummary,
+    extract: 'Kasper Høgh is a striker who plays for Rangers.',
+  });
+  const { container: missed } = renderAt('sco.1', '272624', { club: 'Celtic' });
+
+  useWikiSummary.mockReset().mockReturnValue({ data: undefined });
+  const { container: today } = renderAt('sco.1', '272624', { club: 'Celtic' });
+  expect(missed.innerHTML).toBe(today.innerHTML);
+  expect(missed.querySelector('img')).toBeNull();
+});
+
+test('no club context (no router state) arms nothing — the dossier never fetches', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  renderAt('sco.1', '272624');
+  for (const call of useWikiSummary.mock.calls) expect(call[1]).toBe(false);
+  expect(useFplIndex).toHaveBeenCalledWith(false);
+  for (const call of useTsdbPlayers.mock.calls) expect(call[1]).toBe(false);
 });
 
 test("the page carries the 'Scout player' control and opens the reel on tap (spec §13.35)", async () => {

@@ -1,9 +1,12 @@
 // The player page (spec §13.16, design C "The splits"): stats as chunky
 // two-tone proportion blocks for outfield players, saves/clean sheets for
 // keepers, discipline as three plain numbers, rating/minutes as quiet
-// gauge lines. Identity is entirely typographic — no portrait, roundel or
-// initials mark anywhere (binding design note: no player photos exist in
-// any feed).
+// gauge lines. Identity is typographic UNTIL the Scout's Dossier (spec
+// §13.37) verifies a portrait — then the D-B profile column prints a
+// plate beside the name. ESPN's own feed still carries no player photos
+// (the 404 lore stands); faces come only from the dossier's verified
+// remote sources, and an unverified identity leaves the page exactly as
+// the typographic original.
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useState } from 'react';
 import { usePlayerVideos, youtubeKey } from '../match/video.js';
@@ -11,6 +14,7 @@ import VideoCard from '../match/VideoCard.jsx';
 import { byId } from '../../domain/competitions.js';
 import { usePlayer } from '../../data/queries.js';
 import { isKeeper } from '../../data/player.js';
+import { useDossier } from './dossier.js';
 import SectionLabel from '../../ui/SectionLabel.jsx';
 
 // A two-tone proportion bar with a big headline number on the left — the
@@ -188,15 +192,32 @@ export default function PlayerScreen() {
   // page — every stat section below already null-renders when stats is
   // absent, so there is a full page to show as long as bio resolved.
   const { bio, stats, isLoading } = usePlayer(comp, playerId);
-  const reel = usePlayerVideos(bio, scouting);
+  const club = location.state?.club ?? null;
+  const reel = usePlayerVideos(bio, scouting, club);
+  // The Scout's Dossier (spec §13.37) — called before the early returns
+  // (hooks stay unconditional); with no bio or no club it arms nothing
+  // and returns all nulls, so the page prints exactly as before.
+  const { bio: dossierBio, face, credit } = useDossier(bio, comp, club);
 
   if (isLoading) return <p className="text-muted">Loading player…</p>;
   if (!bio) return <p className="text-muted">Player unavailable right now.</p>;
 
-  const club = location.state?.club ?? null;
-
   const bioParts = [club, bio.nationality, bio.age, bio.heightDisplay,
     stats?.appearances != null ? `${stats.appearances} games` : null].filter(Boolean);
+
+  // The page header's name + meta lines — shared by all three dossier
+  // states (plate column / bio-only / today's typographic original).
+  const nameBlock = (
+    <>
+      <div className="flex items-baseline gap-3">
+        <h1 className="text-[26px]">{bio.name}</h1>
+        {bio.shirt != null && <span className="font-sans text-[12px] text-muted">№ {bio.shirt}</span>}
+      </div>
+      {bioParts.length > 0 && (
+        <p className="font-sans text-[11px] text-muted mt-1">{bioParts.join(' · ')}</p>
+      )}
+    </>
+  );
 
   return (
     <main>
@@ -205,12 +226,45 @@ export default function PlayerScreen() {
             filtered out rather than rendering the literal string "null". */}
         {[comp.name, bio.position].filter(Boolean).join(' · ')}
       </p>
-      <div className="flex items-baseline gap-3 mt-3">
-        <h1 className="text-[26px]">{bio.name}</h1>
-        {bio.shirt != null && <span className="font-sans text-[12px] text-muted">№ {bio.shirt}</span>}
-      </div>
-      {bioParts.length > 0 && (
-        <p className="font-sans text-[11px] text-muted mt-1 mb-6">{bioParts.join(' · ')}</p>
+      {/* The Scout's Dossier (spec §13.37, D-B): a verified face prints the
+          profile column — plate on the left, name/meta/bio setting beside
+          it, the photograph credit beneath; a face-less verified bio prints
+          full-width under the meta line; an unverified identity (or no club
+          context) prints today's typographic header EXACTLY. Arrival is the
+          content crossfade — no skeleton, no reserved space: enrichment,
+          not structure. */}
+      {face != null ? (
+        <div className="xfade-in mt-3 mb-6">
+          <div className="flex items-start gap-4">
+            <img src={face.src} alt="" loading="lazy" referrerPolicy="no-referrer"
+              className="w-[96px] h-[122px] rounded-[4px] border border-ink/35 object-cover
+                         bg-drawer shrink-0" />
+            <div className="flex-1 min-w-0">
+              {nameBlock}
+              {dossierBio != null && (
+                <p className="font-serif text-[13.5px] leading-relaxed mt-3">{dossierBio}</p>
+              )}
+            </div>
+          </div>
+          <p className="font-sans text-[8.5px] uppercase tracking-[.14em] text-muted mt-2">
+            Photograph · {credit}
+          </p>
+        </div>
+      ) : dossierBio != null ? (
+        <div className="xfade-in mt-3 mb-6">
+          {nameBlock}
+          <p className="font-serif text-[13.5px] leading-relaxed mt-3">{dossierBio}</p>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-baseline gap-3 mt-3">
+            <h1 className="text-[26px]">{bio.name}</h1>
+            {bio.shirt != null && <span className="font-sans text-[12px] text-muted">№ {bio.shirt}</span>}
+          </div>
+          {bioParts.length > 0 && (
+            <p className="font-sans text-[11px] text-muted mt-1 mb-6">{bioParts.join(' · ')}</p>
+          )}
+        </>
       )}
 
       {/* The Scout Player reel (spec §13.35) — lazy: quota is spent on

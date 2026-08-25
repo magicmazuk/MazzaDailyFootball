@@ -212,6 +212,25 @@ test('the player query quotes the name and anchors it to football', () => {
   expect(buildPlayerVideoQuery('Cláudio Braga')).toBe('"Cláudio Braga" football highlights');
 });
 
+// The sharpened reel (spec §13.37, §13.35's deferred item): when the club
+// is known the query anchors to IT — sharper than the generic 'football'.
+test('a known club sharpens the player query to "name" club highlights', () => {
+  expect(buildPlayerVideoQuery('James Forrest', 'Celtic')).toBe('"James Forrest" Celtic highlights');
+});
+
+test('a null club keeps the current football-anchored form', () => {
+  expect(buildPlayerVideoQuery('James Forrest', null)).toBe('"James Forrest" football highlights');
+});
+
+test('usePlayerVideos threads the club through to the sharpened query', async () => {
+  vi.stubEnv('VITE_YOUTUBE_API_KEY', 'k');
+  const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ items: [] }), { status: 200 }));
+  vi.stubGlobal('fetch', fetchSpy);
+  renderHook(() => usePlayerVideos({ id: 'p1', name: 'Braga' }, true, 'Aberdeen'), { wrapper });
+  await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
+  expect(fetchSpy.mock.calls[0][0]).toContain(encodeURIComponent('"Braga" Aberdeen highlights'));
+});
+
 test('usePlayerVideos never fetches until enabled, even with a key set', async () => {
   vi.stubEnv('VITE_YOUTUBE_API_KEY', 'k');
   const fetcher = vi.fn();

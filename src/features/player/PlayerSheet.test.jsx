@@ -1,13 +1,37 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
-import { expect, test, vi } from 'vitest';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 
-vi.mock('../../data/queries.js', () => ({ usePlayer: vi.fn() }));
+// Reads the router's live location so tests can see the state a Link sent.
+function LocationProbe() {
+  const location = useLocation();
+  return <span data-testid="loc-club">{location.state?.club ?? ''}</span>;
+}
+import { beforeEach, expect, test, vi } from 'vitest';
+
+// The dossier's four raw fetch hooks (spec §13.37) join usePlayer in the
+// factory — disabled-shaped stubs by default, so every pre-dossier test
+// still sees today's sheet exactly.
+vi.mock('../../data/queries.js', () => ({
+  usePlayer: vi.fn(),
+  useWikiSummary: vi.fn(() => ({ data: undefined })),
+  useWikiSearch: vi.fn(() => ({ data: undefined })),
+  useFplIndex: vi.fn(() => ({ data: undefined })),
+  useTsdbPlayers: vi.fn(() => ({ data: undefined })),
+}));
 
 import PlayerSheet from './PlayerSheet.jsx';
-import { usePlayer } from '../../data/queries.js';
+import {
+  usePlayer, useFplIndex, useTsdbPlayers, useWikiSearch, useWikiSummary,
+} from '../../data/queries.js';
 import { byId } from '../../domain/competitions.js';
+
+beforeEach(() => {
+  useWikiSummary.mockReset().mockReturnValue({ data: undefined });
+  useWikiSearch.mockReset().mockReturnValue({ data: undefined });
+  useFplIndex.mockReset().mockReturnValue({ data: undefined });
+  useTsdbPlayers.mockReset().mockReturnValue({ data: undefined });
+});
 
 const outfieldBio = {
   id: '272624', name: 'Kasper Høgh', position: 'Forward', shirt: '9', age: 25,
@@ -330,6 +354,106 @@ test('opening the sheet locks body scroll and closing restores the prior value',
   document.body.style.overflow = '';
 });
 
+// --- the Scout's Dossier (spec §13.37), a size down: 72×92 plate left of
+// the name block, bio paragraph below the Headline numbers clamped to two
+// lines until the sheet expands, the same credit register. The sheet only
+// dossiers when a caller hands it a club it genuinely knows (TeamScreen's
+// squad context) — no club prop, no dossier, never a guessed club. ---
+
+const hoeghSummary = {
+  title: 'Kasper Høgh',
+  kind: 'standard',
+  extract: 'Kasper Høgh is a Danish professional footballer who plays as a '
+    + 'striker for Scottish Premiership club Celtic.',
+  portrait: 'https://upload.wikimedia.org/thumb/hoegh.jpg',
+  original: 'https://upload.wikimedia.org/hoegh.jpg',
+};
+
+function armVerifiedSummary(summary) {
+  useWikiSummary.mockImplementation(title => (
+    title === summary.title ? { data: summary, isSuccess: true } : { data: undefined }));
+}
+
+test('a verified face renders the 72×92 plate beside the name block, with the credit line', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  armVerifiedSummary(hoeghSummary);
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" club="Celtic" onClose={() => {}} /></MemoryRouter>,
+  );
+
+  const img = container.querySelector('img');
+  expect(img).toBeTruthy();
+  expect(img).toHaveAttribute('src', hoeghSummary.portrait);
+  expect(img).toHaveAttribute('alt', '');
+  expect(img).toHaveAttribute('loading', 'lazy');
+  expect(img).toHaveAttribute('referrerpolicy', 'no-referrer');
+  expect(img.className).toContain('w-[72px]');
+  expect(img.className).toContain('h-[92px]');
+  expect(img.className).toContain('rounded-[4px]');
+  expect(img.className).toContain('border-ink/35');
+  expect(img.className).toContain('object-cover');
+  expect(img.className).toContain('bg-drawer');
+  // The plate sits in the same flex row as the name column.
+  expect(img.parentElement).toContainElement(screen.getByText('Kasper Høgh'));
+
+  const credit = screen.getByText('Photograph · Wikimedia Commons');
+  expect(credit.className).toContain('text-[8.5px]');
+  expect(credit.className).toContain('uppercase');
+  expect(credit.className).toContain('tracking-[.14em]');
+  expect(credit.className).toContain('text-muted');
+});
+
+test('the bio paragraph sits below the Headline numbers, box-clamped to 2 lines until expanded', async () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  armVerifiedSummary(hoeghSummary);
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" club="Celtic" onClose={() => {}} /></MemoryRouter>,
+  );
+
+  const para = screen.getByText(hoeghSummary.extract);
+  expect(para.className).toContain('font-serif');
+  expect(para.className).toContain('text-[13.5px]');
+  expect(para.className).toContain('leading-relaxed');
+  // Below the Headline grid in document order.
+  const headline = container.querySelector('.grid-cols-3');
+  expect(headline.compareDocumentPosition(para) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // Collapsed: the house box-clamp (Papers' technique) pins two lines.
+  expect(para.getAttribute('style')).toContain('-webkit-box');
+  expect(para.getAttribute('style')).toContain('hidden');
+
+  await userEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
+  // Expanded: the clamp lifts and the paragraph runs free.
+  expect(screen.getByText(hoeghSummary.extract).getAttribute('style') ?? '').not.toContain('-webkit-box');
+});
+
+test('THE LAW on the sheet: an unverified extract leaves the sheet byte-identical to today', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  armVerifiedSummary({
+    ...hoeghSummary,
+    extract: 'Kasper Høgh is a striker who plays for Rangers.',
+  });
+  const { container: missed } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" club="Celtic" onClose={() => {}} /></MemoryRouter>,
+  );
+
+  useWikiSummary.mockReset().mockReturnValue({ data: undefined });
+  const { container: today } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" club="Celtic" onClose={() => {}} /></MemoryRouter>,
+  );
+  expect(missed.innerHTML).toBe(today.innerHTML);
+  expect(missed.querySelector('img')).toBeNull();
+  expect(within(missed).queryByText(/^Photograph ·/)).not.toBeInTheDocument();
+});
+
+test('no club prop → no dossier: every fetch hook stays armed false', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  render(<MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>);
+  for (const call of useWikiSummary.mock.calls) expect(call[1]).toBe(false);
+  for (const call of useWikiSearch.mock.calls) expect(call[1]).toBe(false);
+  expect(useFplIndex).toHaveBeenCalledWith(false);
+  for (const call of useTsdbPlayers.mock.calls) expect(call[1]).toBe(false);
+});
+
 // --- the Scout Player reel (spec §13.35) ---
 vi.mock('../match/video.js', () => ({
   usePlayerVideos: vi.fn(() => ({ data: undefined, isLoading: false })),
@@ -354,4 +478,15 @@ test("a 'Scout player' control shows once the bio lands, and tapping it opens th
   const scout = await screen.findByRole('button', { name: /Scout player/ });
   await user.click(scout);
   expect(await screen.findByTitle('Braga highlights')).toBeInTheDocument();
+});
+
+test('"Open as page →" hands the club forward as location state (spec §13.37)', async () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  render(<MemoryRouter>
+    <LocationProbe />
+    <PlayerSheet comp={comp} playerId="272624" onClose={() => {}} club="Celtic" />
+  </MemoryRouter>);
+  await userEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
+  await userEvent.click(screen.getByRole('link', { name: /Open as page/ }));
+  expect(screen.getByTestId('loc-club').textContent).toBe('Celtic');
 });

@@ -23,6 +23,13 @@ vi.mock('../../data/queries.js', () => ({
   // keeps landing on SquadBoard's bands fallback, same as before this hook
   // existed.
   useMatchDetail: vi.fn(() => ({ isLoading: false, isError: false, data: undefined })),
+  // The Scout's Dossier (spec §13.37): PlayerSheet dossiers via these four
+  // raw fetch hooks — disabled-shaped stubs, so nothing enriches unless a
+  // test arms a summary itself.
+  useWikiSummary: vi.fn(() => ({ data: undefined })),
+  useWikiSearch: vi.fn(() => ({ data: undefined })),
+  useFplIndex: vi.fn(() => ({ data: undefined })),
+  useTsdbPlayers: vi.fn(() => ({ data: undefined })),
 }));
 // The scout film (spec §13.20.3): video.js's own hook + key accessor, mocked
 // the same way as everything above — no QueryClientProvider needed, and
@@ -35,7 +42,9 @@ vi.mock('../match/video.js', () => ({
 }));
 
 import TeamScreen, { matchStarters } from './TeamScreen.jsx';
-import { useTeams, useAllSeasonFixtures, useSquad, usePlayer, useMatchDetail } from '../../data/queries.js';
+import {
+  useTeams, useAllSeasonFixtures, useSquad, usePlayer, useMatchDetail, useWikiSummary,
+} from '../../data/queries.js';
 import { useTeamVideos, youtubeKey } from '../match/video.js';
 
 // Every shirt button's accessible name is "<number> · <name>" (task 3
@@ -58,6 +67,7 @@ beforeEach(() => {
   useMatchDetail.mockImplementation(() => ({ isLoading: false, isError: false, data: undefined }));
   useTeamVideos.mockImplementation(() => ({ isLoading: false, isError: false, data: undefined }));
   youtubeKey.mockReturnValue(null);
+  useWikiSummary.mockReset().mockReturnValue({ data: undefined });
 });
 
 // Feeds every one of the 13 registry comps a fixture list (default empty)
@@ -172,6 +182,42 @@ test('a squad row is a button (not a link) that opens the player sheet', async (
 
   await userEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
   expect(screen.getByRole('link', { name: 'Open as page →' })).toHaveAttribute('href', '/player/sco.1/p1');
+});
+
+// --- the Scout's Dossier (spec §13.37): TeamScreen genuinely knows the
+// sheet's club — every squad-row tap is a tap on THIS team's squad — so it
+// hands the team name down as the sheet's `club`, arming the dossier. ---
+
+test('a squad-row sheet dossiers under the squad club: the wiki lookup arms and a verified plate prints', async () => {
+  const celtic = side('256', 'Celtic');
+  stubSeasons({
+    'sco.1': [fx('f1', 'sco.1', 'round-1', '2026-08-01T15:00:00Z', celtic, side('o1', 'Opponent 1'))],
+  });
+  useSquad.mockImplementation(() => ({
+    isLoading: false, isError: false,
+    data: { players: [{ id: 'p1', name: 'Kasper Høgh', shirt: '9', position: 'Forward' }] },
+  }));
+  usePlayer.mockReturnValue({
+    bio: { id: 'p1', name: 'Kasper Høgh', position: 'Forward', shirt: '9', age: 24, nationality: 'Denmark' },
+    stats: { appearances: 10, minutes: 900, goals: 3 },
+    isLoading: false, isError: false,
+  });
+  useWikiSummary.mockImplementation(title => (title === 'Kasper Høgh'
+    ? {
+      data: {
+        title: 'Kasper Høgh', kind: 'standard',
+        extract: 'Kasper Høgh is a Danish striker who plays for Scottish Premiership club Celtic.',
+        portrait: 'https://upload.wikimedia.org/thumb/hoegh.jpg', original: null,
+      },
+      isSuccess: true,
+    }
+    : { data: undefined }));
+
+  renderAt('sco.1', '256');
+  await userEvent.click(screen.getByRole('button', { name: lbl('Kasper Høgh', '9') }));
+
+  expect(useWikiSummary).toHaveBeenCalledWith('Kasper Høgh', true);
+  expect(screen.getByText('Photograph · Wikimedia Commons')).toBeInTheDocument();
 });
 
 // --- home-league hotfix (Aug 2026): useSquad resolves squads under a
