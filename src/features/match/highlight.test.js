@@ -92,3 +92,17 @@ test('an empty season cache falls back to the fixture itself — the line still 
   const { result } = renderHook(() => useFixtureHighlight(fixture(), byId('eng.1')));
   expect(result.current.line).toBe('Featured on Match of the Day');
 });
+
+// Review finding (2026-08-25): the season read must be GATED, not merely
+// ignored — an ungated useSeasonFixtures({ id: 'none' }) fires a real
+// /soccer/none/scoreboard fetch the ESPN allowlist can only 400.
+test('the season read is disabled off the iplayer leagues', () => {
+  renderHook(() => useFixtureHighlight(fixture({ compId: 'eng.fa' }), byId('eng.fa')));
+  expect(useSeasonFixtures).toHaveBeenCalledWith(expect.anything(), { enabled: false });
+});
+
+test('the season read is enabled on an iplayer league', () => {
+  useHighlights.mockReturnValue([episode()]);
+  renderHook(() => useFixtureHighlight(fixture(), byId('eng.1')));
+  expect(useSeasonFixtures).toHaveBeenCalledWith(byId('eng.1'), { enabled: true });
+});

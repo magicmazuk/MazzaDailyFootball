@@ -204,7 +204,8 @@ export function seasonFixturesQuery(comp) {
   };
 }
 
-export const useSeasonFixtures = comp => useQuery(seasonFixturesQuery(comp));
+export const useSeasonFixtures = (comp, opts = {}) =>
+  useQuery({ ...seasonFixturesQuery(comp), ...opts });
 export const useAllSeasonFixtures = comps =>
   useQueries({ queries: comps.map(seasonFixturesQuery) });
 
