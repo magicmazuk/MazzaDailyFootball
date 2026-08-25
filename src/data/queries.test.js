@@ -2,7 +2,10 @@ import { createElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, expect, test, vi } from 'vitest';
-import { seasonFixturesQuery, todayWindowQuery, useHighlights, useNews, usePlayer, useSquad } from './queries.js';
+import {
+  seasonFixturesQuery, todayWindowQuery, useHighlights, useNews, usePlayer, useSquad,
+  useTsdbPlayers, useWikiSummary,
+} from './queries.js';
 
 // No JSX in this file — the QueryClientProvider wrapper is built with
 // createElement instead (matches src/features/match/video.test.js).
@@ -807,4 +810,59 @@ test('useHighlights keeps the short synopsis when the episode-detail tier fails'
 
   await waitFor(() => expect(result.current).toHaveLength(2));
   expect(result.current.every(e => e.synopsis === 'the short synopsis')).toBe(true);
+});
+
+// --- The Scout's Dossier hooks (spec §13.37): lazy, enabled-gated raw
+// fetches through /api/dossier — identity logic lives in the domain
+// layer, so these tests pin only the proxy discipline (encoded paths,
+// one hop) and the enabled gate. Adapter behaviour is pinned in
+// dossier.test.js. ---
+
+test('useWikiSummary fetches the encoded title through the dossier proxy and adapts the summary', async () => {
+  const calls = [];
+  const summary = {
+    title: 'James Forrest (footballer, born 1991)', type: 'standard',
+    extract: 'Plays for Celtic.', thumbnail: { source: 'https://upload.wikimedia.org/jf.jpg' },
+  };
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    calls.push(url);
+    return new Response(JSON.stringify(summary), { status: 200 });
+  }));
+
+  const { result } = renderHook(
+    () => useWikiSummary('James Forrest (footballer, born 1991)', true),
+    { wrapper },
+  );
+
+  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  // Encoded, and through our proxy — never to wikipedia.org directly.
+  expect(calls).toEqual(['/api/dossier/wiki/summary/James%20Forrest%20(footballer%2C%20born%201991)']);
+  expect(result.current.data.kind).toBe('standard');
+  expect(result.current.data.portrait).toBe('https://upload.wikimedia.org/jf.jpg');
+});
+
+test('useWikiSummary stays idle (no fetch) until enabled with a title — enrichment is lazy', async () => {
+  const fetchSpy = vi.fn();
+  vi.stubGlobal('fetch', fetchSpy);
+
+  const idle = renderHook(() => useWikiSummary('James Forrest', false), { wrapper });
+  const untitled = renderHook(() => useWikiSummary(null, true), { wrapper });
+
+  expect(idle.result.current.fetchStatus).toBe('idle');
+  expect(untitled.result.current.fetchStatus).toBe('idle');
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
+
+test('useTsdbPlayers adapts TSDB’s live no-hits shape {"player":null} to an empty array', async () => {
+  const calls = [];
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    calls.push(url);
+    return new Response(JSON.stringify({ player: null }), { status: 200 });
+  }));
+
+  const { result } = renderHook(() => useTsdbPlayers('James Forrest', true), { wrapper });
+
+  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  expect(calls).toEqual(['/api/dossier/tsdb/James%20Forrest']);
+  expect(result.current.data).toEqual([]);
 });
