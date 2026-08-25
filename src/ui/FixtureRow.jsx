@@ -5,6 +5,7 @@ import { monogram } from '../domain/monogram.js';
 import { legLabel, tieLine } from '../domain/legs.js';
 import { prettifyRound } from '../domain/round.js';
 import { useMatchDetail } from '../data/queries.js';
+import { useFixtureHighlight } from '../features/match/highlight.js';
 import Collapse from './Collapse.jsx';
 import Crest from './Crest.jsx';
 import { SkeletonLines } from './Skeleton.jsx';
@@ -347,6 +348,9 @@ function ScorerColumn({ clubSide, scorers, testId }) {
 // attendance whichever the source published, then the way through to the
 // full page.
 function ResultDrawer({ detail, fixture, comp }) {
+  // The highlight line (spec §13.36, R-A) — safe to hook here: the drawer
+  // mounts lazily on first expand, so nothing fetches before the tap.
+  const highlight = useFixtureHighlight(fixture, comp);
   const points = timelinePoints(detail.events, fixture);
   const scorers = scorersBySide(detail.events, fixture, detail.lineups);
   const tie = tieLine(fixture);
@@ -374,6 +378,17 @@ function ResultDrawer({ detail, fixture, comp }) {
       )}
       {metaParts.length > 0 && (
         <p className="font-sans text-[10px] text-muted tabular-nums mt-2">{metaParts.join(' · ')}</p>
+      )}
+      {/* Watch it back (spec §13.36, R-A): the covered episode's line in
+          the Full-table accent recipe, linking out to iPlayer — never
+          embedded (DRM). No episode, no line: §13.36 exempts absence here
+          from the one-line law, since coverage was never promised. */}
+      {highlight && (
+        <a data-testid="highlight-line" href={highlight.url}
+          target="_blank" rel="noopener noreferrer"
+          className="font-sans text-[10px] uppercase tracking-[.16em] text-accent mt-2 block">
+          {highlight.line} — iPlayer →
+        </a>
       )}
       <FullDetailLink comp={comp} fixture={fixture} />
     </>

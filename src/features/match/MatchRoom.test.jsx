@@ -10,6 +10,11 @@ import { beforeEach, expect, test, vi } from 'vitest';
 // each file's own relative path to it, so this single mock covers both.
 vi.mock('../../data/queries.js', () => ({
   usePlayer: vi.fn(() => ({ bio: null, stats: null, isLoading: false, isError: false })),
+  // The header's highlight line (spec §13.36, R-B) joins via
+  // useFixtureHighlight, which reads these two — stubbed to a silent reel
+  // and a cold season cache by default.
+  useHighlights: vi.fn(() => []),
+  useSeasonFixtures: vi.fn(() => ({ data: undefined })),
 }));
 // PlayerSheet also scouts (spec §13.35) via a real react-query hook —
 // stubbed here for the same no-QueryClientProvider reason as usePlayer.
@@ -20,13 +25,15 @@ vi.mock('./video.js', () => ({
 
 import MatchRoom, { statSplit } from './MatchRoom.jsx';
 import { byId } from '../../domain/competitions.js';
-import { usePlayer } from '../../data/queries.js';
+import { usePlayer, useHighlights } from '../../data/queries.js';
 
 // usePlayer is a shared mock across every test in this file — reset to the
 // closed-sheet default before each one so a test that opens the sheet with
 // real bio/stats can't leak that data into a later, unrelated test.
+// useHighlights likewise resets to a silent reel.
 beforeEach(() => {
   usePlayer.mockReturnValue({ bio: null, stats: null, isLoading: false, isError: false });
+  useHighlights.mockReturnValue([]);
 });
 
 const side = (name, score) => ({ teamId: name, name, shortName: name,
@@ -1020,6 +1027,59 @@ test('the match page head-to-head shows ALL meetings most-recent-first with the 
   expect(screen.getByText('Celtic 3')).toBeInTheDocument();
   expect(screen.getByText('drawn 1')).toBeInTheDocument();
   expect(screen.getByText('Rangers 0')).toBeInTheDocument();
+});
+
+// --- the highlight line (spec §13.36, R-B): the covered episode's line in
+// the muted-link recipe under the header meta, linking out to iPlayer. ---
+
+const sportsceneEpisode = (over = {}) => ({
+  comp: byId('sco.1'), show: 'Sportscene', pid: 'm0030s0h', date: '2026-08-22',
+  firstBroadcast: '2026-08-22T22:30:00+01:00', availableUntil: null,
+  synopsis: 'Highlights of the day\'s Premiership action.',
+  url: 'https://www.bbc.co.uk/iplayer/episode/m0030s0h', ...over,
+});
+
+test('a covered FT fixture prints the highlight line in the muted-link recipe inside the header, linking out', () => {
+  useHighlights.mockReturnValue([sportsceneEpisode()]);
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  const line = screen.getByTestId('highlight-line');
+  expect(container.querySelector('header')).toContainElement(line);
+  // Sportscene synopses never name games — the covered tier, never Featured.
+  expect(line.textContent).toBe('Highlights · Sportscene — watch on iPlayer →');
+  expect(line).toHaveAttribute('href', 'https://www.bbc.co.uk/iplayer/episode/m0030s0h');
+  expect(line).toHaveAttribute('target', '_blank');
+  expect(line).toHaveAttribute('rel', 'noopener noreferrer');
+  // The Scout-player muted-link recipe, verbatim.
+  expect(line).toHaveClass('font-sans', 'text-[9.5px]', 'uppercase', 'tracking-[.14em]',
+    'text-muted', 'underline', 'underline-offset-4');
+});
+
+test('a synopsis naming both clubs upgrades the header line to the Featured tier', () => {
+  useHighlights.mockReturnValue([sportsceneEpisode({
+    synopsis: 'Celtic edge Rangers in the derby.' })]);
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  expect(screen.getByTestId('highlight-line').textContent)
+    .toBe('Featured on Sportscene — watch on iPlayer →');
+});
+
+test('no covering episode means no header line at all — absence is not degradation here (§13.36)', () => {
+  useHighlights.mockReturnValue([sportsceneEpisode({ date: '2026-08-15' })]);
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  expect(screen.queryByTestId('highlight-line')).not.toBeInTheDocument();
+});
+
+test('a live fixture never carries the highlight line, even on the broadcast day', () => {
+  useHighlights.mockReturnValue([sportsceneEpisode()]);
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  expect(screen.queryByTestId('highlight-line')).not.toBeInTheDocument();
 });
 
 // --- two-legged ties on the match page (spec §13.29): the tie's verdict in

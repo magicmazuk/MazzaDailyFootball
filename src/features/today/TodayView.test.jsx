@@ -7,9 +7,13 @@ import { byId } from '../../domain/competitions.js';
 // TodayView renders Papers (The papers, spec §13.19.2), which fetches its
 // own news via useNews — stub it so these presentational tests need no
 // QueryClientProvider and stay focused on TodayView's own layout/ordering.
+// The highlights reel (spec §13.36) fetches its own episodes the same way —
+// same stub discipline, defaulting to an empty (silent) reel.
 vi.mock('../../data/queries.js', () => ({
   useNews: vi.fn(() => ({ isLoading: false, data: { items: [] } })),
+  useHighlights: vi.fn(() => []),
 }));
+import { useHighlights } from '../../data/queries.js';
 
 const side = (teamId, name) => ({ teamId, name, crestUrl: null, monogram: 'XX', score: 1 });
 const fx = (id, h, a, status = 'ft') => ({
@@ -286,6 +290,38 @@ test('The papers section sits after Earlier today and before On TV', () => {
   expect(earlierHeading.compareDocumentPosition(papersHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   // eslint-disable-next-line no-bitwise
   expect(papersHeading.compareDocumentPosition(onTvHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+// --- The highlights placement (spec §13.36, H-A) ---
+
+test('The highlights sits between Earlier today and The papers, in its own rise-in-5 wrapper', () => {
+  useHighlights.mockReturnValueOnce([{
+    comp: byId('eng.1'), show: 'Match of the Day', pid: 'm0001',
+    date: '2026-08-22', firstBroadcast: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    availableUntil: null, synopsis: '', url: 'https://www.bbc.co.uk/iplayer/episode/m0001',
+  }]);
+  render(
+    <MemoryRouter>
+      <TodayView
+        date={new Date('2026-08-21T00:00:00Z')}
+        followedIds={new Set()}
+        partition={{ yours: [], live: [], later: [], earlier: [fx('9', 'Falkirk', 'Hearts')], yesterday: [] }}
+      />
+    </MemoryRouter>,
+  );
+
+  const earlierHeading = screen.getByText('Earlier today');
+  const highlightsHeading = screen.getByText('The highlights');
+  const papersHeading = screen.getByText('The papers');
+  // eslint-disable-next-line no-bitwise
+  expect(earlierHeading.compareDocumentPosition(highlightsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // eslint-disable-next-line no-bitwise
+  expect(highlightsHeading.compareDocumentPosition(papersHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // Wrapped exactly like Papers: its own rise-in-5 div, so the named
+  // rise-in slots of the fixture sections stay undisturbed.
+  const wrapper = highlightsHeading.closest('[class*="rise-in"]');
+  expect(wrapper).toHaveClass('rise-in', 'rise-in-5');
+  expect(wrapper).not.toBe(papersHeading.closest('[class*="rise-in"]'));
 });
 
 // --- motion (spec §13.21): each top-level section rises in on mount, one

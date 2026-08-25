@@ -4,6 +4,7 @@ import NextUpRow from './NextUpRow.jsx';
 import MiniTable from './MiniTable.jsx';
 import DrawInvitation from './DrawInvitation.jsx';
 import Papers from './Papers.jsx';
+import HighlightsReel from './HighlightsReel.jsx';
 
 const longDate = d => d.toLocaleDateString('en-GB',
   { weekday: 'long', day: 'numeric', month: 'long' });
@@ -70,6 +71,12 @@ export default function TodayView({ partition, followedIds, date, asOf = null, n
       <Section label="Later today" muted fixtures={later} followedIds={followedIds} riseIn="rise-in rise-in-3" />
       <Section label="Earlier today" muted fixtures={earlier} followedIds={followedIds} riseIn="rise-in rise-in-4" />
       {quiet && <p className="text-muted mt-2">No matches today.</p>}
+      {/* The highlights reel (spec §13.36) owns its own <section> like
+          Papers — wrapped, not touched, for the same rise-in reason; it
+          renders nothing at all when no episode is fresh. */}
+      <div className="rise-in rise-in-5">
+        <HighlightsReel />
+      </div>
       {/* Papers owns its own <section> internally (task 2) — wrapped here
           rather than touched directly, so the rise-in slot stays a purely
           section-level, page-owned concern (spec §13.21). */}
