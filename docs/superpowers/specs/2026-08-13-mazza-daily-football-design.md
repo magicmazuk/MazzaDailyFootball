@@ -1136,3 +1136,25 @@ The open design question (fit vs sideways scroll at 390px) was answered by MEASU
 taste: scrollWidth ≤ clientWidth live at phone width — the full print fits, no scroll
 container needed. Verified on the real Premiership table (Celtic 2 from 2; the split rule
 and zone ticks intact in both modes).
+
+## 13.34 The Competitions front
+
+User request (2026-08-25, after three days of daily use): the Competitions tab as a front
+page — full EPL and Premiership tables on the page, summaries of the active tournaments,
+the list below. Mockup round: C-A "the two classifieds" chosen over C-B (tabbed one-at-a-
+time, my recommendation) and C-C (top-4 snippets) — the user took the long scroll with
+eyes open, consistent with their full-print instincts.
+
+**The page**: h1, then the two headline classifieds (accent sub-label + "Full table →" to
+the comp page; EVERY row in the quick-table recipe — pos · crest · name · ★ · pts at 13px;
+each row navigating to its club per the v1.8.2 rule; MiniTable's pre-season guard); then
+IN PLAY ELSEWHERE — one line per active tournament from `activeSummary` (live → "Live ·
+{round}" in accent; else nearest round inside a fortnight → "{round} · {day}"; league slugs
+day-only via prettifyRound's rejection; nothing upcoming → no line); then the country-
+grouped list minus the two headliners. A summarised cup appears in the desk AND the list
+by design — status line vs canonical index. ZERO new fetches: two useTable hooks plus the
+season fixtures Today already keeps warm.
+
+Verified live: both classifieds render in full with real matchday-3/matchday-2 data; the
+desk wrote itself — Carabao Cup Second round tonight, Champions League play-off 2nd legs
+(Celtic in Linz) tomorrow.
