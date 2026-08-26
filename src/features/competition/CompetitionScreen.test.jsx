@@ -207,3 +207,31 @@ test('a league carries no displayable round (ESPN season.slug is a year-prefixed
   await screen.findByText('Celtic');
   expect(screen.queryAllByRole('heading', { level: 2 })).toHaveLength(0);
 });
+
+// --- the fantasy ladder (spec §13.40) ---
+
+const FPL_INDEX = {
+  teams: [{ id: 1, name: 'Arsenal' }],
+  players: [{ code: 1, web: 'Saka', team: 1, points: 9, event: 4 }],
+};
+
+const stubFplFetch = () => vi.stubGlobal('fetch', vi.fn(async url => {
+  if (String(url).includes('/fpl/index')) {
+    return new Response(JSON.stringify(FPL_INDEX), { status: 200 });
+  }
+  return new Response(JSON.stringify({ events: [] }), { status: 200 });
+}));
+
+test('the EPL page carries the league-wide fantasy ladder under its table', async () => {
+  stubFplFetch();
+  renderAt('eng.1');
+  expect(await screen.findByText('The fantasy ladder')).toBeInTheDocument();
+  expect(await screen.findByText('Saka')).toBeInTheDocument();
+});
+
+test('no other league carries a ladder — the data is EPL-only by reality', async () => {
+  stubFplFetch();
+  renderAt('sco.1');
+  await screen.findByText(/Table|Loading table/);
+  expect(screen.queryByText('The fantasy ladder')).not.toBeInTheDocument();
+});

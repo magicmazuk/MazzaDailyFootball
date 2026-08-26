@@ -1298,3 +1298,29 @@ name-based and accent/case-insensitive (the feed carries no pot). The shipped ta
 EMPTY: an uncurated season, comp or club simply wears no chip and the ceremony plays exactly
 as §13.15 printed it — never a guess. The ceremony itself needs no structural change for
 2026-27 (36 clubs, 8 opponents, fixture-driven throughout).
+
+## 13.40 The fantasy ladder
+
+The user's ask (2026-08-26): "a table per squad and a table for all players on the EPL page
+— top 10 is fine." FPL's bootstrap (already proxied for the Dossier) carries per-player
+total_points/event_points; ESPN has no fantasy soccer game and the SPFL none at all, so this
+is an EPL-ONLY surface by data reality — Scottish clubs simply carry no ladder (the absence
+precedent), with the ESPN-leaders Golden Boot ladder noted in BACKLOG as the every-club
+sibling if the asymmetry ever rankles.
+
+**Data:** the /fpl/index trim gains `points` (total_points) and `event` (event_points) per
+player — nothing else. Domain (src/domain/fantasy.js, pure): `fplLadder(index, club, n=10)`
+— the club's FPL squad sorted by points, via the dossier's own uniquely-matched-team rule
+(exported as `fplTeamId`; never cross teams); `leagueLadder(index, n=10)` — the whole
+league's top n with each player's club attached. Players lacking a numeric points field
+render NOTHING (the edge may serve the pre-points trimmed cache for up to 6h after this
+ships — sections stay absent rather than printing fake zeros).
+
+**Surfaces:** (1) every eng.1 TEAM page: "The fantasy ladder" between Squad and Season —
+rank (muted tabular), the player's FPL name in serif, this-gameweek points muted, season
+points tabular at the right margin. (2) the eng.1 COMPETITION page, Table tab, below the
+classified: the league-wide top 10, same row form with the club's shortName muted beside
+the name. Names print as FPL publishes them and stay PLAIN TEXT (no player-sheet tap —
+FPL's web_name cannot be identity-matched to an ESPN roster safely; a wrong sheet is worse
+than no tap; backlogged as a Dossier-machinery enhancement). Both sections absent wherever
+the data is (£0, zero new upstreams).

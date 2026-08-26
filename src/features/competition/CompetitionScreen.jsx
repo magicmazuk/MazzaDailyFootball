@@ -9,6 +9,7 @@ import { useSeasonFixtures, useTable } from '../../data/queries.js';
 import { usePrefs } from '../../store/prefs.js';
 import FixtureRow from '../../ui/FixtureRow.jsx';
 import LeagueTable from './LeagueTable.jsx';
+import FantasyLadder from '../../ui/FantasyLadder.jsx';
 import FieldBoard from './FieldBoard.jsx';
 import { groupFixturesByRound } from './roundGroups.js';
 
@@ -161,6 +162,10 @@ export default function CompetitionScreen() {
                 followedIds={followedIds} formByTeam={formByTeam}
                 full={fullTable} onToggleFull={toggleFullTable} />
             : <p className="text-muted">{table.isError ? 'Table unavailable.' : 'Loading table…'}</p>}
+          {/* The fantasy ladder (spec §13.40): the division's top ten by
+              FPL points, below the classified — eng.1 only (no fantasy
+              feed exists for any other league we carry). */}
+          {comp?.id === 'eng.1' && <FantasyLadder league />}
         </div>
       )}
       {active === 'Fixtures' && (
