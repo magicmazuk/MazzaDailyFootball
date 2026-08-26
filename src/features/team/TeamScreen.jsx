@@ -11,6 +11,7 @@ import Crest from '../../ui/Crest.jsx';
 import { SkeletonBlock } from '../../ui/Skeleton.jsx';
 import FixtureRow from '../../ui/FixtureRow.jsx';
 import SectionLabel from '../../ui/SectionLabel.jsx';
+import FantasyLadder from '../../ui/FantasyLadder.jsx';
 import CalendarGlyph from '../../ui/CalendarGlyph.jsx';
 import PlayerSheet from '../player/PlayerSheet.jsx';
 import SquadBoard from './SquadBoard.jsx';
@@ -294,6 +295,15 @@ export default function TeamScreen() {
           {comp?.hasSquads && squad.isLoading && <p className="text-muted">Loading squad…</p>}
           {comp?.hasSquads && squad.isError && <p className="font-sans text-[11px] text-muted">Squad unavailable right now.</p>}
         </section>
+
+        {/* The fantasy ladder (spec 13.40): the squad's top ten by FPL
+            points - eng.1 clubs only, absent elsewhere by data reality.
+            Wrapped for its rise-in slot like every named section. */}
+        {comp?.id === 'eng.1' && team && (
+          <div className="rise-in rise-in-5">
+            <FantasyLadder club={team.name} />
+          </div>
+        )}
 
         <section className="rise-in rise-in-5">
           {phaseReplayLinks.length > 0 ? (

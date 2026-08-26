@@ -88,12 +88,12 @@ export function pickSearchTitle(titles, name) {
 const namesMatch = (a, b) => a !== '' && b !== ''
   && (a === b || hasPhrase(a, b) || hasPhrase(b, a));
 
-// The FPL join: find the club's team, then match the player INSIDE that team
-// only — full name first, web_name-equals-surname as the fallback and only
-// when it names exactly one man. Never across teams.
-export function fplFace(index, context) {
-  const { name, club } = context ?? {};
-  if (index == null || name == null || club == null) return null;
+// The club's FPL team id — exact-name first, containment either way as the
+// fallback, and only when it names exactly ONE team (the two Manchesters
+// rule). The dossier's face join and the fantasy ladder (spec §13.40)
+// share this seam so "which team is this club" has one answer everywhere.
+export function fplTeamId(index, club) {
+  if (index == null || club == null) return null;
   const clubN = normalise(club);
   if (clubN === '') return null;
   const teams = (index.teams ?? [])
@@ -103,8 +103,17 @@ export function fplFace(index, context) {
   const matched = exact.length > 0
     ? exact
     : teams.filter(x => namesMatch(x.n, clubN));
-  if (matched.length !== 1) return null;
-  const teamId = matched[0].team.id;
+  return matched.length === 1 ? (matched[0].team.id ?? null) : null;
+}
+
+// The FPL join: find the club's team, then match the player INSIDE that team
+// only — full name first, web_name-equals-surname as the fallback and only
+// when it names exactly one man. Never across teams.
+export function fplFace(index, context) {
+  const { name, club } = context ?? {};
+  if (index == null || name == null || club == null) return null;
+  const teamId = fplTeamId(index, club);
+  if (teamId == null) return null;
   const squad = (index.players ?? []).filter(p => p != null && p.team === teamId);
   const nameN = normalise(name);
   const full = squad.filter(p => normalise(`${p.first ?? ''} ${p.second ?? ''}`) === nameN);

@@ -44,6 +44,7 @@ vi.mock('../match/video.js', () => ({
 import TeamScreen, { matchStarters } from './TeamScreen.jsx';
 import {
   useTeams, useAllSeasonFixtures, useSquad, usePlayer, useMatchDetail, useWikiSummary,
+  useFplIndex,
 } from '../../data/queries.js';
 import { useTeamVideos, youtubeKey } from '../match/video.js';
 
@@ -956,4 +957,15 @@ test('the team page\'s top-level blocks carry staggered .rise-in classes', () =>
   expect(film).toHaveClass('rise-in-3');
   expect(squad).toHaveClass('rise-in-4');
   expect(season).toHaveClass('rise-in-5');
+});
+
+// --- the fantasy ladder gate (spec §13.40): EPL team pages only ---
+test('a non-EPL team page carries no fantasy ladder even with a live index', async () => {
+  useFplIndex.mockReturnValue({ data: {
+    teams: [{ id: 1, name: 'Celtic' }],
+    players: [{ code: 1, web: 'McGregor', team: 1, points: 9, event: 4 }],
+  } });
+  renderAt('sco.1', '256');
+  await screen.findByText(/Squad|team page/i).catch(() => {});
+  expect(screen.queryByText('The fantasy ladder')).not.toBeInTheDocument();
 });

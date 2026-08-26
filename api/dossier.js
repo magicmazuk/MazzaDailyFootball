@@ -135,6 +135,9 @@ function trimFplIndex(text) {
         second: e.second_name,
         web: e.web_name,
         team: e.team,
+        // The fantasy ladder (spec 13.40): season and gameweek points.
+        points: e.total_points,
+        event: e.event_points,
       })),
     });
   } catch {
