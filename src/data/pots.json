@@ -1,0 +1,6 @@
+{
+  "_curation": "Pot placements per comp per season (spec §13.39). CURATED like tvListings — hand-entered when UEFA publishes them (the day of each league-phase draw), refreshed each season. Names match the ESPN display or short name, accent- and case-insensitive. Empty pots = the ceremony plays unchipped, exactly as before pots existed.",
+  "uefa.champions": { "season": "2026-27", "pots": {} },
+  "uefa.europa": { "season": "2026-27", "pots": {} },
+  "uefa.europa.conf": { "season": "2026-27", "pots": {} }
+}

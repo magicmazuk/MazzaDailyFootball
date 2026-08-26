@@ -1284,3 +1284,17 @@ The header computes other-leg + overlaid-live-score when the played twin is at h
 aggregate can never lag the fresh score beside it; rows read score and agg from one payload
 and agree by construction. The meetings ledger stays as printed — ESPN's h2h events carry no
 aggregate fields, and we never guess.
+
+## 13.39 The pot chips (PC-A)
+
+Asked off the BBC's draw explainer (2026-08-26, the day before Monaco): the league-phase
+ceremony learns the pots. Pick: **PC-A** — the ceremony's staging is untouched (kickoff-order
+reveals, the §13.15 choreography), and each revealed opponent wears its coefficient pot as a
+quiet chip: on the Stage beneath the crest, and on the landed row between the club and its
+venue marker. Chip recipe: the 8.5px caps label in a rule-hairline pill (the TvBadge chip
+idiom). Pot data is CURATED (src/data/pots.json, the tvListings precedent) — hand-entered
+per comp when UEFA publishes placements on draw day, refreshed each season; lookup is
+name-based and accent/case-insensitive (the feed carries no pot). The shipped table starts
+EMPTY: an uncurated season, comp or club simply wears no chip and the ceremony plays exactly
+as §13.15 printed it — never a guess. The ceremony itself needs no structural change for
+2026-27 (36 clubs, 8 opponents, fixture-driven throughout).
