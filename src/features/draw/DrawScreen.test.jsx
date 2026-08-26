@@ -579,3 +579,38 @@ test('the draw ceremony carries no .rise-in class anywhere — its own choreogra
   await screen.findByText('Tap to draw the first ball');
   expect(container.querySelectorAll('[class*="rise-in"]')).toHaveLength(0);
 });
+
+// --- the pot chips (spec §13.39, PC-A) ---
+// The shipped pots.json is empty by design; the mock stands in for a
+// curated season. Rangers pot 1, Aberdeen pot 3, Hibernian uncurated.
+vi.mock('../../data/pots.js', () => ({
+  potFor: vi.fn((compId, side) =>
+    side?.name === 'Rangers' ? 1 : side?.name === 'Aberdeen' ? 3 : null),
+}));
+
+test('a landed opponent wears its pot chip; an uncurated one wears none', async () => {
+  stubScoreboard(phaseEvents);
+  renderAt('/draw/sco.tennents/league-phase/h1');
+  await screen.findByRole('heading', { level: 1 });
+
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Reveal the rest' }));
+
+  const rangers = screen.getByText('Rangers').closest('div');
+  const chip = within(rangers).getByText('Pot 1');
+  expect(chip.className).toBe('font-sans text-[8.5px] uppercase tracking-[.14em] '
+    + 'text-muted border border-rule rounded-full px-1.5 py-0.5 shrink-0');
+  expect(within(screen.getByText('Aberdeen').closest('div')).getByText('Pot 3')).toBeInTheDocument();
+  expect(within(screen.getByText('Hibernian').closest('div')).queryByText(/^Pot/)).not.toBeInTheDocument();
+});
+
+test('the stage reveal carries the pot chip beneath the name', async () => {
+  stubScoreboard(phaseEvents);
+  renderAt('/draw/sco.tennents/league-phase/h1');
+  await screen.findByRole('heading', { level: 1 });
+
+  vi.useFakeTimers();
+  fireEvent.click(drawButton());
+  await act(async () => { await vi.advanceTimersByTimeAsync(TIMINGS.tumble); });
+  // Rangers is the first reveal (earliest kickoff) — pot 1 on the stage.
+  expect(screen.getAllByText('Pot 1').length).toBeGreaterThan(0);
+});

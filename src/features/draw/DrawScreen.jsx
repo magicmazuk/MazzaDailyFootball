@@ -11,6 +11,7 @@ import { dedupePairings, phaseTieIds, roundTieIds, tieId } from '../../domain/dr
 import { useSeasonFixtures } from '../../data/queries.js';
 import { usePrefs } from '../../store/prefs.js';
 import Crest from '../../ui/Crest.jsx';
+import { potFor } from '../../data/pots.js';
 import {
   TIMINGS, drawMode, drawReducer, initDraw, isComplete, landedSides, remainingClubs, scatterShuffle,
   seededShuffle,
@@ -266,7 +267,7 @@ function CompleteBadge() {
   );
 }
 
-function Stage({ state, canTap, onTap }) {
+function Stage({ state, canTap, onTap, compId }) {
   const { phase, mode, landed } = state;
   const club = revealingClub(state);
   const venue = revealingVenue(state);
@@ -282,6 +283,11 @@ function Stage({ state, canTap, onTap }) {
       {phase === 'revealed' && club && (
         <span className="draw-ball-open flex flex-col items-center gap-1.5">
           <Crest side={club} size={40} />
+          {/* The pot chip (spec 13.39, PC-A): which coefficient bowl this
+              opponent came from - curated per season, absent when unknown. */}
+          {potFor(compId, club) != null && (
+            <span className="font-sans text-[8.5px] uppercase tracking-[.14em] text-muted border border-rule rounded-full px-1.5 py-0.5 shrink-0">Pot {potFor(compId, club)}</span>
+          )}
           <span className="font-serif text-[15px]">
             {club.name}
             {venue && <span className="font-sans text-[10px] text-muted ml-1.5 align-middle">({venue})</span>}
@@ -359,6 +365,9 @@ function OpponentRow({ row, fixtureId, compId, followedIds, complete }) {
     <div className="flex items-center gap-3 py-3 border-b border-rule/70">
       <span className="font-sans text-[10px] text-muted">v</span>
       <Slot side={opponent} landed={landed} followed={opponent && followedIds.has(opponent.teamId)} />
+      {landed && potFor(compId, opponent) != null && (
+        <span className="font-sans text-[8.5px] uppercase tracking-[.14em] text-muted border border-rule rounded-full px-1.5 py-0.5 shrink-0">Pot {potFor(compId, opponent)}</span>
+      )}
       {landed && <span className="font-sans text-[10px] text-muted shrink-0">({venue})</span>}
     </div>
   );
@@ -504,7 +513,8 @@ function Ceremony({ comp, compId, round, ties, roundFixtures, alreadySeen, markT
 
       {mode === 'rollcall'
         ? <RollcallStage state={state} canTap={canTap} onTap={() => canTap && dispatch({ type: 'TAP' })} />
-        : <Stage state={state} canTap={canTap} onTap={() => canTap && dispatch({ type: 'TAP' })} />}
+        : <Stage state={state} canTap={canTap} compId={compId}
+            onTap={() => canTap && dispatch({ type: 'TAP' })} />}
 
       <section className="mt-2 mb-6">
         {mode === 'opponents'
