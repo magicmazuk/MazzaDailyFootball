@@ -1443,3 +1443,27 @@ live-probed on the real card: W. Gibson pen 57'). adaptBbcFixtures now emits the
 own goals shape, so League One and Two (and BBC cup legs) join the goal wire with ZERO
 GoalWire changes — proven against the day's actual League Two results (Elgin's four,
 Spartans 3-3 Clyde's six, all named).
+
+## 13.45 The results broadcast (the classified, folded)
+
+The user's memory (2026-08-31): driving home from a local game, the official-sounding chap
+reading the classified check — "Celtic, one… Motherwell… (tension) NIL." Recreate it.
+
+**The fold.** When the edition leads, the classified arrives MINIFIED: masthead (kicker,
+The Classified, dateline) plus one honest count line — "{n} results in · {m} still in
+play" — so the reader knows whether they're revealing too early, and NOTHING of any score.
+Two doors: **Reveal the card** (the full classified, instantly, as printed today) and
+**The results broadcast** (the ceremony). Once revealed by either door the classified stays
+open for the rest of that edition day (prefs `classifiedRevealedOn`, the London date — the
+seenTies spirit); the next edition folds afresh.
+
+**The broadcast.** TAP-paced like every ceremony — the reader is the announcer's beat, one
+tap per result, desk order (Premiership first). Each reveal lands in the RADIO CADENCE, a
+one-shot performance in the motion block (§8 exemption — performance, not chrome): the home
+side and its score land together, a beat, the away name, a longer beat, the away score
+drops. Comp labels arrive with their first result. Revealed results accumulate as the
+printed classified above the tap stage; "Reveal the rest" is the escape hatch (the draw
+ceremonies' own). In-play and postponed matches never enter the queue — they are not
+results — and print in the completed body's stop-press as ever. Completion marks the day
+revealed and the full body (tables, movement, stakes, airtime) prints beneath. Reduced
+motion collapses every beat to an instant landing; the tap pacing IS the ceremony.
