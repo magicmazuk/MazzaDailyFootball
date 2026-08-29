@@ -102,10 +102,10 @@ test('isFeatured: with no derby twin that day, plain token matching stands', () 
   expect(isFeatured(motd, cityBournemouth, noDerby)).toBe(true);
 });
 
-test('isFeatured: "Wolves" in prose is an honest miss for Wolverhampton Wanderers', () => {
+test('isFeatured: "Wolves" in prose features Wolverhampton — the §13.41 ledger retired the old honest miss', () => {
   const wolves = fx('F4', side('380', 'Wolverhampton Wanderers'), side('364', 'Liverpool'));
   const ep = { ...motd, synopsis: 'Wolves entertain Liverpool at Molineux.' };
-  expect(isFeatured(ep, wolves, [wolves])).toBe(false);
+  expect(isFeatured(ep, wolves, [wolves])).toBe(true);
 });
 
 test('isFeatured: whole words only — Wolverhampton does not hide a "ham"', () => {
@@ -149,4 +149,33 @@ test('freshEpisodes: keeps fresh episodes in order; null in gives []', () => {
   expect(freshEpisodes([stale, sportscene, motd], now)).toEqual([sportscene, motd]);
   expect(freshEpisodes(null, now)).toEqual([]);
   expect(freshEpisodes(undefined, now)).toEqual([]);
+});
+
+// --- known as (spec §13.41): prose nicknames reach the Featured tier ---
+
+const nickFix = (home, away) => ({
+  id: 'x', compId: 'eng.1', status: 'ft', kickoff: '2026-08-29T14:00:00Z',
+  home: { teamId: 'h', name: home }, away: { teamId: 'a', name: away },
+});
+
+const ep = synopsis => ({ comp: { id: 'eng.1' }, show: 'Match of the Day',
+  date: '2026-08-29', firstBroadcast: '2026-08-29T21:30:00+01:00',
+  availableUntil: null, synopsis, url: 'u' });
+
+test('"Wolves" and "Spurs" in prose now feature their formal clubs', () => {
+  const fx = nickFix('Wolverhampton Wanderers', 'Tottenham Hotspur');
+  expect(isFeatured(ep('Wolves held Spurs to a goalless draw.'), fx, [fx])).toBe(true);
+});
+
+test('"Brighton" alone now features Brighton & Hove Albion', () => {
+  const fx = nickFix('Brighton & Hove Albion', 'Everton');
+  expect(isFeatured(ep('Brighton swept Everton aside at the Amex.'), fx, [fx])).toBe(true);
+});
+
+test('on a derby day, "Man City" in prose features City and never United', () => {
+  const city = nickFix('Manchester City', 'AFC Bournemouth');
+  const united = nickFix('Manchester United', 'Fulham');
+  const episode = ep('Man City beat Bournemouth; Fulham frustrated their neighbours.');
+  expect(isFeatured(episode, city, [city, united])).toBe(true);
+  expect(isFeatured(episode, united, [city, united])).toBe(false);
 });

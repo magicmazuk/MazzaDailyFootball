@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import {
-  creditFor, faceFor, fplFace, normalise, pickSearchTitle, searchQuery,
+  creditFor, faceFor, fplFace, fplTeamId, normalise, pickSearchTitle, searchQuery,
   tsdbFace, verifiedSummary,
 } from './dossier.js';
 
@@ -332,4 +332,29 @@ test('creditFor: each source names its house', () => {
 test('creditFor: unknown or null sources credit nothing', () => {
   expect(creditFor('espn')).toBe(null);
   expect(creditFor(null)).toBe(null);
+});
+
+// --- known as (spec §13.41): the abbreviation gap the audit found ---
+
+const FPL_REAL_NAMES = { teams: [
+  { id: 15, name: 'Man City' }, { id: 16, name: 'Man Utd' },
+  { id: 18, name: "Nott'm Forest" }, { id: 19, name: 'Spurs' },
+  { id: 20, name: 'Wolves' },
+], players: [] };
+
+test('the four audit nulls now resolve through the nickname ledger', () => {
+  expect(fplTeamId(FPL_REAL_NAMES, 'Manchester City')).toBe(15);
+  expect(fplTeamId(FPL_REAL_NAMES, 'Manchester United')).toBe(16);
+  expect(fplTeamId(FPL_REAL_NAMES, 'Nottingham Forest')).toBe(18);
+  expect(fplTeamId(FPL_REAL_NAMES, 'Tottenham Hotspur')).toBe(19);
+  expect(fplTeamId(FPL_REAL_NAMES, 'Wolverhampton Wanderers')).toBe(20);
+});
+
+test('bare "Manchester" stays null — the ambiguity rule holds across alias forms too', () => {
+  expect(fplTeamId(FPL_REAL_NAMES, 'Manchester')).toBeNull();
+});
+
+test('tsdbFace: team agreement accepts ledger forms — TSDB "Man City" meets ESPN "Manchester City"', () => {
+  const players = [{ name: 'Erling Haaland', team: 'Man City', cutout: 'c.png', thumb: null }];
+  expect(tsdbFace(players, { name: 'Erling Haaland', club: 'Manchester City' })).toBe('c.png');
 });
