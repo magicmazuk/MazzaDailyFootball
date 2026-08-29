@@ -353,3 +353,20 @@ test('the open classified offers a replay — straight back to the stage, the da
   // the memory is untouched - tomorrow still folds afresh, today stays read
   expect(usePrefs.getState().classifiedRevealedOn).toBe('2026-08-29');
 });
+
+test('the replay is a glyph beside the heading — accent, and only on the surfaced card', async () => {
+  refold();
+  const user = userEvent.setup();
+  renderClassified();
+  // folded: no replay door
+  expect(screen.queryByRole('button', { name: 'Replay the results broadcast' })).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'The results broadcast' }));
+  // mid-broadcast: still no replay door
+  expect(screen.queryByRole('button', { name: 'Replay the results broadcast' })).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Reveal the rest' }));
+  // surfaced: the glyph sits in the heading row, accent-toned, with an svg
+  const door = screen.getByRole('button', { name: 'Replay the results broadcast' });
+  expect(door.className).toContain('text-accent');
+  expect(door.querySelector('svg')).not.toBeNull();
+  expect(door.closest('h2, div')).toContainElement(screen.getByText('The Classified'));
+});
