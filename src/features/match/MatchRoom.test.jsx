@@ -33,6 +33,7 @@ vi.mock('./video.js', () => ({
 
 import MatchRoom, { statSplit } from './MatchRoom.jsx';
 import { byId } from '../../domain/competitions.js';
+import { usePrefs } from '../../store/prefs.js';
 import { usePlayer, useHighlights } from '../../data/queries.js';
 
 // usePlayer is a shared mock across every test in this file — reset to the
@@ -1314,13 +1315,13 @@ test('the report is a broadsheet excerpt — the first three paragraphs, no read
   expect(screen.queryByText(/read more/i)).not.toBeInTheDocument();
 });
 
-test('the running report prints newest first, minutes as primes, scoring entries semibold', async () => {
+test('the wire reading prints newest first, minutes as primes, scoring entries semibold', async () => {
+  // wireDetail carries BOTH readings — select the wire.
+  usePrefs.setState({ matchStoryMode: 'wire' });
   render(<MemoryRouter>
     <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={wireDetail} />
   </MemoryRouter>);
-  const section = screen.getByText('The running report').closest('section');
-  // Pick B: the wire lives behind the fold — open it first.
-  await userEvent.setup().click(screen.getByRole('button', { name: /Read the full report/ }));
+  const section = screen.getByText('The match').closest('section');
   const rows = screen.getAllByTestId('wire-entry');
   expect(rows).toHaveLength(3);
   // Newest first — the reverse of feed order, the timeline's own convention.
@@ -1346,20 +1347,14 @@ test('the running report prints newest first, minutes as primes, scoring entries
     'font-sans', 'text-[8.5px]', 'uppercase', 'tracking-[.14em]', 'text-muted');
 });
 
-test('the wire folds into a lazy collapse — the toggle names the count, a tap reveals ALL entries (pick B)', async () => {
+test('the wire reading holds EVERY entry — the fold-era cap stays retired', async () => {
+  usePrefs.setState({ matchStoryMode: 'wire' });
   const longWire = { ...detail, commentary: Array.from({ length: 41 }, (_, i) =>
     wireEntry(`${i + 1}'`, `Wire entry number ${i + 1}.`)) };
   render(<MemoryRouter>
     <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={longWire} />
   </MemoryRouter>);
-  // Folded: no wire rows mounted at all (lazy-once), the toggle carries the count.
-  expect(screen.queryByTestId('wire-entry')).not.toBeInTheDocument();
-  const toggle = screen.getByRole('button', { name: 'Read the full report · 41 entries' });
-  await userEvent.setup().click(toggle);
-  // Open: every entry, newest first, nothing trimmed — the cap retired with pick B.
-  const rows = screen.getAllByTestId('wire-entry');
-  expect(rows).toHaveLength(41);
-  expect(rows[0].textContent).toContain('Wire entry number 41.');
+  expect(screen.getAllByTestId('wire-entry')).toHaveLength(41);
   expect(screen.getByText('Wire entry number 1.')).toBeInTheDocument();
   expect(screen.queryByText(/The full report runs to/)).not.toBeInTheDocument();
 });
@@ -1385,7 +1380,8 @@ test("the editor's order: report, stats, standouts, the match, then the folded w
   expect(labels.indexOf('Match report')).toBeLessThan(labels.indexOf('Stats'));
   expect(labels.indexOf('Stats')).toBeLessThan(labels.indexOf('Standouts'));
   expect(labels.indexOf('Standouts')).toBeLessThan(labels.indexOf('The match'));
-  expect(labels.indexOf('The match')).toBeLessThan(labels.indexOf('The running report'));
+  // the running report is a READING of The match now (13.42 second
+  // addendum) — no second section to order.
   // The report leads the body: rise-in-2, directly under the header's match line.
   expect(screen.getByText('Match report').closest('section'))
     .toHaveClass('mb-8', 'rise-in', 'rise-in-2');
@@ -1418,4 +1414,41 @@ test('empty commentary and a null report leave the page byte-identical to one wi
   expect(without.querySelector('header')).toBeTruthy(); // sanity: the page really rendered
   expect(screen.queryByText('Match report')).not.toBeInTheDocument();
   expect(screen.queryByText('The running report')).not.toBeInTheDocument();
+});
+
+// --- the story toggle (spec §13.42 second addendum): one section, two readings ---
+
+test('the match section wears the story glyphs when the wire exists, and flips between readings', async () => {
+  usePrefs.setState({ matchStoryMode: 'match' });
+  const both = { ...detail, events: [
+    { minute: "12'", type: 'Goal', player: 'Daizen Maeda', playerId: 'p1',
+      playerOff: null, teamId: 'Celtic', scoringPlay: true },
+  ], commentary: wireDetail.commentary };
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={both} />
+  </MemoryRouter>);
+  // match reading by default: the event row, no wire rows
+  expect(screen.getByText('Daizen Maeda')).toBeInTheDocument();
+  expect(screen.queryAllByTestId('wire-entry')).toHaveLength(0);
+  // one section, one label — the running report label is retired
+  expect(screen.queryByText('The running report')).not.toBeInTheDocument();
+  await userEvent.setup().click(screen.getByRole('button', { name: 'The running report' }));
+  expect(usePrefs.getState().matchStoryMode).toBe('wire');
+  // the wire reading: entries newest first with the credit, the events resting
+  expect(screen.getAllByTestId('wire-entry').length).toBeGreaterThan(0);
+  expect(screen.getByText('Commentary · ESPN')).toBeInTheDocument();
+  expect(screen.queryByText('Daizen Maeda')).not.toBeInTheDocument();
+  await userEvent.setup().click(screen.getByRole('button', { name: 'The match' }));
+  expect(screen.getByText('Daizen Maeda')).toBeInTheDocument();
+});
+
+test('no commentary means no glyphs — the match section stays plain, never a dead control', () => {
+  const eventsOnly = { ...detail, events: [
+    { minute: "12'", type: 'Goal', player: 'Daizen Maeda', playerId: 'p1',
+      playerOff: null, teamId: 'Celtic', scoringPlay: true },
+  ] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={eventsOnly} />
+  </MemoryRouter>);
+  expect(screen.queryByRole('button', { name: 'The running report' })).not.toBeInTheDocument();
 });

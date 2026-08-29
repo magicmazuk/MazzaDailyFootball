@@ -1487,3 +1487,10 @@ keeps its delay regardless of neighbours is precisely what the migrated choreogr
 now holds. And the classified gained its replay: a quiet "Replay the results broadcast"
 door on the open card (the draw ceremonies' own recipe) — phase wins over the remembered
 reveal, so the stage returns without unmarking the day.
+
+**§13.42 second addendum — the story toggle (user note, 2026-08-31).** The running report
+stops being a second section: it is a READING of The match, switched by the §13.44 glyph
+grammar on the section's own rule — dots for the events, bars for the wire, active in ink,
+choice persisted (matchStoryMode). Glyphs appear only when BOTH readings exist (a
+commentary-less match stays plain; an events-less one reads as wire alone — never a dead
+control). The fold retires; the wire reading holds every entry with its ESPN credit.
