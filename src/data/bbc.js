@@ -40,6 +40,31 @@ export function bbcRoundSlug(label) {
   return null;
 }
 
+// BBC minutes read "57'" or "90'+2'" — base plus added time, in minutes.
+// Unparseable labels get clockValue null (the wire still prints the label).
+function bbcClockValue(label) {
+  const m = /^(\d+)'(?:\+(\d+)')?$/.exec(label ?? '');
+  if (!m) return null;
+  return (Number(m[1]) + Number(m[2] ?? 0)) * 60;
+}
+
+// The goal wire's shape (spec 13.44 second addendum): BBC files goals as
+// per-side "actions" with playerName, type and timeLabel — live-probed
+// 2026-08-30 ("W. Gibson", Penalty, 57'). One entry per inner action (a
+// brace is two actions under one player). Feed order within each side.
+function bbcGoals(sideJson, teamId) {
+  return (sideJson?.actions ?? [])
+    .filter(a => a?.actionType === 'goal')
+    .flatMap(a => (a.actions ?? []).map(x => ({
+      minute: x.timeLabel?.value ?? null,
+      clockValue: bbcClockValue(x.timeLabel?.value),
+      scorer: a.playerName ?? null,
+      teamId,
+      ownGoal: x.type === 'Own Goal',
+      penalty: x.type === 'Penalty',
+    })));
+}
+
 export function adaptBbcFixtures(json, compId) {
   const events = (json?.eventGroups ?? []).flatMap(g =>
     (g.secondaryGroups ?? []).flatMap(sg => {
@@ -58,5 +83,9 @@ export function adaptBbcFixtures(json, compId) {
     venue: null,
     home: side(ev.home),
     away: side(ev.away),
+    goals: [
+      ...bbcGoals(ev.home, side(ev.home).teamId),
+      ...bbcGoals(ev.away, side(ev.away).teamId),
+    ],
   }));
 }

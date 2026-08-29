@@ -1432,3 +1432,14 @@ the wire now has two forms — the revolving line and the goal stack (latest fou
 rows) — switched by a pair of hairline bar-glyphs on the Live rule itself (one bar = the
 line, three = the stack; active in ink, idle in rule tone), the choice persisted in
 mdf-prefs beside fullTable. SectionLabel grew an optional right-hand slot to carry it.
+
+**§13.43/§13.44 second addenda (user notes, 2026-08-30 evening).** The classified's
+competition titles are doors (same label recipe, now Links — results blocks and movement
+tables both), and the desk order leads Premiership then Premier League before the lower
+desks. And the lower-league wire: the user caught League Two live with no goal wire — the
+BBC adapter carried no events. The spike found BBC DOES file them (per-side `actions`:
+playerName, Penalty/Own Goal/Goal type, timeLabel incl. "90'+2'" stoppage forms —
+live-probed on the real card: W. Gibson pen 57'). adaptBbcFixtures now emits the wire's
+own goals shape, so League One and Two (and BBC cup legs) join the goal wire with ZERO
+GoalWire changes — proven against the day's actual League Two results (Elgin's four,
+Spartans 3-3 Clyde's six, all named).

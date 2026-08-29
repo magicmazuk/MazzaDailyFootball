@@ -121,3 +121,55 @@ test('adaptBbcFixtures propagates group labels through to round: "group-stage", 
   const fx = adaptBbcFixtures(groupPayload, 'sco.cis');
   expect(fx[0].round).toBe('group-stage');
 });
+
+// --- the lower-league goal wire (spec §13.44 second addendum): BBC's own
+// actions carry scorer, minute and type — live-probed 2026-08-30 ---
+
+test('adaptBbcFixtures: goal actions become fixture.goals in the wire shape', () => {
+  const json = { eventGroups: [{ secondaryGroups: [{ displayLabel: null, events: [{
+    id: 'b1', startDateTime: '2026-08-29T14:00:00Z', status: 'MatchStatusLive',
+    periodLabel: { value: "90'" },
+    home: { fullName: 'Elgin City', id: 'ec', scores: { fulltime: '4' },
+      actions: [
+        { playerName: 'W. Gibson', actionType: 'goal', actions: [
+          { type: 'Penalty', timeLabel: { value: "57'" } },
+        ] },
+        { playerName: 'K. Watson', actionType: 'goal', actions: [
+          { type: 'Goal', timeLabel: { value: "12'" } },
+          { type: 'Goal', timeLabel: { value: "90'+2'" } },
+        ] },
+      ] },
+    away: { fullName: 'Stirling Albion', id: 'sa', scores: { fulltime: '0' },
+      actions: [
+        { playerName: 'A. Body', actionType: 'booking', actions: [
+          { type: 'Yellow Card', timeLabel: { value: "30'" } },
+        ] },
+      ] },
+  }] }] }] };
+  const [fx] = adaptBbcFixtures(json, 'scottish-league-two');
+  expect(fx.goals).toEqual([
+    { minute: "57'", clockValue: 57 * 60, scorer: 'W. Gibson', teamId: fx.home.teamId, ownGoal: false, penalty: true },
+    { minute: "12'", clockValue: 12 * 60, scorer: 'K. Watson', teamId: fx.home.teamId, ownGoal: false, penalty: false },
+    { minute: "90'+2'", clockValue: (90 + 2) * 60, scorer: 'K. Watson', teamId: fx.home.teamId, ownGoal: false, penalty: false },
+  ]);
+});
+
+test('adaptBbcFixtures: an own goal is flagged and credited as the feed gives it; no actions means []', () => {
+  const json = { eventGroups: [{ secondaryGroups: [{ displayLabel: null, events: [{
+    id: 'b2', startDateTime: '2026-08-29T14:00:00Z', status: 'MatchStatusLive',
+    home: { fullName: 'A', id: 'a', actions: [
+      { playerName: 'O. Goal', actionType: 'goal', actions: [
+        { type: 'Own Goal', timeLabel: { value: "5'" } },
+      ] },
+    ] },
+    away: { fullName: 'B', id: 'b' },
+  }] }] }] };
+  const [fx] = adaptBbcFixtures(json, 'scottish-league-two');
+  expect(fx.goals[0].ownGoal).toBe(true);
+  expect(fx.goals[0].penalty).toBe(false);
+  const bare = { eventGroups: [{ secondaryGroups: [{ displayLabel: null, events: [{
+    id: 'b3', startDateTime: '2026-08-29T14:00:00Z', status: 'MatchStatusLive',
+    home: { fullName: 'A', id: 'a' }, away: { fullName: 'B', id: 'b' },
+  }] }] }] };
+  expect(adaptBbcFixtures(bare, 'scottish-league-two')[0].goals).toEqual([]);
+});

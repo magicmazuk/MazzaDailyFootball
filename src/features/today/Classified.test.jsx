@@ -231,3 +231,33 @@ test('no broadcasts tonight means no foot — the line is off, never invented', 
   renderClassified();
   expect(screen.queryByText(/Tonight —/)).toBeNull();
 });
+
+// --- the classified desk polish (user notes, 2026-08-30 evening) ---
+
+const deskFx = (id, home, away) => result(id, at('15:00'),
+  { teamId: `h${id}`, name: home }, 1, { teamId: `a${id}`, name: away }, 0);
+
+test('competition titles in the classified link to their competition pages — results and tables both', () => {
+  renderClassified();
+  const spl = screen.getAllByRole('link', { name: 'Premiership' });
+  expect(spl.length).toBeGreaterThanOrEqual(2); // the results block AND the movement table
+  spl.forEach(a => expect(a).toHaveAttribute('href', '/competition/sco.1'));
+  screen.getAllByRole('link', { name: 'Premier League' })
+    .forEach(a => expect(a).toHaveAttribute('href', '/competition/eng.1'));
+});
+
+test('the results lead Premiership then Premier League, before the lower desks', () => {
+  renderClassified({ fixturesByComp: [
+    { comp: byId('sco.2'), fixtures: [deskFx('d1', 'Arbroath', 'Ayr')] },
+    { comp: byId('scottish-league-two'), fixtures: [deskFx('d2', 'Elgin City', 'Stirling Albion')] },
+    { comp: byId('sco.1'), fixtures: [deskFx('d3', 'Hearts', 'St Johnstone')] },
+    { comp: byId('eng.1'), fixtures: [deskFx('d4', 'Hull', 'Everton')] },
+  ] });
+  const labels = screen.getAllByRole('link',
+    { name: /^(Premiership|Premier League|Championship|League Two)$/ }).map(a => a.textContent);
+  // indexOf reads first occurrence, so the movement table's duplicate
+  // labels further down never pollute the order claim.
+  expect(labels.indexOf('Premiership')).toBeLessThan(labels.indexOf('Premier League'));
+  expect(labels.indexOf('Premier League')).toBeLessThan(labels.indexOf('Championship'));
+  expect(labels.indexOf('Championship')).toBeLessThan(labels.indexOf('League Two'));
+});

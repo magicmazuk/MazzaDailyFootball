@@ -28,13 +28,12 @@ const stopPress = n => (n === 1
   : `${n} in play — results in a later edition.`);
 
 // The m-sec style comp label — bordered in ink, shared by the results
-// blocks and the tables.
-function CompLabel({ children }) {
-  return (
-    <p className="font-sans text-[9px] tracking-[.18em] uppercase text-muted border-b border-ink pb-1 mb-1">
-      {children}
-    </p>
-  );
+// blocks and the tables. Given a compId it becomes a door to the
+// competition page (user note, 2026-08-30): same recipe, now tappable.
+function CompLabel({ children, compId = null }) {
+  const cls = 'block font-sans text-[9px] tracking-[.18em] uppercase text-muted border-b border-ink pb-1 mb-1';
+  if (compId == null) return <p className={cls}>{children}</p>;
+  return <Link to={`/competition/${compId}`} className={cls}>{children}</Link>;
 }
 
 // A dense classified row: names and bare scores, the whole line a door to
@@ -94,7 +93,7 @@ function EditionTable({ comp, rows, deltas, followedIds }) {
   const followedBelow = rows.filter(r => r.position > 4 && followedIds.has(r.teamId));
   return (
     <div className="mt-3 first:mt-0">
-      <CompLabel>{comp.shortName}</CompLabel>
+      <CompLabel compId={comp.id}>{comp.shortName}</CompLabel>
       {top.map(r => <TableRow key={r.teamId} r={r} delta={deltas.get(r.teamId)} followedIds={followedIds} />)}
       {followedBelow.length > 0
         && <p className="text-muted text-center leading-none py-1" aria-hidden>⋯</p>}
@@ -114,6 +113,15 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
 
   const nowDate = now instanceof Date ? now : new Date(now);
   const inPlay = state.inPlay.length;
+
+  // The desk order (user note, 2026-08-30): the two headline leagues lead
+  // the classified - Premiership then Premier League - before the lower
+  // desks in their registry order.
+  const HEADLINERS = ['sco.1', 'eng.1'];
+  const results = [
+    ...HEADLINERS.flatMap(id => state.results.filter(r => r.comp.id === id)),
+    ...state.results.filter(r => !HEADLINERS.includes(r.comp.id)),
+  ];
 
   // The headline tables: only a comp whose official rows exist AND that
   // put at least one full-time on today's card gets a movement table.
@@ -149,9 +157,9 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
           ? 'full time across the card'
           : `results so far — ${inPlay} in play`}
       </p>
-      {state.results.map(({ comp, fixtures }) => (
+      {results.map(({ comp, fixtures }) => (
         <div key={comp.id} className="mt-5">
-          <CompLabel>{comp.shortName}</CompLabel>
+          <CompLabel compId={comp.id}>{comp.shortName}</CompLabel>
           {fixtures.map(f => <ResultRow key={f.id} compId={comp.id} fixture={f} />)}
         </div>
       ))}
