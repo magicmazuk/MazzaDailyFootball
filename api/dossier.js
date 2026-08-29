@@ -102,8 +102,15 @@ function resolveRoute(rest, params) {
     return {
       key: rest,
       url: 'https://fantasy.premierleague.com/api/bootstrap-static/',
-      cache: CACHE_QUARTER_DAY,
+      // A week of stale-while-revalidate: FPL's WAF blocks cloud egress in
+      // moods (iad1 AND lhr1 both 403d on 2026-08-29 while home lines got
+      // 200s) - one edge success must outlive the mood, not the hour.
+      cache: 'public, s-maxage=21600, stale-while-revalidate=604800',
       trim: trimFplIndex,
+      // The FOURTH UA discipline: FPL's WAF scores UA hard; their API is
+      // normally consumed by logged-out browsers, so a browser UA is the
+      // honest shape here (the iplayer precedent, for a different wall).
+      ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
     };
   }
   m = rest.match(/^\/tsdb\/([^/]+)$/);
@@ -159,7 +166,7 @@ export default async function handler(req, res) {
   }
   try {
     const upstream = await fetch(route.url, {
-      headers: { 'user-agent': UA, accept: 'application/json' },
+      headers: { 'user-agent': route.ua ?? UA, accept: 'application/json' },
     });
     const text = await upstream.text();
     if (upstream.ok) {
