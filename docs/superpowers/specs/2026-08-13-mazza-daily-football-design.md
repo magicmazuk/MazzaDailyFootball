@@ -1475,3 +1475,15 @@ breath)… away score — the home score is its own breath, and slower throughou
 stage names it: "Read the Premiership results"), rows staggering through the cadence;
 completion prints the body beneath the read card rather than yanking the reader out
 mid-cadence. Delays land inline per row; the beat classes carry only the landing.
+
+## 13.46 The live lead, and the replay
+
+The user's synthesis after the broadcast landed (2026-08-31): "the information and my
+journey in finding the results makes sense" — and therefore, while the ball is moving,
+LIVE is the front page. The Live section (goal wire and all) now outranks the classified
+and Your Clubs whenever it exists; draw-day invitation cards alone keep the very top
+(event chrome, not sections). Its named rise-in slot stays 2 — §13.21's law that a section
+keeps its delay regardless of neighbours is precisely what the migrated choreography pin
+now holds. And the classified gained its replay: a quiet "Replay the results broadcast"
+door on the open card (the draw ceremonies' own recipe) — phase wins over the remembered
+reveal, so the stage returns without unmarking the day.

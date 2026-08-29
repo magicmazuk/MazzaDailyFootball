@@ -417,10 +417,13 @@ test('sections carry .rise-in with staggered delay classes in DOM order, capped 
   expect(onTv).toHaveClass('rise-in', 'rise-in-5');
   expect(quickView).toHaveClass('rise-in', 'rise-in-5');
 
+  // The live lead (spec 13.46): Live now PRECEDES Your clubs while active
+  // — its named slot number stays 2 (13.21: delay per named slot, not per
+  // position), which is exactly the law this pin exists to hold.
   // eslint-disable-next-line no-bitwise
-  expect(yourClubs.compareDocumentPosition(live) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(live.compareDocumentPosition(yourClubs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   // eslint-disable-next-line no-bitwise
-  expect(live.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(yourClubs.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   // eslint-disable-next-line no-bitwise
   expect(later.compareDocumentPosition(earlier) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   // eslint-disable-next-line no-bitwise
@@ -476,4 +479,37 @@ test('the wire toggle sits on the Live rule and flips line to stack, the choice 
   expect(screen.getAllByTestId('wire-row')).toHaveLength(2);
   await userEvent.setup().click(screen.getByRole('button', { name: 'The revolving line' }));
   expect(screen.queryAllByTestId('wire-row')).toHaveLength(0);
+});
+
+// --- the live lead (spec §13.46): live tops Today when active ---
+test('when matches are live, the Live section outranks the classified and Your clubs', () => {
+  usePrefs.setState({ goalWireMode: 'line' });
+  const liveFx = { ...fx('ll1', 'H', 'A', 'live'), compId: 'sco.1', goals: [] };
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-29T15:30:00Z')} followedIds={new Set()}
+        partition={{ ...emptyPartition, live: [liveFx], yours: [fx('ll2', 'C', 'D')] }}
+        nextUp={[]} classified={<div data-testid="classified-stub" />} />
+    </MemoryRouter>,
+  );
+  const liveHead = screen.getByRole('heading', { name: 'Live' });
+  const classified = screen.getByTestId('classified-stub');
+  const yours = screen.getByText('★ Your clubs');
+  /* eslint-disable no-bitwise */
+  expect(liveHead.compareDocumentPosition(classified) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(liveHead.compareDocumentPosition(yours) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test('with nothing live, the classified and Your clubs lead exactly as before', () => {
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-29T15:30:00Z')} followedIds={new Set()}
+        partition={{ ...emptyPartition, yours: [fx('ll3', 'C', 'D')] }}
+        nextUp={[]} classified={<div data-testid="classified-stub" />} />
+    </MemoryRouter>,
+  );
+  const classified = screen.getByTestId('classified-stub');
+  const yours = screen.getByText('★ Your clubs');
+  expect(classified.compareDocumentPosition(yours) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.queryByRole('heading', { name: 'Live' })).toBeNull();
 });
