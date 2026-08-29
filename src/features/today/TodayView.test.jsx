@@ -439,3 +439,18 @@ test('"Yesterday" carries no rise-in class — it is not one of the named arriva
   const yesterday = screen.getByText('Yesterday').closest('section');
   expect(yesterday.className).not.toMatch(/rise-in/);
 });
+
+// --- the goal wire (spec §13.44) rides the Live section ---
+test('the goal wire sits under the LIVE rule when live fixtures carry goals', () => {
+  const liveFx = { ...fx('lw1', 'H', 'A', 'live'), compId: 'sco.1', kickoff: '2026-08-29T14:00:00Z',
+    goals: [{ minute: "4'", clockValue: 240, scorer: 'Camilo Durán', teamId: 't', ownGoal: false, penalty: false }] };
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-29T15:00:00Z')} followedIds={new Set()}
+        partition={{ ...emptyPartition, live: [liveFx] }} nextUp={[]} />
+    </MemoryRouter>,
+  );
+  const liveLabel = screen.getByRole('heading', { name: 'Live' });
+  const wire = screen.getByText('GOAL');
+  expect(liveLabel.compareDocumentPosition(wire) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});

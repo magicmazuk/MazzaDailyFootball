@@ -4,6 +4,7 @@ import NextUpRow from './NextUpRow.jsx';
 import MiniTable from './MiniTable.jsx';
 import DrawInvitation from './DrawInvitation.jsx';
 import Papers from './Papers.jsx';
+import GoalWire from './GoalWire.jsx';
 import HighlightsReel from './HighlightsReel.jsx';
 
 const longDate = d => d.toLocaleDateString('en-GB',
@@ -25,11 +26,12 @@ const groupOnTvByDay = fixtures => {
 // just Yesterday) — assigned per NAMED slot, not by this section's runtime
 // position among its visible siblings, so a section always rises with the
 // same delay regardless of which of its neighbours happen to be absent.
-function Section({ label, muted, fixtures, followedIds, riseIn }) {
+function Section({ label, muted, fixtures, followedIds, riseIn, lead = null }) {
   if (!fixtures.length) return null;
   return (
     <section className={`mt-8 first:mt-0 ${riseIn ?? ''}`}>
       <SectionLabel muted={muted}>{label}</SectionLabel>
+      {lead}
       {fixtures.map(f => <FixtureRow key={f.id} fixture={f} followedIds={followedIds} />)}
     </section>
   );
@@ -74,7 +76,10 @@ export default function TodayView({ partition, followedIds, date, asOf = null, n
           )}
         </section>
       )}
-      <Section label="Live" fixtures={live} followedIds={followedIds} riseIn="rise-in rise-in-2" />
+      {/* The goal wire (spec 13.44) rides as the Live section's lead -
+          the day's latest goals on one revolving line. */}
+      <Section label="Live" fixtures={live} followedIds={followedIds} riseIn="rise-in rise-in-2"
+        lead={<GoalWire fixtures={live} />} />
       <Section label="Later today" muted fixtures={later} followedIds={followedIds} riseIn="rise-in rise-in-3" />
       <Section label="Earlier today" muted fixtures={earlier} followedIds={followedIds} riseIn="rise-in rise-in-4" />
       {quiet && <p className="text-muted mt-2">No matches today.</p>}
