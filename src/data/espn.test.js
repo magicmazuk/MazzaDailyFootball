@@ -702,3 +702,43 @@ test('sanitiseStory: non-string and empty input yield []', () => {
   expect(sanitiseStory('')).toEqual([]);
   expect(sanitiseStory('   ')).toEqual([]);
 });
+
+// --- the goal wire (spec §13.44): scoreboard details pass through ---
+
+test('adaptScoreboard: scoring details become fixture.goals — clock, team, scorer when named', () => {
+  const json = { events: [{
+    id: 'w1', date: '2026-08-29T14:00:00Z',
+    season: { slug: '2026-27-scottish-premiership' },
+    status: { type: { state: 'in' }, displayClock: "20'" },
+    competitions: [{
+      competitors: [
+        { homeAway: 'home', team: { id: '256', displayName: 'Celtic' }, score: '1' },
+        { homeAway: 'away', team: { id: '392', displayName: 'Falkirk' }, score: '0' },
+      ],
+      details: [
+        { type: { text: 'Goal' }, clock: { value: 205, displayValue: "4'" },
+          team: { id: '256' }, scoringPlay: true, ownGoal: false, penaltyKick: false,
+          athletesInvolved: [{ displayName: 'Camilo Durán' }] },
+        { type: { text: 'Yellow Card' }, clock: { value: 600, displayValue: "10'" },
+          team: { id: '392' }, scoringPlay: false },
+        { type: { text: 'Goal' }, clock: { value: 720, displayValue: "12'" },
+          team: { id: '392' }, scoringPlay: true, ownGoal: false, penaltyKick: true,
+          athletesInvolved: [] },
+      ],
+    }],
+  }] };
+  const [fx] = adaptScoreboard(json, 'sco.1');
+  expect(fx.goals).toEqual([
+    { minute: "4'", clockValue: 205, scorer: 'Camilo Durán', teamId: '256', ownGoal: false, penalty: false },
+    { minute: "12'", clockValue: 720, scorer: null, teamId: '392', ownGoal: false, penalty: true },
+  ]);
+});
+
+test('adaptScoreboard: no details means goals is an empty array, never a hole', () => {
+  const json = { events: [{ id: 'w2', date: '2026-08-29T14:00:00Z', season: {},
+    status: { type: { state: 'pre' } },
+    competitions: [{ competitors: [
+      { homeAway: 'home', team: { id: '1' } }, { homeAway: 'away', team: { id: '2' } },
+    ] }] }] };
+  expect(adaptScoreboard(json, 'sco.1')[0].goals).toEqual([]);
+});

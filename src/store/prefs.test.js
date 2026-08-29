@@ -118,3 +118,12 @@ test('fullTable defaults compact and toggles persistently', () => {
   usePrefs.getState().toggleFullTable();
   expect(usePrefs.getState().fullTable).toBe(false);
 });
+
+// --- the goal wire's two forms (spec §13.44 addendum) ---
+test('goalWireMode defaults to the revolving line and toggles to the stack and back', () => {
+  expect(usePrefs.getState().goalWireMode).toBe('line');
+  usePrefs.getState().toggleGoalWireMode();
+  expect(usePrefs.getState().goalWireMode).toBe('stack');
+  usePrefs.getState().toggleGoalWireMode();
+  expect(usePrefs.getState().goalWireMode).toBe('line');
+});

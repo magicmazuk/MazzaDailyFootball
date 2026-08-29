@@ -1407,3 +1407,28 @@ three offered): the timeline stays the one events surface (tappable, structured)
 running report becomes a lazy-once Collapse ("Read the full report · N entries") holding
 EVERY entry — the 40-cap retired with the fold. Rider: "Form coming in" rests on finished
 matches — its tense is pre-match, and stale copy under a result violates the house voice.
+
+## 13.44 The goal wire (T-A, the revolving line)
+
+Asked mid-Saturday off Sky Sports News (2026-08-30, screenshots supplied; T-A picked over
+the vertical T-B): under the LIVE rule, above the live rows, ONE hairline-bound line
+carrying the day's latest goals — "GOAL · Celtic 1 Falkirk 0 · Durán 4′" — crossfading
+between them every few seconds. NEVER a scrolling marquee: the crossfade is the xfade
+recipe inside the motion block, so reduced-motion gets a clean cut and rotation itself is
+content change, not chrome. Quiet 3px dots count the pool (shown only when >1); the line
+links to its match.
+
+**Data (verified live mid-match, zero new fetches):** the scoreboard payload the front
+page already polls carries `competitions[0].details` — scoring plays with clock, team,
+athletesInvolved (displayName may LAG the goal: the probe caught a scorerless goal at 12′,
+so the line prints minute alone until the wire names him — never a guess). adaptScoreboard
+passes them through as `fixture.goals`: { minute, scorer|null, teamId, ownGoal, penalty }.
+The wire pools goals across today's LIVE fixtures, ordered by real time (kickoff + clock),
+newest first, capped at the six most recent; it exists only while matches are live and
+≥1 goal has been scored — cleared by its own absence, like the classified.
+
+**§13.44 addendum — both forms, one toggle (same day).** The reader wanted T-B as well:
+the wire now has two forms — the revolving line and the goal stack (latest four as quiet
+rows) — switched by a pair of hairline bar-glyphs on the Live rule itself (one bar = the
+line, three = the stack; active in ink, idle in rule tone), the choice persisted in
+mdf-prefs beside fullTable. SectionLabel grew an optional right-hand slot to carry it.

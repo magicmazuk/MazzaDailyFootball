@@ -62,6 +62,19 @@ export function adaptScoreboard(json, compId) {
       // decided, and — only once decided — who goes through, straight from
       // the event's series block. All null for ordinary fixtures, so no
       // other surface changes behaviour.
+      // The goal wire (spec §13.44): the scoreboard's own scoring details,
+      // live-updating with the poll. Scorer may LAG the goal (live-probed:
+      // a 12′ goal arrived nameless) — null until the wire names him.
+      goals: (comp.details ?? [])
+        .filter(x => x?.scoringPlay === true)
+        .map(x => ({
+          minute: x.clock?.displayValue ?? null,
+          clockValue: x.clock?.value ?? null,
+          scorer: x.athletesInvolved?.[0]?.displayName ?? null,
+          teamId: x.team?.id ?? null,
+          ownGoal: x.ownGoal === true,
+          penalty: x.penaltyKick === true,
+        })),
       leg: comp.leg?.value ?? null,
       tieCompleted: (ev.series ?? comp.series)?.completed ?? null,
       tieWinnerId: ((ev.series ?? comp.series)?.completed

@@ -34,6 +34,12 @@ export const usePrefs = create(persist(
     // between the compact points column and the full classified print.
     fullTable: false,
     toggleFullTable: () => set(s => ({ fullTable: !s.fullTable })),
+    // The goal wire's two forms (spec 13.44 addendum): the revolving line
+    // or the stacked latest-goals - the reader's choice, kept.
+    goalWireMode: 'line',
+    toggleGoalWireMode: () => set(s => ({
+      goalWireMode: s.goalWireMode === 'line' ? 'stack' : 'line',
+    })),
     follow: club => set(s => ({ followed: { ...s.followed, [club.id]: club } })),
     unfollow: id => {
       if (id === CELTIC.id) return;
