@@ -15,7 +15,7 @@
 const UPSTREAM = 'https://www.bbc.co.uk/programmes';
 
 const ALLOWED = [
-  /^\/(b007t9y1|m002jryr)\/episodes\/last\.json$/,
+  /^\/(b007t9y1|m002jryr)\/episodes\/(last|upcoming)\.json$/,
   /^\/[a-z0-9]{8}\.json$/,
 ];
 

@@ -47,5 +47,26 @@ export function adaptEpisode(json) {
   };
 }
 
+// episodes/upcoming.json → the scheduled broadcasts, in feed order
+// (spec §13.43, the airtime foot). Live-probed 2026-08-29: each
+// broadcasts[] entry carries start/end + service + programme; the channel
+// is service.title (the real feed has NO service.name) and the brand's
+// name lives at programme.display_titles — PLURAL; the singular
+// display_title belongs to {pid}.json detail — while programme.title is
+// just the episode's date string ("29/08/2026"). Entries without a
+// programme are skipped; anything malformed adapts to [].
+export function adaptUpcoming(json) {
+  const broadcasts = Array.isArray(json?.broadcasts) ? json.broadcasts : [];
+  return broadcasts
+    .filter(b => b?.programme != null)
+    .map(b => ({
+      pid: b.programme.pid ?? null,
+      title: b.programme.display_titles?.title ?? b.programme.title ?? null,
+      start: b.start ?? null,
+      end: b.end ?? null,
+      channel: b.service?.title ?? null,
+    }));
+}
+
 // Verified deep-link shape (ledger) — link out only, never embed (DRM).
 export const episodeUrl = pid => `https://www.bbc.co.uk/iplayer/episode/${pid}`;

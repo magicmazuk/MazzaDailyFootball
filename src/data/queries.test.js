@@ -4,7 +4,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, expect, test, vi } from 'vitest';
 import {
   seasonFixturesQuery, todayWindowQuery, useHighlights, useNews, usePlayer, useSquad,
-  useTsdbPlayers, useWikiSummary,
+  useTsdbPlayers, useUpcomingBroadcasts, useWikiSummary,
 } from './queries.js';
 
 // No JSX in this file — the QueryClientProvider wrapper is built with
@@ -810,6 +810,84 @@ test('useHighlights keeps the short synopsis when the episode-detail tier fails'
 
   await waitFor(() => expect(result.current).toHaveLength(2));
   expect(result.current.every(e => e.synopsis === 'the short synopsis')).toBe(true);
+});
+
+// --- useUpcomingBroadcasts (spec §13.43, the airtime foot): one
+// episodes/upcoming.json per iplayer brand, adapted and flattened to
+// broadcast lines with comp + show. [] while loading or failed — absence
+// is honest, never degradation. Payload fixtures mirror the live-probed
+// truth (2026-08-29): channel at service.title, brand name at
+// display_titles (plural). ---
+
+const upcomingJson = (pid, show, channel, times) => JSON.stringify({
+  broadcasts: times.map(([start, end]) => ({
+    is_repeat: false, is_blanked: false, schedule_date: start.slice(0, 10),
+    start, end,
+    service: { type: 'tv', id: 'svc', key: 'svc', title: channel },
+    programme: { pid, title: start.slice(8, 10) + '/08/2026', display_titles: { title: show } },
+  })),
+});
+
+test('useUpcomingBroadcasts fetches both brands via the proxy and flattens broadcasts with comp and show', async () => {
+  const calls = [];
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    calls.push(url);
+    if (url === '/api/iplayer/b007t9y1/episodes/upcoming.json') {
+      return new Response(upcomingJson('m003116q', 'Match of the Day', 'BBC One', [
+        ['2026-08-29T22:25:00+01:00', '2026-08-29T23:35:00+01:00'],
+        ['2026-08-30T08:50:00+01:00', '2026-08-30T10:00:00+01:00'],
+      ]), { status: 200 });
+    }
+    if (url === '/api/iplayer/m002jryr/episodes/upcoming.json') {
+      return new Response(upcomingJson('m00312s3', 'Sportscene: Premiership Highlights', 'BBC Scotland', [
+        ['2026-08-29T19:15:00+01:00', '2026-08-29T20:15:00+01:00'],
+      ]), { status: 200 });
+    }
+    throw new Error(`unexpected url ${url}`);
+  }));
+
+  const { result } = renderHook(() => useUpcomingBroadcasts(), { wrapper });
+
+  expect(result.current).toEqual([]); // loading — the honest empty schedule
+
+  await waitFor(() => expect(result.current).toHaveLength(3));
+  // Registry order leads: sco.1 (Sportscene) sits before eng.1 in the
+  // registry, so its broadcast flattens first.
+  const scene = result.current[0];
+  expect(scene.comp.id).toBe('sco.1');
+  expect(scene.show).toBe('Sportscene');
+  expect(scene.channel).toBe('BBC Scotland');
+  const motd = result.current[1];
+  expect(motd.comp.id).toBe('eng.1');
+  expect(motd.show).toBe('Match of the Day');
+  expect(motd.pid).toBe('m003116q');
+  expect(motd.title).toBe('Match of the Day');
+  expect(motd.start).toBe('2026-08-29T22:25:00+01:00');
+  expect(motd.end).toBe('2026-08-29T23:35:00+01:00');
+  expect(motd.channel).toBe('BBC One');
+  expect(result.current[2].comp.id).toBe('eng.1'); // MOTD's second broadcast
+  // Every request went through our proxy — never to bbc.co.uk directly.
+  expect(calls.every(u => u.startsWith('/api/iplayer/'))).toBe(true);
+});
+
+test('useUpcomingBroadcasts keeps the healthy brand when the other fails — never all-or-nothing', async () => {
+  vi.stubGlobal('fetch', vi.fn(async url => {
+    if (url === '/api/iplayer/b007t9y1/episodes/upcoming.json') {
+      return new Response('<html>BBC error page</html>', { status: 500 });
+    }
+    if (url === '/api/iplayer/m002jryr/episodes/upcoming.json') {
+      return new Response(upcomingJson('m00312s3', 'Sportscene: Premiership Highlights', 'BBC Scotland', [
+        ['2026-08-29T19:15:00+01:00', '2026-08-29T20:15:00+01:00'],
+      ]), { status: 200 });
+    }
+    throw new Error(`unexpected url ${url}`);
+  }));
+
+  const { result } = renderHook(() => useUpcomingBroadcasts(), { wrapper });
+
+  await waitFor(() => expect(result.current).toHaveLength(1));
+  expect(result.current[0].pid).toBe('m00312s3');
+  expect(result.current[0].show).toBe('Sportscene');
 });
 
 // --- The Scout's Dossier hooks (spec §13.37): lazy, enabled-gated raw
