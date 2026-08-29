@@ -304,6 +304,13 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
   return (
     <section className="mt-8">
       {masthead}
+      {/* The replay (user ask, 2026-08-31): the ritual, again - phase wins
+          over the remembered reveal, so the stage returns without
+          unmarking the day. The draw ceremonies' own replay recipe. */}
+      <button type="button" onClick={() => { setRead(0); setPhase('broadcast'); }}
+        className="font-sans text-[9.5px] uppercase tracking-[.12em] text-muted mt-2">
+        Replay the results broadcast
+      </button>
       {results.map(({ comp, fixtures }) => (
         <div key={comp.id} className="mt-5">
           <CompLabel compId={comp.id}>{comp.shortName}</CompLabel>

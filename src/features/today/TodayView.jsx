@@ -85,6 +85,14 @@ export default function TodayView({ partition, followedIds, date, asOf = null, n
           rise-in slot. Wrapped like Papers/HighlightsReel: the element
           owns its own <section> and gates itself; a null prop adds
           nothing at all. */}
+      {/* THE LIVE LEAD (spec 13.46): while the ball is moving, live IS the
+          front page - it outranks the classified and Your clubs whenever
+          it exists. Its named rise-in slot stays 2 (13.21: a section keeps
+          its delay regardless of neighbours). The goal wire (13.44) rides
+          as its lead; the toggle lives on the rule. */}
+      <Section label="Live" fixtures={live} followedIds={followedIds} riseIn="rise-in rise-in-2"
+        labelRight={<WireModeToggle mode={goalWireMode} onToggle={toggleGoalWireMode} />}
+        lead={<GoalWire fixtures={live} mode={goalWireMode} />} />
       {classified && <div className="rise-in rise-in-1">{classified}</div>}
       {(yours.length > 0 || nextUp.length > 0) && (
         <section className="mt-8 first:mt-0 rise-in rise-in-1">
@@ -100,11 +108,6 @@ export default function TodayView({ partition, followedIds, date, asOf = null, n
           )}
         </section>
       )}
-      {/* The goal wire (spec 13.44) rides as the Live section's lead in
-          the reader's chosen form; the toggle lives on the rule itself. */}
-      <Section label="Live" fixtures={live} followedIds={followedIds} riseIn="rise-in rise-in-2"
-        labelRight={<WireModeToggle mode={goalWireMode} onToggle={toggleGoalWireMode} />}
-        lead={<GoalWire fixtures={live} mode={goalWireMode} />} />
       <Section label="Later today" muted fixtures={later} followedIds={followedIds} riseIn="rise-in rise-in-3" />
       <Section label="Earlier today" muted fixtures={earlier} followedIds={followedIds} riseIn="rise-in rise-in-4" />
       {quiet && <p className="text-muted mt-2">No matches today.</p>}

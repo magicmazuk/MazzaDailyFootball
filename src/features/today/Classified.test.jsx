@@ -340,3 +340,16 @@ test('Reveal the rest abandons the ceremony into the full classified', async () 
   expect(screen.getAllByRole('link').map(l => l.getAttribute('href'))).toContain('/match/sco.1/t2');
   expect(usePrefs.getState().classifiedRevealedOn).toBe('2026-08-29');
 });
+
+test('the open classified offers a replay — straight back to the stage, the day still marked', async () => {
+  usePrefs.setState({ classifiedRevealedOn: '2026-08-29' });
+  const user = userEvent.setup();
+  renderClassified();
+  await user.click(screen.getByRole('button', { name: 'Replay the results broadcast' }));
+  // the envelope theatre again: no rows yet, the first desk on the stage
+  expect(screen.queryAllByTestId('broadcast-row')).toHaveLength(0);
+  expect(screen.queryByText('Brora')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Read the Premiership results' })).toBeInTheDocument();
+  // the memory is untouched - tomorrow still folds afresh, today stays read
+  expect(usePrefs.getState().classifiedRevealedOn).toBe('2026-08-29');
+});
