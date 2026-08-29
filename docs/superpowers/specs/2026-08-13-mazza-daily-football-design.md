@@ -1426,3 +1426,9 @@ passes them through as `fixture.goals`: { minute, scorer|null, teamId, ownGoal, 
 The wire pools goals across today's LIVE fixtures, ordered by real time (kickoff + clock),
 newest first, capped at the six most recent; it exists only while matches are live and
 ≥1 goal has been scored — cleared by its own absence, like the classified.
+
+**§13.44 addendum — both forms, one toggle (same day).** The reader wanted T-B as well:
+the wire now has two forms — the revolving line and the goal stack (latest four as quiet
+rows) — switched by a pair of hairline bar-glyphs on the Live rule itself (one bar = the
+line, three = the stack; active in ink, idle in rule tone), the choice persisted in
+mdf-prefs beside fullTable. SectionLabel grew an optional right-hand slot to carry it.

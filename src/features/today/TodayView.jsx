@@ -5,6 +5,28 @@ import MiniTable from './MiniTable.jsx';
 import DrawInvitation from './DrawInvitation.jsx';
 import Papers from './Papers.jsx';
 import GoalWire from './GoalWire.jsx';
+import { usePrefs } from '../../store/prefs.js';
+
+// The wire's two forms, one hairline toggle on the Live rule (spec 13.44
+// addendum): the revolving line or the stacked latest goals - drawn as
+// tiny bar glyphs, the active one in ink, the choice persisted.
+function WireModeToggle({ mode, onToggle }) {
+  const glyph = (bars, active, label) => (
+    <button key={label} type="button" aria-label={label} aria-pressed={active}
+      onClick={active ? undefined : onToggle}
+      className="p-1 -m-0.5 flex flex-col gap-[2px] items-stretch w-[18px]">
+      {Array.from({ length: bars }, (_, i) => (
+        <span key={i} className={`block h-[2px] rounded-sm ${active ? 'bg-ink' : 'bg-rule'}`} />
+      ))}
+    </button>
+  );
+  return (
+    <span className="flex gap-1.5 items-center normal-case tracking-normal">
+      {glyph(1, mode === 'line', 'The revolving line')}
+      {glyph(3, mode === 'stack', 'The goal stack')}
+    </span>
+  );
+}
 import HighlightsReel from './HighlightsReel.jsx';
 
 const longDate = d => d.toLocaleDateString('en-GB',
@@ -26,11 +48,11 @@ const groupOnTvByDay = fixtures => {
 // just Yesterday) — assigned per NAMED slot, not by this section's runtime
 // position among its visible siblings, so a section always rises with the
 // same delay regardless of which of its neighbours happen to be absent.
-function Section({ label, muted, fixtures, followedIds, riseIn, lead = null }) {
+function Section({ label, muted, fixtures, followedIds, riseIn, lead = null, labelRight = null }) {
   if (!fixtures.length) return null;
   return (
     <section className={`mt-8 first:mt-0 ${riseIn ?? ''}`}>
-      <SectionLabel muted={muted}>{label}</SectionLabel>
+      <SectionLabel muted={muted} right={labelRight}>{label}</SectionLabel>
       {lead}
       {fixtures.map(f => <FixtureRow key={f.id} fixture={f} followedIds={followedIds} />)}
     </section>
@@ -38,6 +60,8 @@ function Section({ label, muted, fixtures, followedIds, riseIn, lead = null }) {
 }
 
 export default function TodayView({ partition, followedIds, date, asOf = null, nextUp = [], onTv = [], quickTables = [], draws = [], phaseDraws = [], classified = null }) {
+  const goalWireMode = usePrefs(s => s.goalWireMode);
+  const toggleGoalWireMode = usePrefs(s => s.toggleGoalWireMode);
   const { yours, live, later, earlier, yesterday } = partition;
   const quiet = !yours.length && !live.length && !later.length && !earlier.length;
   return (
@@ -76,10 +100,11 @@ export default function TodayView({ partition, followedIds, date, asOf = null, n
           )}
         </section>
       )}
-      {/* The goal wire (spec 13.44) rides as the Live section's lead -
-          the day's latest goals on one revolving line. */}
+      {/* The goal wire (spec 13.44) rides as the Live section's lead in
+          the reader's chosen form; the toggle lives on the rule itself. */}
       <Section label="Live" fixtures={live} followedIds={followedIds} riseIn="rise-in rise-in-2"
-        lead={<GoalWire fixtures={live} />} />
+        labelRight={<WireModeToggle mode={goalWireMode} onToggle={toggleGoalWireMode} />}
+        lead={<GoalWire fixtures={live} mode={goalWireMode} />} />
       <Section label="Later today" muted fixtures={later} followedIds={followedIds} riseIn="rise-in rise-in-3" />
       <Section label="Earlier today" muted fixtures={earlier} followedIds={followedIds} riseIn="rise-in rise-in-4" />
       {quiet && <p className="text-muted mt-2">No matches today.</p>}

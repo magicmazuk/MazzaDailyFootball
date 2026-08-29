@@ -70,3 +70,31 @@ test('a single goal shows no dots and never rotates; no goals or no live means n
   rerender(<MemoryRouter><GoalWire fixtures={[]} /></MemoryRouter>);
   expect(container.innerHTML).toBe('');
 });
+
+// --- the stack (T-B), the wire's second form (spec §13.44 addendum) ---
+
+test('stack mode prints the latest goals as rows, newest first, capped at four, no dots, no timer', () => {
+  const busy = [...CARD,
+    live('m6', 'Aberdeen', 2, 'Ross County', 0, '2026-08-29T14:00:00Z', [
+      { minute: "15'", clockValue: 900, scorer: 'One Player', teamId: 'm6h', ownGoal: false, penalty: false },
+      { minute: "18'", clockValue: 1080, scorer: 'Two Player', teamId: 'm6h', ownGoal: false, penalty: false },
+    ])];
+  render(<MemoryRouter><GoalWire fixtures={busy} mode="stack" /></MemoryRouter>);
+  const rows = screen.getAllByTestId('wire-row');
+  expect(rows).toHaveLength(4);
+  expect(rows[0].textContent).toContain('18′');
+  expect(rows[0].textContent).toContain('Player');
+  expect(rows[3].textContent).toContain('9′');
+  expect(document.querySelectorAll('[data-testid="wire-dot"]')).toHaveLength(0);
+  act(() => { vi.advanceTimersByTime(12000); });
+  expect(screen.getAllByTestId('wire-row')[0].textContent).toContain('18′');
+  // each row doors into its match
+  expect(rows[0].closest('a')).toHaveAttribute('href', '/match/sco.1/m6');
+});
+
+test('a scorerless goal in the stack prints minute alone — never a dash of guesswork', () => {
+  render(<MemoryRouter><GoalWire fixtures={[CARD[2]]} mode="stack" /></MemoryRouter>);
+  const row = screen.getByTestId('wire-row');
+  expect(row.textContent).toContain('12′');
+  expect(row.textContent).toContain('Kilmarnock 0 Dundee United 1');
+});

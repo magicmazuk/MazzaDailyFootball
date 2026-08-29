@@ -1,8 +1,10 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 import TodayView from './TodayView.jsx';
 import { byId } from '../../domain/competitions.js';
+import { usePrefs } from '../../store/prefs.js';
 
 // TodayView renders Papers (The papers, spec §13.19.2), which fetches its
 // own news via useNews — stub it so these presentational tests need no
@@ -453,4 +455,25 @@ test('the goal wire sits under the LIVE rule when live fixtures carry goals', ()
   const liveLabel = screen.getByRole('heading', { name: 'Live' });
   const wire = screen.getByText('GOAL');
   expect(liveLabel.compareDocumentPosition(wire) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test('the wire toggle sits on the Live rule and flips line to stack, the choice stored', async () => {
+  usePrefs.setState({ goalWireMode: 'line' });
+  const liveFx = { ...fx('lw2', 'H', 'A', 'live'), compId: 'sco.1', kickoff: '2026-08-29T14:00:00Z',
+    goals: [
+      { minute: "4'", clockValue: 240, scorer: 'A Scorer', teamId: 't', ownGoal: false, penalty: false },
+      { minute: "9'", clockValue: 540, scorer: 'B Scorer', teamId: 't', ownGoal: false, penalty: false },
+    ] };
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-29T15:00:00Z')} followedIds={new Set()}
+        partition={{ ...emptyPartition, live: [liveFx] }} nextUp={[]} />
+    </MemoryRouter>,
+  );
+  expect(screen.queryAllByTestId('wire-row')).toHaveLength(0);
+  await userEvent.setup().click(screen.getByRole('button', { name: 'The goal stack' }));
+  expect(usePrefs.getState().goalWireMode).toBe('stack');
+  expect(screen.getAllByTestId('wire-row')).toHaveLength(2);
+  await userEvent.setup().click(screen.getByRole('button', { name: 'The revolving line' }));
+  expect(screen.queryAllByTestId('wire-row')).toHaveLength(0);
 });

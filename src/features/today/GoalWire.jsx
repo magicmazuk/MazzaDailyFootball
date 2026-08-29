@@ -27,7 +27,7 @@ export function poolGoals(fixtures) {
 
 const prime = m => (m ?? '').replace(/'/g, '′');
 
-export default function GoalWire({ fixtures }) {
+export default function GoalWire({ fixtures, mode = 'line' }) {
   const pool = poolGoals(fixtures);
   const [at, setAt] = useState(0);
   useEffect(() => {
@@ -36,6 +36,28 @@ export default function GoalWire({ fixtures }) {
     return () => clearInterval(t);
   }, [pool.length]);
   if (pool.length === 0) return null;
+  // The stack (T-B, the wire's second form): the latest goals as quiet
+  // rows, newest first, capped at four - no timers, the poll is the pulse.
+  if (mode === 'stack') {
+    return (
+      <div className="mb-1">
+        {pool.slice(0, 4).map(({ fixture, goal }, i) => (
+          <Link key={`${fixture.id}-${goal.clockValue}-${i}`} data-testid="wire-row"
+            to={`/match/${fixture.compId}/${fixture.id}`}
+            className="flex items-baseline gap-2 py-1.5 border-b border-rule/70">
+            <span className="font-sans text-[8.5px] tracking-[.16em] text-accent font-semibold shrink-0 w-9">GOAL</span>
+            <span className="font-sans text-[10px] text-muted tabular-nums shrink-0 w-8">{prime(goal.minute)}</span>
+            <span className="text-[12.5px] truncate flex-1 min-w-0">
+              {`${fixture.home.name} ${fixture.home.score} ${fixture.away.name} ${fixture.away.score}`}
+            </span>
+            {goal.scorer && (
+              <span className="font-sans text-[10px] text-muted shrink-0">{surnameOf(goal.scorer)}</span>
+            )}
+          </Link>
+        ))}
+      </div>
+    );
+  }
   const { fixture, goal } = pool[at % pool.length];
   const line = `${fixture.home.name} ${fixture.home.score} ${fixture.away.name} ${fixture.away.score}`;
   const who = goal.scorer ? `${surnameOf(goal.scorer)} ${prime(goal.minute)}` : prime(goal.minute);
