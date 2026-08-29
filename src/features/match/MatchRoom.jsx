@@ -5,6 +5,7 @@
 // scoreline plus one honest line where the source publishes no detail.
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import Collapse from '../../ui/Collapse.jsx';
 import Crest from '../../ui/Crest.jsx';
 import FixtureRow, { BalanceBar, MatchLine, MeetingRow, meetingBalance, pressFill,
   shirtLookup, surnameOf, timelinePoints } from '../../ui/FixtureRow.jsx';
@@ -219,6 +220,9 @@ function ScoreHeader({ fixture, comp, gameInfo, events, otherLeg }) {
 // lopsided form object (one side only) renders nothing rather than a
 // half-empty block.
 function FormBlock({ form, fixture }) {
+  // "Form coming in" is pre-match tense - on a finished match it reads as
+  // stale copy under the result (editorial rider, user-note wave 2026-08-30).
+  if (fixture.status === 'ft') return null;
   if (!form) return null;
   const homeForm = form[fixture.home.teamId];
   const awayForm = form[fixture.away.teamId];
@@ -435,7 +439,7 @@ function Stats({ teamStats, fixture }) {
 function MatchReport({ report, fixture }) {
   if (fixture.status !== 'ft' || !report) return null;
   return (
-    <section className="mb-8 rise-in rise-in-5">
+    <section className="mb-8 rise-in rise-in-2">
       <SectionLabel muted>Match report</SectionLabel>
       {report.paragraphs.slice(0, 3).map((para, i) => (
         <p key={i} className="font-serif text-[15.5px] leading-relaxed max-w-[60ch] mb-3">
@@ -453,36 +457,44 @@ function MatchReport({ report, fixture }) {
 // first — the timeline's own convention on this page. Two honest tiers by
 // data reality: eng.1 prose reads as prose, Scottish machine-cut lines
 // print AS wire — never dressed up. FT only, absent when the payload
-// carried none. Capped at 40 entries with an honest foot line — a quiet
-// count, never a silent trim. The minute converts its straight apostrophe
-// to a prime (′) here at render — the adapter keeps the feed's raw form.
-const WIRE_CAP = 40;
-
+// carried none. Pick B (user note 2026-08-30): the timeline is the one
+// events surface; the wire is texture, FOLDED beneath it — a lazy-once
+// Collapse in the accordion culture, every entry once opened (the 40-cap
+// retired with the fold; a collapse owns its own length). The minute
+// converts its straight apostrophe to a prime (′) here at render.
 function RunningReport({ commentary, fixture }) {
+  const [open, setOpen] = useState(false);
+  const [everOpened, setEverOpened] = useState(false);
   if (fixture.status !== 'ft' || !commentary?.length) return null;
   const entries = [...commentary].reverse();
   return (
     <section className="mb-8 rise-in rise-in-5">
       <SectionLabel muted>The running report</SectionLabel>
-      {entries.slice(0, WIRE_CAP).map((e, i) => (
-        <div key={i} data-testid="wire-entry"
-          className="flex items-baseline gap-4 py-3 border-b border-rule/60">
-          <span className="font-sans text-[9.5px] text-accent tabular-nums w-7 shrink-0">
-            {(e.minute ?? '').replace(/'/g, '′')}
-          </span>
-          <span className={`text-[13px] flex-1 min-w-0${e.scoring ? ' font-semibold' : ''}`}>
-            {e.text}
-          </span>
-        </div>
-      ))}
-      {entries.length > WIRE_CAP && (
-        <p className="font-sans text-[10px] text-muted mt-3">
-          The full report runs to {entries.length} entries.
-        </p>
-      )}
-      <p className="font-sans text-[8.5px] uppercase tracking-[.14em] text-muted mt-3">
-        Commentary · ESPN
-      </p>
+      <button type="button"
+        onClick={() => { setOpen(v => !v); setEverOpened(true); }}
+        className="font-sans text-[10px] uppercase tracking-[.14em] text-muted underline underline-offset-4 mt-1">
+        {open ? 'Fold the report away' : `Read the full report · ${entries.length} entries`}
+      </button>
+      <Collapse open={open}>
+        {everOpened && (
+          <div className="mt-2">
+            {entries.map((e, i) => (
+              <div key={i} data-testid="wire-entry"
+                className="flex items-baseline gap-4 py-3 border-b border-rule/60">
+                <span className="font-sans text-[9.5px] text-accent tabular-nums w-7 shrink-0">
+                  {(e.minute ?? '').replace(/'/g, '′')}
+                </span>
+                <span className={`text-[13px] flex-1 min-w-0${e.scoring ? ' font-semibold' : ''}`}>
+                  {e.text}
+                </span>
+              </div>
+            ))}
+            <p className="font-sans text-[8.5px] uppercase tracking-[.14em] text-muted mt-3">
+              Commentary · ESPN
+            </p>
+          </div>
+        )}
+      </Collapse>
     </section>
   );
 }
@@ -690,13 +702,18 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings, oth
         events={detail?.events} otherLeg={otherLeg} />
       {comp.hasMatchDetail
         ? (<>
-            <FormBlock form={detail?.form} fixture={fixture} />
-            <Timeline events={detail?.events} fixture={fixture} comp={comp} onOpenPlayer={openPlayer} />
-            <Stats teamStats={detail?.teamStats} fixture={fixture} />
+            {/* The editor's order (user note 2026-08-30): the report reads
+                like a standfirst directly under the header's match line, the
+                numbers next, the people, then the chronology - with the full
+                wire folded beneath it. Sections still self-gate by status,
+                so pre-match and live pages keep their own shape. */}
             <MatchReport report={detail?.report} fixture={fixture} />
-            <RunningReport commentary={detail?.commentary} fixture={fixture} />
+            <FormBlock form={detail?.form} fixture={fixture} />
+            <Stats teamStats={detail?.teamStats} fixture={fixture} />
             <Standouts standouts={detail?.standouts} fixture={fixture} comp={comp}
               lineups={detail?.lineups} onOpenPlayer={openPlayer} />
+            <Timeline events={detail?.events} fixture={fixture} comp={comp} onOpenPlayer={openPlayer} />
+            <RunningReport commentary={detail?.commentary} fixture={fixture} />
             <Lineups lineups={detail?.lineups} fixture={fixture} comp={comp} onOpenPlayer={openPlayer} />
             <HeadToHead headToHead={detail?.headToHead} fixture={fixture} />
           </>)

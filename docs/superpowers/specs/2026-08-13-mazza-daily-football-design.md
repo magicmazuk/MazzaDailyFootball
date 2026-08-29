@@ -1399,3 +1399,11 @@ absent, line off — never invent a broadcast).
 Riders absorbed per the ruling: stakes-lite trials HERE because a settled table is the
 one context where the arithmetic cannot shift mid-read. The §13.36 backlog note (Saturday's
 episode losing its iPlayer line when Sunday's lands) is NOT this wave — noted, separate.
+
+**§13.42 addendum — the editor's order and the fold (user notes, 2026-08-30).** The match
+page reorders to read like a paper: report as the standfirst directly under the header's
+match line, then Stats, Standouts, The match, and the wire FOLDED beneath it (pick B of
+three offered): the timeline stays the one events surface (tappable, structured); the
+running report becomes a lazy-once Collapse ("Read the full report · N entries") holding
+EVERY entry — the 40-cap retired with the fold. Rider: "Form coming in" rests on finished
+matches — its tense is pre-match, and stale copy under a result violates the house voice.

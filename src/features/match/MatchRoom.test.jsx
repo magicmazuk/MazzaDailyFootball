@@ -1314,11 +1314,13 @@ test('the report is a broadsheet excerpt — the first three paragraphs, no read
   expect(screen.queryByText(/read more/i)).not.toBeInTheDocument();
 });
 
-test('the running report prints newest first, minutes as primes, scoring entries semibold', () => {
+test('the running report prints newest first, minutes as primes, scoring entries semibold', async () => {
   render(<MemoryRouter>
     <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={wireDetail} />
   </MemoryRouter>);
   const section = screen.getByText('The running report').closest('section');
+  // Pick B: the wire lives behind the fold — open it first.
+  await userEvent.setup().click(screen.getByRole('button', { name: /Read the full report/ }));
   const rows = screen.getAllByTestId('wire-entry');
   expect(rows).toHaveLength(3);
   // Newest first — the reverse of feed order, the timeline's own convention.
@@ -1344,18 +1346,22 @@ test('the running report prints newest first, minutes as primes, scoring entries
     'font-sans', 'text-[8.5px]', 'uppercase', 'tracking-[.14em]', 'text-muted');
 });
 
-test('a long wire caps at 40 entries with the honest foot line — never a silent trim', () => {
+test('the wire folds into a lazy collapse — the toggle names the count, a tap reveals ALL entries (pick B)', async () => {
   const longWire = { ...detail, commentary: Array.from({ length: 41 }, (_, i) =>
     wireEntry(`${i + 1}'`, `Wire entry number ${i + 1}.`)) };
   render(<MemoryRouter>
     <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={longWire} />
   </MemoryRouter>);
-  expect(screen.getAllByTestId('wire-entry')).toHaveLength(40);
-  // Newest first: entry 41 leads, entry 1 (the kickoff) is the one trimmed.
-  expect(screen.getByText('Wire entry number 41.')).toBeInTheDocument();
-  expect(screen.queryByText('Wire entry number 1.')).not.toBeInTheDocument();
-  expect(screen.getByText('The full report runs to 41 entries.')).toHaveClass(
-    'font-sans', 'text-[10px]', 'text-muted');
+  // Folded: no wire rows mounted at all (lazy-once), the toggle carries the count.
+  expect(screen.queryByTestId('wire-entry')).not.toBeInTheDocument();
+  const toggle = screen.getByRole('button', { name: 'Read the full report · 41 entries' });
+  await userEvent.setup().click(toggle);
+  // Open: every entry, newest first, nothing trimmed — the cap retired with pick B.
+  const rows = screen.getAllByTestId('wire-entry');
+  expect(rows).toHaveLength(41);
+  expect(rows[0].textContent).toContain('Wire entry number 41.');
+  expect(screen.getByText('Wire entry number 1.')).toBeInTheDocument();
+  expect(screen.queryByText(/The full report runs to/)).not.toBeInTheDocument();
 });
 
 test('a live fixture shows neither section even when the payload carries both — live is out of this wave', () => {
@@ -1368,21 +1374,35 @@ test('a live fixture shows neither section even when the payload carries both �
   expect(screen.queryByTestId('wire-entry')).not.toBeInTheDocument();
 });
 
-test('the two sections sit between Stats and Standouts, in the capped rise-in-5 slot', () => {
+test("the editor's order: report, stats, standouts, the match, then the folded wire (user note 2026-08-30)", () => {
   const everything = { ...detail, report: reportDetail.report,
     commentary: wireDetail.commentary, standouts: standoutsData };
   const { container } = render(<MemoryRouter>
     <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={everything} />
   </MemoryRouter>);
   const labels = [...container.querySelectorAll('h2')].map(h => h.textContent);
-  expect(labels.indexOf('Stats')).toBeGreaterThanOrEqual(0);
-  expect(labels.indexOf('Stats')).toBeLessThan(labels.indexOf('Match report'));
-  expect(labels.indexOf('Match report')).toBeLessThan(labels.indexOf('The running report'));
-  expect(labels.indexOf('The running report')).toBeLessThan(labels.indexOf('Standouts'));
+  expect(labels.indexOf('Match report')).toBeGreaterThanOrEqual(0);
+  expect(labels.indexOf('Match report')).toBeLessThan(labels.indexOf('Stats'));
+  expect(labels.indexOf('Stats')).toBeLessThan(labels.indexOf('Standouts'));
+  expect(labels.indexOf('Standouts')).toBeLessThan(labels.indexOf('The match'));
+  expect(labels.indexOf('The match')).toBeLessThan(labels.indexOf('The running report'));
+  // The report leads the body: rise-in-2, directly under the header's match line.
   expect(screen.getByText('Match report').closest('section'))
-    .toHaveClass('mb-8', 'rise-in', 'rise-in-5');
-  expect(screen.getByText('The running report').closest('section'))
-    .toHaveClass('mb-8', 'rise-in', 'rise-in-5');
+    .toHaveClass('mb-8', 'rise-in', 'rise-in-2');
+});
+
+test('form coming in rests on a finished match — its tense is pre-match (editorial rider)', () => {
+  const withForm = { ...detail, form: {
+    [fixture.home.teamId]: ['W', 'W'], [fixture.away.teamId]: ['L', 'D'],
+  } };
+  const { rerender } = render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={withForm} />
+  </MemoryRouter>);
+  expect(screen.getByText('Form coming in')).toBeInTheDocument();
+  rerender(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={withForm} />
+  </MemoryRouter>);
+  expect(screen.queryByText('Form coming in')).not.toBeInTheDocument();
 });
 
 test('empty commentary and a null report leave the page byte-identical to one without the fields', () => {
