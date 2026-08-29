@@ -22,6 +22,9 @@ vi.mock('../../data/queries.js', () => ({
   // ...and the highlights reel (spec §13.36), which fetches for itself the
   // same way — an empty reel renders nothing.
   useHighlights: vi.fn(() => []),
+  // ...and the classified (spec §13.43), which fetches its airtime foot for
+  // itself — an empty schedule is simply no foot.
+  useUpcomingBroadcasts: vi.fn(() => []),
 }));
 
 import TodayScreen from './TodayScreen.jsx';

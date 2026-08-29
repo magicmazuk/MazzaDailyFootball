@@ -157,6 +157,77 @@ export function adaptTeamRecord(json) {
   return { played, wins, draws, losses, points };
 }
 
+// The match report arrives as HTML (spec §13.42 probe: ~4KB story with
+// <p> structure and espn.com anchors). The page prints PLAIN TEXT only —
+// no tag or attribute may survive. Exported for direct testing precisely
+// because a leak here would put ESPN's markup on the page. Order is
+// load-bearing:
+// (1) drop script/style elements WITH their contents (a </p> inside a
+//     script string would otherwise split a phantom paragraph out of code),
+// (2) split on paragraph boundaries (</p>, <br>) while they still exist,
+// (3) strip every remaining tag — including a truncated trailing fragment
+//     ("<a href=…" cut mid-attribute), which is dropped to end-of-paragraph
+//     rather than ever printing a "<",
+// (4) decode basic entities LAST, so "&amp;lt;" reads "&lt;" as text and an
+//     encoded tag decodes to literal characters instead of re-entering the
+//     strip as markup (React escapes text nodes, so that stays text),
+// (5) collapse internal whitespace and drop empty paragraphs.
+export function sanitiseStory(html) {
+  if (typeof html !== 'string') return [];
+  const decode = s => s
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
+  return html
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .split(/<\/p\s*>|<br\s*\/?\s*>/gi)
+    .map(part => decode(part.replace(/<[^>]*>/g, '').replace(/<[^>]*$/, ''))
+      .replace(/\s+/g, ' ').trim())
+    .filter(part => part !== '');
+}
+
+// The running report (spec §13.42): the summary payload's commentary wire,
+// previously dropped. Feed order is preserved — the adapter never re-sorts.
+// Two verified tiers (prod proxy, 2026-08-29/30): eng.1 prose entries carry
+// `sequence`; sco.1 terse machine lines may lack it, so it maps to null
+// rather than being invented. Scoring is play.scoringPlay when the feed
+// says so, with the prose tier's "Goal!" opening as the fallback signal.
+// The minute keeps the feed's raw "45'" form — the prime (′) is a
+// render-time conversion (the house prime law), never baked into data.
+// Missing/empty commentary → [] (NOT null): [] means "payload carried none".
+function adaptCommentary(json) {
+  return (Array.isArray(json?.commentary) ? json.commentary : [])
+    .map(c => {
+      const text = typeof c?.text === 'string' ? c.text.trim() : '';
+      const seq = c?.sequence;
+      return {
+        minute: typeof c?.time?.displayValue === 'string' && c.time.displayValue !== ''
+          ? c.time.displayValue : null,
+        text,
+        scoring: c?.play?.scoringPlay === true || /^goal!/i.test(text),
+        sequence: seq != null && seq !== '' && Number.isFinite(Number(seq)) ? Number(seq) : null,
+      };
+    })
+    .filter(e => e.text !== '');
+}
+
+// ESPN's own match report (spec §13.42) — published on SOME matches only
+// (absent on the probed sco.1 derby), so presence gates per match: null
+// unless article.story is a non-empty string that sanitises to at least
+// one paragraph. A story of pure markup yields null too — never a
+// paragraph-less shell for the page to gate open on.
+function adaptReport(json) {
+  const article = json?.article;
+  if (typeof article?.story !== 'string' || article.story === '') return null;
+  const paragraphs = sanitiseStory(article.story);
+  if (paragraphs.length === 0) return null;
+  return { headline: article.headline ?? null, paragraphs };
+}
+
 export function adaptSummary(json) {
   const events = (json?.keyEvents ?? []).map(k => {
     const participants = k.participants ?? [];
@@ -194,7 +265,10 @@ export function adaptSummary(json) {
   const form = adaptForm(json);
   const headToHead = adaptHeadToHead(json);
   const standouts = adaptStandouts(json);
-  return { events, teamStats, lineups, liveScore, gameInfo, form, headToHead, standouts };
+  const commentary = adaptCommentary(json);
+  const report = adaptReport(json);
+  return { events, teamStats, lineups, liveScore, gameInfo, form, headToHead, standouts,
+    commentary, report };
 }
 
 // gameInfo.officials carries match officials in no guaranteed order; a

@@ -1,5 +1,6 @@
 import {
   adaptScoreboard, adaptStandings, adaptTeams, adaptSquad, adaptSummary, adaptTeamRecord,
+  sanitiseStory,
 } from './espn.js';
 
 const scoreboard = {
@@ -304,6 +305,10 @@ test('summary: adaptSummary({}) is fully null-safe for every enrichment field', 
   expect(d.form).toBeNull();
   expect(d.headToHead).toBeNull();
   expect(d.standouts).toBeNull();
+  // §13.42: [] means "the payload carried none", never null — the running
+  // report's absence gate counts entries, it never null-checks.
+  expect(d.commentary).toEqual([]);
+  expect(d.report).toBeNull();
 });
 
 // --- keyEvents: participants (current ESPN shape) vs athletesInvolved (legacy) ---
@@ -543,4 +548,157 @@ test('scoreboard: an undecided tie (leg 1 played) reports completed false and no
   expect(f.leg).toBe(1);
   expect(f.tieCompleted).toBe(false);
   expect(f.tieWinnerId).toBeNull();
+});
+
+// --- the running report (spec §13.42): commentary + article now pass
+// through adaptSummary instead of being dropped. Probe truths (prod proxy,
+// 2026-08-29/30): eng.1 = 99 prose entries, `sequence` ordered, shape
+// { sequence, text, time: { value, displayValue: "45'" }, play? };
+// sco.1 = terse machine lines ("Name (Club) Substitution at 45'") that may
+// LACK `sequence`. Scoring entries identifiable via play.scoringPlay OR a
+// text opening "Goal!". ---
+
+const proseCommentary = {
+  commentary: [
+    { sequence: 1, text: 'First Half begins.', time: { value: 0, displayValue: "1'" } },
+    { sequence: 44,
+      text: 'Goal! Arsenal 1, Chelsea 0. Bukayo Saka (Arsenal) right footed shot from the centre of the box to the bottom left corner.',
+      time: { value: 1980, displayValue: "33'" } },
+    { sequence: 99, text: 'Match ends, Arsenal 2, Chelsea 0.',
+      time: { value: 5700, displayValue: "90'+5'" }, play: { scoringPlay: false } },
+  ],
+};
+
+test('summary commentary: eng.1 prose entries map minute/text/sequence in feed order, minute kept raw', () => {
+  const c = adaptSummary(proseCommentary).commentary;
+  expect(c).toHaveLength(3);
+  expect(c[0]).toEqual({ minute: "1'", text: 'First Half begins.', scoring: false, sequence: 1 });
+  // Feed order preserved — the adapter never re-sorts the wire.
+  expect(c.map(e => e.sequence)).toEqual([1, 44, 99]);
+  // The straight apostrophe survives the adapter: the prime (′) is a
+  // render-time conversion (the house prime law), never baked into data.
+  expect(c[2].minute).toBe("90'+5'");
+});
+
+test('summary commentary: a terse sco.1 entry lacking `sequence` carries sequence null', () => {
+  const terse = { commentary: [
+    { text: "Daniel Bennie (Dundee United) Substitution at 45'",
+      time: { value: 2700, displayValue: "45'" }, play: { type: { text: 'Substitution' } } },
+  ] };
+  expect(adaptSummary(terse).commentary).toEqual([
+    { minute: "45'", text: "Daniel Bennie (Dundee United) Substitution at 45'",
+      scoring: false, sequence: null },
+  ]);
+});
+
+test('summary commentary: scoring is flagged via play.scoringPlay AND via a "Goal!" text opening', () => {
+  const scoring = { commentary: [
+    // sco.1 shape: the play object says scoring; the terse text never opens "Goal!".
+    { text: "Kasper Høgh (Celtic) Goal at 12'", time: { displayValue: "12'" },
+      play: { scoringPlay: true } },
+    // eng.1 shape: no play object at all; the prose text opens "Goal!".
+    { text: 'Goal! Celtic 2, Rangers 0. Reo Hatate (Celtic) left footed shot.',
+      time: { displayValue: "68'" } },
+    { text: 'Foul by Connor Goldson (Rangers).', time: { displayValue: "70'" } },
+  ] };
+  expect(adaptSummary(scoring).commentary.map(e => e.scoring)).toEqual([true, true, false]);
+});
+
+test('summary commentary: textless entries are dropped; a clockless one keeps minute null', () => {
+  const gappy = { commentary: [
+    { time: { displayValue: "45'" } },           // no text at all — dropped
+    { text: '', time: { displayValue: "46'" } }, // empty text — dropped
+    { text: 'Lineups are announced and players are warming up.' }, // no clock — kept
+    { text: 'Second Half begins.', time: { displayValue: "46'" } },
+  ] };
+  expect(adaptSummary(gappy).commentary).toEqual([
+    { minute: null, text: 'Lineups are announced and players are warming up.',
+      scoring: false, sequence: null },
+    { minute: "46'", text: 'Second Half begins.', scoring: false, sequence: null },
+  ]);
+});
+
+test('summary commentary: missing or empty commentary is [], never null — [] means "payload carried none"', () => {
+  expect(adaptSummary({}).commentary).toEqual([]);
+  expect(adaptSummary({ commentary: [] }).commentary).toEqual([]);
+});
+
+test('summary report: article story sanitises to plain-text paragraphs — tags and anchors never survive', () => {
+  const withArticle = { article: {
+    headline: 'Saka double sinks Chelsea',
+    story: '<p>Bukayo Saka struck twice as <a href="https://www.espn.co.uk/football/match?gameId=1" class="inline">Arsenal</a> swept Chelsea aside at the Emirates.</p>'
+      + '<p>The second half &amp; its late drama belonged to Saka&#39;s wing once more, &quot;a masterclass&quot;&nbsp;by any measure.</p>'
+      + '<p>   </p>',
+  } };
+  const r = adaptSummary(withArticle).report;
+  expect(r.headline).toBe('Saka double sinks Chelsea');
+  expect(r.paragraphs).toEqual([
+    'Bukayo Saka struck twice as Arsenal swept Chelsea aside at the Emirates.',
+    'The second half & its late drama belonged to Saka\'s wing once more, "a masterclass" by any measure.',
+  ]);
+  expect(r.paragraphs.join('')).not.toContain('<');
+});
+
+test('summary report: a story without a headline still reports, headline null', () => {
+  expect(adaptSummary({ article: { story: '<p>One honest paragraph.</p>' } }).report)
+    .toEqual({ headline: null, paragraphs: ['One honest paragraph.'] });
+});
+
+test('summary report: absent article, storyless article and empty-string story are all null', () => {
+  expect(adaptSummary({}).report).toBeNull();
+  expect(adaptSummary({ article: { headline: 'Headline with no story' } }).report).toBeNull();
+  expect(adaptSummary({ article: { story: '' } }).report).toBeNull();
+});
+
+test('summary report: a story that sanitises to nothing is null — never a paragraph-less shell', () => {
+  expect(adaptSummary({ article: { story: '<script>var x = 1;</script>' } }).report).toBeNull();
+  expect(adaptSummary({ article: { story: '<p> </p><p></p>' } }).report).toBeNull();
+});
+
+// --- sanitiseStory (spec §13.42): the report's HTML→plain-text gate,
+// exported for direct testing precisely because a tag leaking through
+// would print ESPN's markup on the page. ---
+
+test('sanitiseStory: nested tags and attributed anchors strip clean — no "<" survives', () => {
+  const nasty = '<p>One <b><i>two</i></b> three</p>'
+    + '<p>A <a href="https://evil.example/x" onclick="steal()">link name</a> stands down</p>';
+  expect(sanitiseStory(nasty)).toEqual(['One two three', 'A link name stands down']);
+  expect(sanitiseStory(nasty).join('')).not.toContain('<');
+});
+
+test('sanitiseStory: script and style elements vanish WITH their contents — even a </p> inside script text splits nothing', () => {
+  const scripted = '<p>Before</p><script type="text/javascript">var p = "</p><p>sneaky</p>";</script>'
+    + '<style>.x { color: red; }</style><p>After</p>';
+  expect(sanitiseStory(scripted)).toEqual(['Before', 'After']);
+  expect(sanitiseStory(scripted).join('')).not.toContain('<');
+});
+
+test('sanitiseStory: <br> variants split paragraphs like </p> does', () => {
+  expect(sanitiseStory('<p>Line one<br>Line two<br/>Line three<br />Line four</p>'))
+    .toEqual(['Line one', 'Line two', 'Line three', 'Line four']);
+});
+
+test('sanitiseStory: internal whitespace collapses to single spaces; blank paragraphs drop', () => {
+  expect(sanitiseStory('<p>Spaced   out\n\n   copy</p><p> </p><p></p>'))
+    .toEqual(['Spaced out copy']);
+});
+
+test('sanitiseStory: a truncated trailing tag fragment is dropped, never printed', () => {
+  expect(sanitiseStory('<p>Truncated mid-anchor <a href="https://x')).toEqual(['Truncated mid-anchor']);
+});
+
+test('sanitiseStory: entities decode AFTER stripping — an encoded tag prints as text, &amp;lt; stays &lt;', () => {
+  expect(sanitiseStory('<p>Fish &amp; Chips</p>')).toEqual(['Fish & Chips']);
+  // Encoded angle brackets are TEXT the author wrote, not markup — they
+  // decode to literal characters (React escapes text nodes on render).
+  expect(sanitiseStory('<p>&lt;b&gt;not bold&lt;/b&gt;</p>')).toEqual(['<b>not bold</b>']);
+  // &amp; decodes LAST, so a double-encoded entity never re-enters decoding.
+  expect(sanitiseStory('<p>&amp;lt;</p>')).toEqual(['&lt;']);
+});
+
+test('sanitiseStory: non-string and empty input yield []', () => {
+  expect(sanitiseStory(null)).toEqual([]);
+  expect(sanitiseStory(undefined)).toEqual([]);
+  expect(sanitiseStory('')).toEqual([]);
+  expect(sanitiseStory('   ')).toEqual([]);
 });

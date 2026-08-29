@@ -1262,3 +1262,140 @@ test('the header shows no aggregate on a first leg', () => {
   </MemoryRouter>);
   expect(screen.queryByText(/^\(\d+\)$/)).not.toBeInTheDocument();
 });
+
+// --- the running report (spec §13.42): the finished match page tells the
+// story — ESPN's match report as sanitised prose paragraphs, then the
+// minute-by-minute wire newest first. FT only (live is explicitly out of
+// this wave); both sections absent when the payload carried nothing
+// (§13.36 absence precedent — no placeholder, no degraded line). ---
+
+const reportDetail = { ...detail, report: {
+  headline: 'Celtic edge the derby',
+  paragraphs: [
+    'Celtic struck twice inside the opening half hour to settle a feverish derby.',
+    'Rangers rallied after the interval but found Schmeichel unbeatable.',
+    'The result sends Celtic four points clear at the summit.',
+    'A fourth paragraph the excerpt never shows.',
+    'A fifth paragraph the excerpt never shows either.',
+  ],
+} };
+
+const wireEntry = (minute, text, over = {}) =>
+  ({ minute, text, scoring: false, sequence: null, ...over });
+
+const wireDetail = { ...detail, commentary: [
+  wireEntry("1'", 'First Half begins.'),
+  wireEntry("33'", 'Goal! Celtic 1, Rangers 0. Daizen Maeda scores.', { scoring: true }),
+  wireEntry("90'+4'", 'Match ends, Celtic 2, Rangers 1.'),
+] };
+
+test('a finished match prints the report paragraphs in the blurb prose recipe with the ESPN credit', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={reportDetail} />
+  </MemoryRouter>);
+  expect(screen.getByText('Match report')).toBeInTheDocument();
+  const para = screen.getByText(/settle a feverish derby/);
+  expect(para.tagName).toBe('P');
+  // The house body prose recipe, verbatim from the competition blurb.
+  expect(para).toHaveClass('font-serif', 'text-[15.5px]', 'leading-relaxed', 'max-w-[60ch]');
+  // Attribution is non-negotiable — wire copy, not the house voice.
+  expect(screen.getByText('Report · ESPN')).toHaveClass(
+    'font-sans', 'text-[8.5px]', 'uppercase', 'tracking-[.14em]', 'text-muted');
+});
+
+test('the report is a broadsheet excerpt — the first three paragraphs, no read-more', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={reportDetail} />
+  </MemoryRouter>);
+  const section = screen.getByText('Match report').closest('section');
+  expect(section.querySelectorAll('p.font-serif')).toHaveLength(3);
+  expect(screen.getByText(/four points clear at the summit/)).toBeInTheDocument();
+  expect(screen.queryByText(/never shows/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/read more/i)).not.toBeInTheDocument();
+});
+
+test('the running report prints newest first, minutes as primes, scoring entries semibold', () => {
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={wireDetail} />
+  </MemoryRouter>);
+  const section = screen.getByText('The running report').closest('section');
+  const rows = screen.getAllByTestId('wire-entry');
+  expect(rows).toHaveLength(3);
+  // Newest first — the reverse of feed order, the timeline's own convention.
+  expect(rows[0].textContent).toContain('Match ends');
+  expect(rows[1].textContent).toContain('Goal!');
+  expect(rows[2].textContent).toContain('First Half begins.');
+  // The house prime law: ′ at render, never the feed's straight apostrophe.
+  expect(rows[0].textContent).toContain('90′+4′');
+  expect(section.textContent).not.toContain("33'");
+  expect(section.textContent).toContain('33′');
+  // The minute cell recipe, verbatim.
+  expect(rows[0].querySelector('span')).toHaveClass(
+    'font-sans', 'text-[9.5px]', 'text-accent', 'tabular-nums', 'w-7', 'shrink-0');
+  // Scoring entries carry the weight; plain wire stays regular.
+  expect(screen.getByText(/Goal! Celtic 1/).className).toContain('font-semibold');
+  expect(screen.getByText('First Half begins.').className).not.toContain('font-semibold');
+  // Rows separated by the soft hairline.
+  expect(rows[0]).toHaveClass('border-b');
+  // Three entries sit under the cap — no cap line.
+  expect(screen.queryByText(/The full report runs to/)).not.toBeInTheDocument();
+  // Attribution foot in the credit recipe.
+  expect(screen.getByText('Commentary · ESPN')).toHaveClass(
+    'font-sans', 'text-[8.5px]', 'uppercase', 'tracking-[.14em]', 'text-muted');
+});
+
+test('a long wire caps at 40 entries with the honest foot line — never a silent trim', () => {
+  const longWire = { ...detail, commentary: Array.from({ length: 41 }, (_, i) =>
+    wireEntry(`${i + 1}'`, `Wire entry number ${i + 1}.`)) };
+  render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={longWire} />
+  </MemoryRouter>);
+  expect(screen.getAllByTestId('wire-entry')).toHaveLength(40);
+  // Newest first: entry 41 leads, entry 1 (the kickoff) is the one trimmed.
+  expect(screen.getByText('Wire entry number 41.')).toBeInTheDocument();
+  expect(screen.queryByText('Wire entry number 1.')).not.toBeInTheDocument();
+  expect(screen.getByText('The full report runs to 41 entries.')).toHaveClass(
+    'font-sans', 'text-[10px]', 'text-muted');
+});
+
+test('a live fixture shows neither section even when the payload carries both — live is out of this wave', () => {
+  const both = { ...reportDetail, commentary: wireDetail.commentary };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={both} />
+  </MemoryRouter>);
+  expect(screen.queryByText('Match report')).not.toBeInTheDocument();
+  expect(screen.queryByText('The running report')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('wire-entry')).not.toBeInTheDocument();
+});
+
+test('the two sections sit between Stats and Standouts, in the capped rise-in-5 slot', () => {
+  const everything = { ...detail, report: reportDetail.report,
+    commentary: wireDetail.commentary, standouts: standoutsData };
+  const { container } = render(<MemoryRouter>
+    <MatchRoom fixture={{ ...fixture, status: 'ft' }} comp={byId('sco.1')} detail={everything} />
+  </MemoryRouter>);
+  const labels = [...container.querySelectorAll('h2')].map(h => h.textContent);
+  expect(labels.indexOf('Stats')).toBeGreaterThanOrEqual(0);
+  expect(labels.indexOf('Stats')).toBeLessThan(labels.indexOf('Match report'));
+  expect(labels.indexOf('Match report')).toBeLessThan(labels.indexOf('The running report'));
+  expect(labels.indexOf('The running report')).toBeLessThan(labels.indexOf('Standouts'));
+  expect(screen.getByText('Match report').closest('section'))
+    .toHaveClass('mb-8', 'rise-in', 'rise-in-5');
+  expect(screen.getByText('The running report').closest('section'))
+    .toHaveClass('mb-8', 'rise-in', 'rise-in-5');
+});
+
+test('empty commentary and a null report leave the page byte-identical to one without the fields', () => {
+  const ft = { ...fixture, status: 'ft' };
+  const { container: without } = render(<MemoryRouter>
+    <MatchRoom fixture={ft} comp={byId('sco.1')} detail={detail} />
+  </MemoryRouter>);
+  const { container: withEmpty } = render(<MemoryRouter>
+    <MatchRoom fixture={ft} comp={byId('sco.1')}
+      detail={{ ...detail, commentary: [], report: null }} />
+  </MemoryRouter>);
+  expect(withEmpty.innerHTML).toBe(without.innerHTML);
+  expect(without.querySelector('header')).toBeTruthy(); // sanity: the page really rendered
+  expect(screen.queryByText('Match report')).not.toBeInTheDocument();
+  expect(screen.queryByText('The running report')).not.toBeInTheDocument();
+});

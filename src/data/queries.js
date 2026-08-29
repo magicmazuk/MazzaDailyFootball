@@ -12,7 +12,7 @@ import { adaptBbcFixtures } from './bbc.js';
 import { wosflSeasonFixtures } from './wosfl.js';
 import { crestIndexFrom, enrichCrests } from './crests.js';
 import { adaptFeed } from './news.js';
-import { adaptEpisode, adaptLastEpisode, episodeUrl } from './iplayer.js';
+import { adaptEpisode, adaptLastEpisode, adaptUpcoming, episodeUrl } from './iplayer.js';
 import { adaptFplIndex, adaptTsdbPlayers, adaptWikiSearch, adaptWikiSummary } from './dossier.js';
 import { applyTv } from './tv.js';
 import { bbcUrl, dossierUrl, espnUrl, getJson, getText, iplayerUrl, newsUrl } from './client.js';
@@ -375,6 +375,28 @@ export function useHighlights() {
       url: episodeUrl(last.pid),
     }];
   });
+}
+
+// The airtime foot (spec §13.43): the scheduled broadcasts for every comp
+// carrying an iplayer brand — one episodes/upcoming.json per brand,
+// mirroring useHighlights' first tier, flattened to broadcast lines. A
+// tier still loading or failed contributes nothing: [] is the honest
+// empty schedule (absence is not degradation, the §13.36 precedent).
+export function useUpcomingBroadcasts() {
+  const comps = COMPETITIONS.filter(c => c.iplayer);
+  const upcoming = useQueries({
+    queries: comps.map(comp => ({
+      queryKey: ['iplayer-upcoming', comp.iplayer.brand],
+      staleTime: 30 * MIN,
+      retry: 1,
+      queryFn: async () => {
+        const { data } = await getJson(iplayerUrl(`/${comp.iplayer.brand}/episodes/upcoming.json`));
+        return adaptUpcoming(data);
+      },
+    })),
+  });
+  return comps.flatMap((comp, i) =>
+    (upcoming[i].data ?? []).map(b => ({ comp, show: comp.iplayer.show, ...b })));
 }
 
 // The Scout's Dossier (spec §13.37) — raw fetch hooks ONLY. Identity

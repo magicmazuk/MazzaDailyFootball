@@ -7,6 +7,7 @@ import { nextUpForFollowed } from './nextUp.js';
 import { upcomingTv } from './onTv.js';
 import { allTieIds, tieId, unrevealedDraws, unrevealedPhaseDraws } from '../../domain/draws.js';
 import TodayView from './TodayView.jsx';
+import Classified from './Classified.jsx';
 
 export default function TodayScreen() {
   const followed = usePrefs(s => s.followed);
@@ -22,13 +23,18 @@ export default function TodayScreen() {
 
   const followedIds = new Set(Object.keys(followed));
 
-  // Cup season results paired with their comp, registry order (comps is
+  // Season results paired with their comp, registry order (comps is
   // COMPETITIONS filtered by hiddenComps, never reordered) — seasons[i]
   // lines up with comps[i] since both are built from that same array.
-  const cupResults = comps
-    .map((comp, i) => ({ comp, ...seasons[i] }))
-    .filter(r => r.comp.type === 'cup');
+  const seasonResults = comps.map((comp, i) => ({ comp, ...seasons[i] }));
+  const cupResults = seasonResults.filter(r => r.comp.type === 'cup');
   const cupFixturesByComp = cupResults
+    .filter(r => r.isSuccess)
+    .map(r => ({ comp: r.comp, fixtures: r.data?.fixtures ?? [] }));
+  // The edition desk (spec §13.43): the same zip across EVERY non-hidden
+  // comp — editionState counts the whole day's full-times across all
+  // desks, and movement wants each comp's season of finished fixtures.
+  const seasonFixturesByComp = seasonResults
     .filter(r => r.isSuccess)
     .map(r => ({ comp: r.comp, fixtures: r.data?.fixtures ?? [] }));
 
@@ -99,6 +105,13 @@ export default function TodayScreen() {
         { comp: byId('sco.1'), rows: spl.data?.rows ?? [] },
         { comp: byId('eng.1'), rows: epl.data?.rows ?? [] },
       ]}
+      classified={(
+        <Classified
+          fixturesByComp={seasonFixturesByComp}
+          tables={{ 'sco.1': spl.data?.rows ?? null, 'eng.1': epl.data?.rows ?? null }}
+          followedIds={followedIds}
+        />
+      )}
     />
   );
 }

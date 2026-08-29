@@ -35,7 +35,7 @@ function Section({ label, muted, fixtures, followedIds, riseIn }) {
   );
 }
 
-export default function TodayView({ partition, followedIds, date, asOf = null, nextUp = [], onTv = [], quickTables = [], draws = [], phaseDraws = [] }) {
+export default function TodayView({ partition, followedIds, date, asOf = null, nextUp = [], onTv = [], quickTables = [], draws = [], phaseDraws = [], classified = null }) {
   const { yours, live, later, earlier, yesterday } = partition;
   const quiet = !yours.length && !live.length && !later.length && !earlier.length;
   return (
@@ -53,6 +53,13 @@ export default function TodayView({ partition, followedIds, date, asOf = null, n
       {phaseDraws.map(d => (
         <DrawInvitation key={`${d.comp.id}:${d.round}:${d.club.teamId}`} draw={d} />
       ))}
+      {/* The classified (spec §13.43) — the five o'clock edition IS the
+          lead when present, so it takes the invitation slot's position
+          (after the draws, before Your clubs) rather than a new named
+          rise-in slot. Wrapped like Papers/HighlightsReel: the element
+          owns its own <section> and gates itself; a null prop adds
+          nothing at all. */}
+      {classified && <div className="rise-in rise-in-1">{classified}</div>}
       {(yours.length > 0 || nextUp.length > 0) && (
         <section className="mt-8 first:mt-0 rise-in rise-in-1">
           <SectionLabel>★ Your clubs</SectionLabel>
