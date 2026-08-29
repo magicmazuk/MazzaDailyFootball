@@ -1348,3 +1348,54 @@ tier — "Wolves" in a synopsis now features Wolverhampton, and because an alias
 SPECIFIC ("man city" can only be City) it needs no derby guard of its own; (3) tsdbFace's
 team agreement accepts alias forms. The crest-enrichment norm (BBC↔ESPN lower leagues) is
 a separate seam with no reported gaps — deliberately untouched.
+
+## 13.42 The running report (the match page tells the story)
+
+From the overnight commission (picked 2026-08-30, with §13.43): finished match pages gain
+the story. The summary payload the app already fetches carries a `commentary` array the
+adapter drops (VERIFIED through the prod proxy: 99 prose entries on an eng.1 match, 17
+terse wire lines on a sco.1 one) and, sometimes, a full ESPN match report (`article` —
+absent on the probed Dundee derby, so presence gates per match).
+
+**Adapter:** adaptSummary passes through `commentary` (sequence/time/text, normalised to
+{ minute, text, scoring }) and `report` ({ headline, paragraphs[] } from article.story,
+sanitised to PLAIN TEXT — never ESPN's HTML/anchors). **Surface:** the match page, FT
+only: "Match report · ESPN" (two-three serif paragraphs, the body prose recipe) when a
+report exists; beneath it "The running report · ESPN" — newest first like the timeline,
+minute in the accent tabular sans, scoring entries semibold. Two honest tiers by data
+reality: eng.1 reads as prose; Scottish matches print their machine-cut lines AS wire —
+never dressed up. Both sections absent when the payload carries nothing (the §13.36
+absence precedent). Attribution is non-negotiable: this is wire copy, not the house voice.
+LIVE minute-by-minute is explicitly OUT of this wave — accumulation during a live match is
+unverified; it ships only after being proven through the proxy mid-match.
+
+## 13.43 The five o'clock edition (the classified)
+
+The convergence pick — two desks independently. When the day's card has settled, Today
+re-leads with THE CLASSIFIED: an edition block above Your Clubs (the DrawInvitation slot
+precedent), present only when earned, gone by morning.
+
+**The settled law (domain, pure, tested like the Collapse contracts):** the edition leads
+only when (a) it is 17:00 or later, London, and (b) at least N=3 of today's fixtures
+across the followed-league headliners are FT. Matches still live print INSIDE the edition
+as stop-press — "in play — result in a later edition" — never as finished; postponed
+prints P–P as a result line. The edition never claims the card is complete while a ball
+is in motion; arrows and stakes compute from COMPLETED matches only.
+
+**The composition:** (1) the day's results per competition, dense classified rows (score
+only — scorers live one tap away where §13.42 now tells the story; a scorer line here
+would cost a detail fetch per result and the pitch promised zero). (2) The headline
+tables with MOVEMENT: computeTable(all ft) vs computeTable(ft before today), position
+delta as ▲n/▼n/— in the quiet tabular sans. Both sides of the subtraction are the same
+pure machinery — self-consistent by construction; deductions caveat inherited from
+computeTable, so movement is labelled "today's movement", never "official". (3) THE
+STAKES LINE, capped at subtraction: a copy set proven case-by-case — "top by N" / "top on
+goal difference" / "Pth, N behind [leader]" (+ "with a game in hand" when played counts
+differ). No permutations, no clinch talk — one wrong stakes line kills trust forever.
+(4) The airtime foot: tonight's MOTD/Sportscene broadcast from the BBC's own
+episodes/upcoming.json (two new alternation entries in the iplayer allowlist; field
+absent, line off — never invent a broadcast).
+
+Riders absorbed per the ruling: stakes-lite trials HERE because a settled table is the
+one context where the arithmetic cannot shift mid-read. The §13.36 backlog note (Saturday's
+episode losing its iPlayer line when Sunday's lands) is NOT this wave — noted, separate.
