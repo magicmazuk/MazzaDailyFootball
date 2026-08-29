@@ -299,27 +299,33 @@ test('an already-revealed edition day opens straight into the full classified', 
   expect(screen.getAllByRole('link').map(l => l.getAttribute('href'))).toContain('/match/sco.1/t1');
 });
 
-test('the broadcast reveals one result per tap, desk order, radio cadence classes on the landing line', async () => {
+test('each tap reads a whole DESK, rows rolling on a stagger, four cadence beats per line', async () => {
   refold();
   const user = userEvent.setup();
   renderClassified();
   await user.click(screen.getByRole('button', { name: 'The results broadcast' }));
-  // nothing read yet — the stage awaits the first tap
   expect(screen.queryByText('Brora')).not.toBeInTheDocument();
-  const stage = screen.getByRole('button', { name: 'Read the next result' });
+  // the stage names the desk about to be read
+  const stage = screen.getByRole('button', { name: 'Read the Premiership results' });
   await user.click(stage);
-  // first result of the first desk lands, in cadence spans
-  const landed = screen.getByTestId('broadcast-row');
-  // spans render tight: names and scores as separate cells, cadence order
-  expect(landed.textContent).toBe('Brora3Cults0');
-  expect(landed.querySelector('.cl-beat-2')).not.toBeNull();
-  expect(landed.querySelector('.cl-beat-3')).not.toBeNull();
-  // its desk label arrived with it
-  expect(screen.getAllByRole('link', { name: 'Premiership' }).length).toBeGreaterThanOrEqual(1);
-  await user.click(screen.getByRole('button', { name: 'Read the next result' }));
-  expect(screen.getAllByTestId('broadcast-row')).toHaveLength(2);
-  // third and final result reads out — the day marks and the body prints
-  await user.click(screen.getByRole('button', { name: 'Read the next result' }));
+  // the WHOLE first desk lands in one tap — both its results
+  const rows = screen.getAllByTestId('broadcast-row');
+  expect(rows).toHaveLength(2);
+  expect(rows[0].textContent).toBe('Brora3Cults0');
+  expect(rows[1].textContent).toBe('Elgin1Dyce0');
+  // FOUR beats: home name, home score, away name, away score — the home
+  // score is its own breath (Celtic… two… Falkirk… ONE)
+  const spans = rows[0].querySelectorAll('span');
+  expect(spans[0].className).toContain('cl-beat-1');
+  expect(spans[1].className).toContain('cl-beat-2');
+  expect(spans[2].className).toContain('cl-beat-3');
+  expect(spans[3].className).toContain('cl-beat-4');
+  // the second row rolls on without a tap: same beats, staggered later
+  expect(rows[1].querySelector('.cl-beat-1').style.animationDelay).not.toBe(
+    rows[0].querySelector('.cl-beat-1').style.animationDelay);
+  // next tap reads the next desk and, being the last, marks the day
+  await user.click(screen.getByRole('button', { name: 'Read the Premier League results' }));
+  expect(screen.getAllByTestId('broadcast-row')).toHaveLength(3);
   expect(usePrefs.getState().classifiedRevealedOn).toBe('2026-08-29');
   expect(screen.getByText(/in play — result in a later edition/)).toBeInTheDocument();
 });
@@ -329,7 +335,7 @@ test('Reveal the rest abandons the ceremony into the full classified', async () 
   const user = userEvent.setup();
   renderClassified();
   await user.click(screen.getByRole('button', { name: 'The results broadcast' }));
-  await user.click(screen.getByRole('button', { name: 'Read the next result' }));
+  await user.click(screen.getByRole('button', { name: 'Read the Premiership results' }));
   await user.click(screen.getByRole('button', { name: 'Reveal the rest' }));
   expect(screen.getAllByRole('link').map(l => l.getAttribute('href'))).toContain('/match/sco.1/t2');
   expect(usePrefs.getState().classifiedRevealedOn).toBe('2026-08-29');

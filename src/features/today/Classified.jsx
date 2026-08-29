@@ -56,19 +56,26 @@ function ResultRow({ compId, fixture: f }) {
   );
 }
 
-// The broadcast's landed result (spec 13.45): the same dense row, but the
-// LATEST landing reads in the radio cadence - home and score together, a
-// beat, the away name, a longer beat, the away score drops. Earlier rows
-// print settled.
-function BroadcastRow({ compId, fixture: f, latest }) {
-  const b = n => (latest ? ` cl-beat-${n}` : '');
+// The broadcast's landed result (spec 13.45, re-metered 2026-08-31): the
+// dense row read in FOUR beats - home name... home score... away name...
+// (the longest breath)... away score. A whole desk reads per tap, each
+// row rolling on after the last; delays land inline per row so the desk
+// plays through without stopping. Settled desks print plain.
+const BEAT_MS = [0, 700, 1500, 2500];
+const ROW_MS = 3400;
+
+function BroadcastRow({ compId, fixture: f, cadenced, row = 0 }) {
+  const beat = n => (cadenced
+    ? { className: ` cl-beat-${n}`, style: { animationDelay: `${row * ROW_MS + BEAT_MS[n - 1]}ms` } }
+    : { className: '', style: undefined });
+  const b1 = beat(1); const b2 = beat(2); const b3 = beat(3); const b4 = beat(4);
   return (
     <Link data-testid="broadcast-row" to={`/match/${compId}/${f.id}`}
       className="flex items-baseline gap-2 border-b border-rule/70 py-1.5 text-[13px]">
-      <span className={`flex-1 min-w-0 truncate${b(1)}`}>{f.home.name}</span>
-      <span className={`tabular-nums${b(1)}`}>{f.home.score}</span>
-      <span className={`flex-1 min-w-0 truncate${b(2)}`}>{f.away.name}</span>
-      <span className={`tabular-nums${b(3)}`}>{f.away.score}</span>
+      <span className={`flex-1 min-w-0 truncate${b1.className}`} style={b1.style}>{f.home.name}</span>
+      <span className={`tabular-nums${b2.className}`} style={b2.style}>{f.home.score}</span>
+      <span className={`flex-1 min-w-0 truncate${b3.className}`} style={b3.style}>{f.away.name}</span>
+      <span className={`tabular-nums${b4.className}`} style={b4.style}>{f.away.score}</span>
     </Link>
   );
 }
@@ -143,7 +150,10 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
   const nowDate = now instanceof Date ? now : new Date(now);
   const inPlay = state.inPlay.length;
   const editionDay = londonDay(nowDate);
-  const mode = revealedOn === editionDay ? 'open' : phase;
+  // An in-progress ceremony keeps its phase (completion marks the day but
+  // must not yank the reader out mid-cadence); the remembered reveal only
+  // short-circuits a FRESH fold.
+  const mode = phase !== 'folded' ? phase : (revealedOn === editionDay ? 'open' : 'folded');
 
   // The desk order (user note, 2026-08-30): the two headline leagues lead
   // the classified - Premiership then Premier League - before the lower
@@ -177,9 +187,8 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
   const seen = new Set();
   const foot = airings?.filter(a => !seen.has(a.show) && seen.add(a.show)) ?? null;
 
-  // The broadcast queue: every result in desk order, one tap each.
-  const queue = results.flatMap(({ comp, fixtures }) =>
-    fixtures.map(fixture => ({ comp, fixture })));
+  // The count line's figure: every result across the desks.
+  const totalResults = results.reduce((n, r) => n + r.fixtures.length, 0);
 
   const masthead = (
     <>
@@ -202,7 +211,7 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
       <section className="mt-8">
         {masthead}
         <p className="text-[13px] mt-4">
-          {queue.length} results in{inPlay > 0 ? ` · ${inPlay} still in play` : ''}
+          {totalResults} results in{inPlay > 0 ? ` · ${inPlay} still in play` : ''}
         </p>
         <div className="flex items-baseline gap-5 mt-3">
           <button type="button" onClick={() => { setPhase('open'); markRevealed(editionDay); }}
@@ -218,48 +227,8 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
     );
   }
 
-  // THE BROADCAST (spec 13.45): tap-paced, desk order, the radio cadence
-  // on each landing. Completion marks the day and the full body prints.
-  if (mode === 'broadcast') {
-    const landed = queue.slice(0, read);
-    return (
-      <section className="mt-8">
-        {masthead}
-        {landed.map(({ comp, fixture }, i) => {
-          const firstOfComp = i === 0 || landed[i - 1].comp.id !== comp.id;
-          return (
-            <div key={fixture.id} className={firstOfComp ? 'mt-5' : ''}>
-              {firstOfComp && <CompLabel compId={comp.id}>{comp.shortName}</CompLabel>}
-              <BroadcastRow compId={comp.id} fixture={fixture} latest={i === read - 1} />
-            </div>
-          );
-        })}
-        <button type="button"
-          onClick={() => {
-            const next = read + 1;
-            setRead(next);
-            if (next >= queue.length) markRevealed(editionDay);
-          }}
-          className="block w-full text-center font-sans text-[10px] uppercase tracking-[.16em] text-accent py-6">
-          Read the next result
-        </button>
-        <button type="button" onClick={() => { setPhase('open'); markRevealed(editionDay); }}
-          className="block w-full text-center font-sans text-[9.5px] uppercase tracking-[.14em] text-muted underline underline-offset-4 pb-2">
-          Reveal the rest
-        </button>
-      </section>
-    );
-  }
-
-  return (
-    <section className="mt-8">
-      {masthead}
-      {results.map(({ comp, fixtures }) => (
-        <div key={comp.id} className="mt-5">
-          <CompLabel compId={comp.id}>{comp.shortName}</CompLabel>
-          {fixtures.map(f => <ResultRow key={f.id} compId={comp.id} fixture={f} />)}
-        </div>
-      ))}
+  const body = (
+    <>
       {state.postponed.length > 0 && (
         <div className="mt-2">
           {state.postponed.map(f => <PostponedRow key={f.id} fixture={f} />)}
@@ -287,6 +256,61 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
           Tonight — {foot.map(a => [a.show, a.timeLabel, a.channel].filter(Boolean).join(' · ')).join(' / ')}
         </p>
       )}
+    </>
+  );
+
+  // THE BROADCAST (spec 13.45, re-metered): each tap reads a whole DESK,
+  // its rows rolling through the four-beat cadence without stopping.
+  // Completion marks the day and prints the full body beneath the read
+  // card - the reader is never yanked out mid-cadence.
+  if (mode === 'broadcast') {
+    const landedDesks = results.slice(0, read);
+    const done = read >= results.length;
+    const next = results[read] ?? null;
+    return (
+      <section className="mt-8">
+        {masthead}
+        {landedDesks.map(({ comp, fixtures }, di) => (
+          <div key={comp.id} className="mt-5">
+            <CompLabel compId={comp.id}>{comp.shortName}</CompLabel>
+            {fixtures.map((fixture, ri) => (
+              <BroadcastRow key={fixture.id} compId={comp.id} fixture={fixture}
+                cadenced={di === read - 1} row={ri} />
+            ))}
+          </div>
+        ))}
+        {!done && next && (
+          <button type="button"
+            onClick={() => {
+              const n = read + 1;
+              setRead(n);
+              if (n >= results.length) markRevealed(editionDay);
+            }}
+            className="block w-full text-center font-sans text-[10px] uppercase tracking-[.16em] text-accent py-6">
+            Read the {next.comp.shortName} results
+          </button>
+        )}
+        {!done && (
+          <button type="button" onClick={() => { setPhase('open'); markRevealed(editionDay); }}
+            className="block w-full text-center font-sans text-[9.5px] uppercase tracking-[.14em] text-muted underline underline-offset-4 pb-2">
+            Reveal the rest
+          </button>
+        )}
+        {done && body}
+      </section>
+    );
+  }
+
+  return (
+    <section className="mt-8">
+      {masthead}
+      {results.map(({ comp, fixtures }) => (
+        <div key={comp.id} className="mt-5">
+          <CompLabel compId={comp.id}>{comp.shortName}</CompLabel>
+          {fixtures.map(f => <ResultRow key={f.id} compId={comp.id} fixture={f} />)}
+        </div>
+      ))}
+      {body}
     </section>
   );
 }
