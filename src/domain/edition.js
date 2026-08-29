@@ -138,7 +138,13 @@ export function stakesLine(rows, followedIds) {
   }
 
   const place = Number.isFinite(club.position) ? club.position : table.indexOf(club) + 1;
-  const base = `${rowName(club)} ${ordinal(place)}, ${leaderPts - clubPts} behind ${rowName(leader)}`;
+  // The "0 behind" hole (review fix): a club level on points with the
+  // leader but held beneath by goal difference must say so — "0 behind"
+  // is arithmetic posing as prose.
+  const gap = leaderPts - clubPts;
+  const base = gap === 0
+    ? `${rowName(club)} ${ordinal(place)}, level on points with ${rowName(leader)}`
+    : `${rowName(club)} ${ordinal(place)}, ${gap} behind ${rowName(leader)}`;
   const inHand = Number.isFinite(club.played) && Number.isFinite(leader.played)
     ? leader.played - club.played : 0;
   if (inHand === 1) return `${base}, with a game in hand.`;

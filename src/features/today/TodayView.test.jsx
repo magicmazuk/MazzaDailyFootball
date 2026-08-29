@@ -207,6 +207,42 @@ test('renders phase-draw cards after tie-draw cards, above Your clubs', () => {
   expect(clubCard.compareDocumentPosition(yourClubsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
+// --- the classified edition slot (spec §13.43) ---
+
+test('the classified renders in the lead slot — after draw invitations, before Your clubs — in its own rise-in-1 wrapper', () => {
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-29T17:05:00Z')} followedIds={new Set()}
+        partition={{ yours: [fx('1', 'Celtic', 'St Johnstone')], live: [], later: [], earlier: [], yesterday: [] }}
+        draws={[draw('sco.tennents', 'fourth-round')]}
+        classified={<section data-testid="the-classified">The Classified</section>} />
+    </MemoryRouter>,
+  );
+  const drawCard = screen.getByText('THE DRAW IS IN');
+  const classified = screen.getByTestId('the-classified');
+  const yourClubs = screen.getByText('★ Your clubs');
+  // eslint-disable-next-line no-bitwise
+  expect(drawCard.compareDocumentPosition(classified) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // eslint-disable-next-line no-bitwise
+  expect(classified.compareDocumentPosition(yourClubs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // The edition IS the lead when present — wrapped like Papers/Highlights,
+  // in the first arrival slot.
+  const wrapper = classified.closest('[class*="rise-in"]');
+  expect(wrapper).toHaveClass('rise-in', 'rise-in-1');
+});
+
+test('a null classified leaves the page byte-identical — the slot adds nothing at all', () => {
+  const props = {
+    date: new Date('2026-08-22T15:00:00Z'), followedIds: new Set(),
+    partition: emptyPartition,
+  };
+  const plain = render(<MemoryRouter><TodayView {...props} /></MemoryRouter>);
+  const before = plain.container.innerHTML;
+  plain.unmount();
+  const withNull = render(<MemoryRouter><TodayView {...props} classified={null} /></MemoryRouter>);
+  expect(withNull.container.innerHTML).toBe(before);
+});
+
 test('renders On TV section with televised fixture', () => {
   const onTvFixture = {
     id: 'f1',

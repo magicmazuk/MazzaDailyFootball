@@ -208,6 +208,16 @@ test('stakesLine: two or more games in hand counts them', () => {
   expect(stakesLine(rows, ['256'])).toBe('Celtic 2nd, 3 behind Rangers, with 2 games in hand.');
 });
 
+test('stakesLine: not first but level on points says so — never "0 behind" (review fix)', () => {
+  const rows = [row('257', 'Rangers', 72, 30, 1), row('256', 'Celtic', 72, 30, 2)];
+  expect(stakesLine(rows, ['256'])).toBe('Celtic 2nd, level on points with Rangers.');
+});
+
+test('stakesLine: the level-on-points base composes with the in-hand suffix like any other', () => {
+  const rows = [row('257', 'Rangers', 72, 30, 1), row('256', 'Celtic', 72, 29, 2)];
+  expect(stakesLine(rows, ['256'])).toBe('Celtic 2nd, level on points with Rangers, with a game in hand.');
+});
+
 test('stakesLine: ordinals print the classified way — 3rd, 12th, 21st', () => {
   const leader = row('999', 'Arsenal', 63, 26, 1);
   expect(stakesLine([leader, row('380', 'Wolves', 33, 26, 21)], ['380']))
