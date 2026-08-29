@@ -4,6 +4,8 @@
 // broadcast day alone; it FEATURES one only when the synopsis names both
 // clubs, derby-guarded so a Manchester never borrows the other's mention.
 
+import { knownAs } from './aliases.js';
+
 const FRESH_MS = 36 * 60 * 60 * 1000;
 
 const toMs = value => {
@@ -93,6 +95,11 @@ export function isFeatured(episode, fixture, dayFixtures) {
     .filter(n => n != null)
     .map(clubIdentity);
   return [fixture.home.name, fixture.away.name].every(name => {
+    // The nickname ledger (spec 13.41): a known-as phrase is SPECIFIC by
+    // the ledger's own law (no bare two-club words in it), so finding one
+    // satisfies the match even for derby-ambiguous clubs - "man city" in
+    // prose can only be City, whoever else played that day.
+    if (knownAs(name).some(form => hasPhrase(text, form))) return true;
     const club = clubIdentity(name);
     const ambiguous = club.tokens.length === 0
       || dayClubs.some(other => other.full !== club.full && other.key === club.key);

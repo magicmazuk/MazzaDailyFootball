@@ -2,6 +2,7 @@
 // dossier adapters' shapes — no fetching, no React. The law: never show an
 // unverified identity. A wrong face on the right name is worse than no face,
 // so every function here errs toward null.
+import { knownAs } from './aliases.js';
 
 // Lowercase, diacritics folded (NFD + combining-mark strip), punctuation
 // flattened to spaces — 'Cláudio' and 'claudio' meet here. Null in → ''.
@@ -99,10 +100,20 @@ export function fplTeamId(index, club) {
   const teams = (index.teams ?? [])
     .map(t => ({ team: t, n: normalise(t?.name) }))
     .filter(x => x.n !== '');
+  // Three tiers, each only when the last found nothing: exact name,
+  // phrase containment, then the nickname ledger (spec 13.41) - "Man
+  // City" and "Manchester City" meet only through knownAs. Uniqueness
+  // rules every tier: a club string whose forms reach two teams (bare
+  // "Manchester") identifies neither.
   const exact = teams.filter(x => x.n === clubN);
-  const matched = exact.length > 0
+  const contained = exact.length > 0
     ? exact
     : teams.filter(x => namesMatch(x.n, clubN));
+  const clubForms = knownAs(club);
+  const matched = contained.length > 0
+    ? contained
+    : teams.filter(x =>
+      knownAs(x.team.name).some(tf => clubForms.some(cf => namesMatch(tf, cf))));
   return matched.length === 1 ? (matched[0].team.id ?? null) : null;
 }
 
@@ -136,7 +147,11 @@ export function tsdbFace(players, context) {
   if (nameN === '' || clubN === '') return null;
   for (const p of players) {
     if (p == null || normalise(p.name) !== nameN) continue;
-    if (!namesMatch(normalise(p.team), clubN)) continue;
+    // Team agreement across ledger forms (spec §13.41): TSDB's "Man City"
+    // and ESPN's "Manchester City" are the same club, known differently.
+    const clubForms = knownAs(club);
+    const teamForms = knownAs(p.team);
+    if (!teamForms.some(tf => clubForms.some(cf => namesMatch(tf, cf)))) continue;
     const face = p.cutout ?? p.thumb ?? null;
     if (face != null) return face;
   }
