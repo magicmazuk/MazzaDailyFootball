@@ -186,6 +186,14 @@ body {
     30% { opacity: 1; }
     to { background-color: transparent; opacity: 1; }
   }
+  /* The results broadcast's radio cadence (spec 13.45, a performance):
+     "Celtic, one... Motherwell... NIL." Three one-shot beats on the
+     landing row - home and score together, the away name, then its score
+     drops. Reduced motion collapses every beat to an instant landing. */
+  .cl-beat-1 { animation: xfade-in 200ms var(--ease-house) both; }
+  .cl-beat-2 { animation: xfade-in 240ms var(--ease-house) 450ms both; }
+  .cl-beat-3 { animation: xfade-in 260ms var(--ease-house) 1050ms both; }
+
   .wire-leave {
     animation: wire-leave 420ms var(--ease-house) forwards;
     overflow: hidden;

@@ -40,6 +40,10 @@ export const usePrefs = create(persist(
     toggleGoalWireMode: () => set(s => ({
       goalWireMode: s.goalWireMode === 'line' ? 'stack' : 'line',
     })),
+    // The classified's fold (spec 13.45): revealed per London edition day;
+    // a new day folds the envelope again.
+    classifiedRevealedOn: null,
+    markClassifiedRevealed: day => set({ classifiedRevealedOn: day }),
     follow: club => set(s => ({ followed: { ...s.followed, [club.id]: club } })),
     unfollow: id => {
       if (id === CELTIC.id) return;

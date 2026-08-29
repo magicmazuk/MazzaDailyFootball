@@ -1,7 +1,9 @@
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { byId } from '../../domain/competitions.js';
+import { usePrefs } from '../../store/prefs.js';
 
 // Classified fetches only its airtime for itself (useUpcomingBroadcasts,
 // the Papers self-containment precedent); fixtures and tables arrive as
@@ -15,6 +17,9 @@ import Classified from './Classified.jsx';
 
 beforeEach(() => {
   useUpcomingBroadcasts.mockImplementation(() => []);
+  // Legacy pins predate the fold (§13.45): open the day by default; the
+  // broadcast suite refolds explicitly per test.
+  usePrefs.setState({ classifiedRevealedOn: '2026-08-29' });
 });
 
 // --- the Saturday card: 2026-08-29 is a real Saturday, BST, so 17:00
@@ -260,4 +265,72 @@ test('the results lead Premiership then Premier League, before the lower desks',
   expect(labels.indexOf('Premiership')).toBeLessThan(labels.indexOf('Premier League'));
   expect(labels.indexOf('Premier League')).toBeLessThan(labels.indexOf('Championship'));
   expect(labels.indexOf('Championship')).toBeLessThan(labels.indexOf('League Two'));
+});
+
+// --- the results broadcast (spec §13.45): the classified, folded ---------
+
+const refold = () => usePrefs.setState({ classifiedRevealedOn: null });
+
+test('the edition arrives FOLDED: masthead and honest count, no scores, two doors', () => {
+  refold();
+  renderClassified();
+  expect(screen.getByText('The Classified')).toBeInTheDocument();
+  // two results in, one in play — and not a score in sight
+  expect(screen.getByText('3 results in · 1 still in play')).toBeInTheDocument();
+  // not a name, not a score — the fold keeps the whole card in the envelope
+  expect(screen.queryByText('Brora')).not.toBeInTheDocument();
+  expect(screen.queryByText('Aird')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Reveal the card' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'The results broadcast' })).toBeInTheDocument();
+});
+
+test('Reveal the card opens the full classified at once and marks the day revealed', async () => {
+  refold();
+  renderClassified();
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Reveal the card' }));
+  expect(screen.getAllByRole('link').map(l => l.getAttribute('href'))).toContain('/match/sco.1/t1');
+  expect(usePrefs.getState().classifiedRevealedOn).toBe('2026-08-29');
+});
+
+test('an already-revealed edition day opens straight into the full classified', () => {
+  usePrefs.setState({ classifiedRevealedOn: '2026-08-29' });
+  renderClassified();
+  expect(screen.queryByRole('button', { name: 'Reveal the card' })).not.toBeInTheDocument();
+  expect(screen.getAllByRole('link').map(l => l.getAttribute('href'))).toContain('/match/sco.1/t1');
+});
+
+test('the broadcast reveals one result per tap, desk order, radio cadence classes on the landing line', async () => {
+  refold();
+  const user = userEvent.setup();
+  renderClassified();
+  await user.click(screen.getByRole('button', { name: 'The results broadcast' }));
+  // nothing read yet — the stage awaits the first tap
+  expect(screen.queryByText('Brora')).not.toBeInTheDocument();
+  const stage = screen.getByRole('button', { name: 'Read the next result' });
+  await user.click(stage);
+  // first result of the first desk lands, in cadence spans
+  const landed = screen.getByTestId('broadcast-row');
+  // spans render tight: names and scores as separate cells, cadence order
+  expect(landed.textContent).toBe('Brora3Cults0');
+  expect(landed.querySelector('.cl-beat-2')).not.toBeNull();
+  expect(landed.querySelector('.cl-beat-3')).not.toBeNull();
+  // its desk label arrived with it
+  expect(screen.getAllByRole('link', { name: 'Premiership' }).length).toBeGreaterThanOrEqual(1);
+  await user.click(screen.getByRole('button', { name: 'Read the next result' }));
+  expect(screen.getAllByTestId('broadcast-row')).toHaveLength(2);
+  // third and final result reads out — the day marks and the body prints
+  await user.click(screen.getByRole('button', { name: 'Read the next result' }));
+  expect(usePrefs.getState().classifiedRevealedOn).toBe('2026-08-29');
+  expect(screen.getByText(/in play — result in a later edition/)).toBeInTheDocument();
+});
+
+test('Reveal the rest abandons the ceremony into the full classified', async () => {
+  refold();
+  const user = userEvent.setup();
+  renderClassified();
+  await user.click(screen.getByRole('button', { name: 'The results broadcast' }));
+  await user.click(screen.getByRole('button', { name: 'Read the next result' }));
+  await user.click(screen.getByRole('button', { name: 'Reveal the rest' }));
+  expect(screen.getAllByRole('link').map(l => l.getAttribute('href'))).toContain('/match/sco.1/t2');
+  expect(usePrefs.getState().classifiedRevealedOn).toBe('2026-08-29');
 });
