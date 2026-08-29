@@ -172,6 +172,29 @@ body {
     to { opacity: 1; }
   }
 
+  /* The goalflash (spec 13.44 addendum): a NEW goal arriving on the wire
+     washes in on the drawer tone and settles - one shot, event-driven,
+     never looping. Its partner wire-leave sees the least-recent goal out:
+     fade and fold, then the component removes it on a timer (never on
+     animationend - jsdom and reduced-motion both skip animations, and a
+     row must never stick around waiting for an event that cannot fire). */
+  .wire-flash {
+    animation: wire-flash 900ms var(--ease-house) both;
+  }
+  @keyframes wire-flash {
+    from { background-color: var(--drawer, #F4F0E7); opacity: 0; }
+    30% { opacity: 1; }
+    to { background-color: transparent; opacity: 1; }
+  }
+  .wire-leave {
+    animation: wire-leave 420ms var(--ease-house) forwards;
+    overflow: hidden;
+  }
+  @keyframes wire-leave {
+    from { opacity: 1; max-height: 44px; }
+    to { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+  }
+
   /* The glide: src/ui/Collapse.jsx's outer element transitions `height`
      via this class alone (not an inline transition) precisely so this
      media query is the single place that can kill it for reduced-motion

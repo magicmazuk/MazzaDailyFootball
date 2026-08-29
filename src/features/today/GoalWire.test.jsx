@@ -98,3 +98,46 @@ test('a scorerless goal in the stack prints minute alone — never a dash of gue
   expect(row.textContent).toContain('12′');
   expect(row.textContent).toContain('Kilmarnock 0 Dundee United 1');
 });
+
+// --- the goalflash (spec §13.44 addendum): arrivals flash, departures fade ---
+
+test('a NEW goal arriving in stack mode wears the flash; the initial render never flashes', () => {
+  const { rerender } = render(<MemoryRouter><GoalWire fixtures={CARD} mode="stack" /></MemoryRouter>);
+  screen.getAllByTestId('wire-row').forEach(r => expect(r.className).not.toContain('wire-flash'));
+  const withNew = [...CARD.slice(0, 2), { ...CARD[2], goals: [...CARD[2].goals,
+    { minute: "31'", clockValue: 1860, scorer: 'New Man', teamId: 'm3a', ownGoal: false, penalty: false }] }];
+  rerender(<MemoryRouter><GoalWire fixtures={withNew} mode="stack" /></MemoryRouter>);
+  const rows = screen.getAllByTestId('wire-row');
+  expect(rows[0].textContent).toContain('31′');
+  expect(rows[0].className).toContain('wire-flash');
+  expect(rows[1].className).not.toContain('wire-flash');
+});
+
+test('the goal pushed off the stack lingers with wire-leave, then departs on the timer', () => {
+  const four = [...CARD, live('m6', 'Aberdeen', 1, 'Ross County', 0, '2026-08-29T14:00:00Z', [
+    { minute: "15'", clockValue: 900, scorer: 'A', teamId: 'm6h', ownGoal: false, penalty: false },
+  ])];
+  const { rerender } = render(<MemoryRouter><GoalWire fixtures={four} mode="stack" /></MemoryRouter>);
+  expect(screen.getAllByTestId('wire-row')).toHaveLength(4);
+  const five = [...four.slice(0, 3), { ...four[3], goals: [...four[3].goals,
+    { minute: "40'", clockValue: 2400, scorer: 'B', teamId: 'm6h', ownGoal: false, penalty: false }] }];
+  rerender(<MemoryRouter><GoalWire fixtures={five} mode="stack" /></MemoryRouter>);
+  const rows = screen.getAllByTestId('wire-row');
+  expect(rows).toHaveLength(5);
+  const leaver = rows.find(r => r.className.includes('wire-leave'));
+  expect(leaver.textContent).toContain('4′');
+  act(() => { vi.advanceTimersByTime(600); });
+  expect(screen.getAllByTestId('wire-row')).toHaveLength(4);
+  expect(screen.queryByText('4′')).not.toBeInTheDocument();
+});
+
+test('in line mode a new goal seizes the line with the flash and resets the rotation', () => {
+  const { rerender } = render(<MemoryRouter><GoalWire fixtures={CARD} /></MemoryRouter>);
+  act(() => { vi.advanceTimersByTime(6000); });
+  expect(screen.getByText(/Wilson 9′/)).toBeInTheDocument();
+  const withNew = [...CARD.slice(0, 2), { ...CARD[2], goals: [...CARD[2].goals,
+    { minute: "31'", clockValue: 1860, scorer: 'New Man', teamId: 'm3a', ownGoal: false, penalty: false }] }];
+  rerender(<MemoryRouter><GoalWire fixtures={withNew} /></MemoryRouter>);
+  expect(screen.getByText(/Man 31′/)).toBeInTheDocument();
+  expect(document.querySelector('.wire-flash')).not.toBeNull();
+});
