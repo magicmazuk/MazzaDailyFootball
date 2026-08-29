@@ -1324,3 +1324,27 @@ the name. Names print as FPL publishes them and stay PLAIN TEXT (no player-sheet
 FPL's web_name cannot be identity-matched to an ESPN roster safely; a wrong sheet is worse
 than no tap; backlogged as a Dossier-machinery enhancement). Both sections absent wherever
 the data is (£0, zero new upstreams).
+
+## 13.41 Known as (the nickname ledger)
+
+The user's audit question (2026-08-29): "how many clubs return null from fplTeamId?" —
+FOUR of twenty, and not from the ambiguity guard: FPL's own display names are
+abbreviations sharing no whole word with ESPN's (Man City, Man Utd, Nott'm Forest, Spurs).
+Phrase containment bridges truncation ("Newcastle United"↔"Newcastle") but never
+abbreviation. The same disease already sat in the backlog for a different wire: MOTD
+synopses say "Wolves", "Spurs", "Brighton" — prose names that token-matching can't reach,
+so those clubs never earn the Featured tier.
+
+**One cure: src/domain/aliases.js** — a small curated ledger of how clubs are KNOWN
+(normalised, bidirectional): the Manchesters' short forms, Nott'm Forest's apostrophe
+casualty, Spurs, Wolves, Hearts, Hibs, Brighton's spoken half. Like the pots it is hand
+data — but club nicknames outlive seasons, so it is curated once, not annually.
+`knownAs(name)` returns every normalised form of a club (itself + its aliases).
+
+**Wired at three seams, all null-biased as ever:** (1) fplTeamId tries alias forms only
+after exact and containment both miss — and the ambiguity rule still applies across ALL
+forms, so bare "Manchester" stays null; (2) highlights' isFeatured gains an alias-phrase
+tier — "Wolves" in a synopsis now features Wolverhampton, and because an alias phrase is
+SPECIFIC ("man city" can only be City) it needs no derby guard of its own; (3) tsdbFace's
+team agreement accepts alias forms. The crest-enrichment norm (BBC↔ESPN lower leagues) is
+a separate seam with no reported gaps — deliberately untouched.
