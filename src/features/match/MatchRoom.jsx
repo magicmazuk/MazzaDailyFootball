@@ -1,8 +1,8 @@
-// The match room (spec §7.6, §13.8): kicker and date, score and clock,
-// venue/attendance/referee, form coming in, a vertical timeline of moments
-// newest first, then stats, standouts, lineups and head-to-head. Degrades
-// to a clean scoreline plus one honest line where the source publishes no
-// detail.
+// The match room (spec §7.6, §13.8, §13.42): kicker and date, score and
+// clock, venue/attendance/referee, form coming in, a vertical timeline of
+// moments newest first, then stats, the match report and running report
+// (FT only), standouts, lineups and head-to-head. Degrades to a clean
+// scoreline plus one honest line where the source publishes no detail.
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Crest from '../../ui/Crest.jsx';
@@ -425,6 +425,68 @@ function Stats({ teamStats, fixture }) {
   );
 }
 
+// The match report (spec §13.42): ESPN's own wire copy for a finished
+// match, sanitised to plain-text paragraphs at the adapter — never its
+// HTML or anchors. FT only (live is explicitly out of this wave), and
+// absent when the payload carried none (§13.36 absence precedent — no
+// placeholder, no degraded line). Capped at the first three paragraphs
+// with no "read more": a broadsheet excerpt — the cap is editorial, not
+// technical. Attribution is non-negotiable: wire copy, not the house voice.
+function MatchReport({ report, fixture }) {
+  if (fixture.status !== 'ft' || !report) return null;
+  return (
+    <section className="mb-8 rise-in rise-in-5">
+      <SectionLabel muted>Match report</SectionLabel>
+      {report.paragraphs.slice(0, 3).map((para, i) => (
+        <p key={i} className="font-serif text-[15.5px] leading-relaxed max-w-[60ch] mb-3">
+          {para}
+        </p>
+      ))}
+      <p className="font-sans text-[8.5px] uppercase tracking-[.14em] text-muted">
+        Report · ESPN
+      </p>
+    </section>
+  );
+}
+
+// The running report (spec §13.42): the minute-by-minute wire, newest
+// first — the timeline's own convention on this page. Two honest tiers by
+// data reality: eng.1 prose reads as prose, Scottish machine-cut lines
+// print AS wire — never dressed up. FT only, absent when the payload
+// carried none. Capped at 40 entries with an honest foot line — a quiet
+// count, never a silent trim. The minute converts its straight apostrophe
+// to a prime (′) here at render — the adapter keeps the feed's raw form.
+const WIRE_CAP = 40;
+
+function RunningReport({ commentary, fixture }) {
+  if (fixture.status !== 'ft' || !commentary?.length) return null;
+  const entries = [...commentary].reverse();
+  return (
+    <section className="mb-8 rise-in rise-in-5">
+      <SectionLabel muted>The running report</SectionLabel>
+      {entries.slice(0, WIRE_CAP).map((e, i) => (
+        <div key={i} data-testid="wire-entry"
+          className="flex items-baseline gap-4 py-3 border-b border-rule/60">
+          <span className="font-sans text-[9.5px] text-accent tabular-nums w-7 shrink-0">
+            {(e.minute ?? '').replace(/'/g, '′')}
+          </span>
+          <span className={`text-[13px] flex-1 min-w-0${e.scoring ? ' font-semibold' : ''}`}>
+            {e.text}
+          </span>
+        </div>
+      ))}
+      {entries.length > WIRE_CAP && (
+        <p className="font-sans text-[10px] text-muted mt-3">
+          The full report runs to {entries.length} entries.
+        </p>
+      )}
+      <p className="font-sans text-[8.5px] uppercase tracking-[.14em] text-muted mt-3">
+        Commentary · ESPN
+      </p>
+    </section>
+  );
+}
+
 // Post-match standout performers per side — up to three quiet
 // "label: player value" rows. Gated on full time explicitly, not just on
 // data presence: ESPN's leaders endpoint publishes season-to-date numbers
@@ -631,6 +693,8 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings, oth
             <FormBlock form={detail?.form} fixture={fixture} />
             <Timeline events={detail?.events} fixture={fixture} comp={comp} onOpenPlayer={openPlayer} />
             <Stats teamStats={detail?.teamStats} fixture={fixture} />
+            <MatchReport report={detail?.report} fixture={fixture} />
+            <RunningReport commentary={detail?.commentary} fixture={fixture} />
             <Standouts standouts={detail?.standouts} fixture={fixture} comp={comp}
               lineups={detail?.lineups} onOpenPlayer={openPlayer} />
             <Lineups lineups={detail?.lineups} fixture={fixture} comp={comp} onOpenPlayer={openPlayer} />
