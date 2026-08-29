@@ -127,3 +127,9 @@ test('goalWireMode defaults to the revolving line and toggles to the stack and b
   usePrefs.getState().toggleGoalWireMode();
   expect(usePrefs.getState().goalWireMode).toBe('line');
 });
+
+test('the classified remembers its reveal per London day, and refolds on a new one', () => {
+  expect(usePrefs.getState().classifiedRevealedOn).toBe(null);
+  usePrefs.getState().markClassifiedRevealed('2026-08-29');
+  expect(usePrefs.getState().classifiedRevealedOn).toBe('2026-08-29');
+});
