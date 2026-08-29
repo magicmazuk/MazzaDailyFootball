@@ -190,12 +190,30 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
   // The count line's figure: every result across the desks.
   const totalResults = results.reduce((n, r) => n + r.fixtures.length, 0);
 
-  const masthead = (
+  // The replay glyph (user note, 2026-08-31): a small accent refresh
+  // beside the heading, ONLY on the surfaced card — the ritual's door
+  // shrunk to a mark. aria keeps its full name.
+  const replayDoor = (
+    <button type="button" aria-label="Replay the results broadcast"
+      onClick={() => { setRead(0); setPhase('broadcast'); }}
+      className="text-accent p-1 -m-1">
+      <svg viewBox="0 0 24 24" className="w-[13px] h-[13px]" fill="none"
+        stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 12a8 8 0 1 1-2.4-5.7" />
+        <path d="M20 4v4h-4" />
+      </svg>
+    </button>
+  );
+
+  const masthead = (withReplay = false) => (
     <>
       <p className="font-sans text-[10px] uppercase tracking-[.22em] text-accent">
         The Five O&apos;Clock Edition
       </p>
-      <h2 className="text-[21px] mt-1">The Classified</h2>
+      <div className="flex items-center gap-2.5">
+        <h2 className="text-[21px] mt-1">The Classified</h2>
+        {withReplay && replayDoor}
+      </div>
       <p className="font-sans text-[9.5px] uppercase tracking-[.14em] text-muted mt-1.5">
         {londonLongDate(nowDate)} · {inPlay === 0
           ? 'full time across the card'
@@ -209,7 +227,7 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
   if (mode === 'folded') {
     return (
       <section className="mt-8">
-        {masthead}
+        {masthead()}
         <p className="text-[13px] mt-4">
           {totalResults} results in{inPlay > 0 ? ` · ${inPlay} still in play` : ''}
         </p>
@@ -269,7 +287,7 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
     const next = results[read] ?? null;
     return (
       <section className="mt-8">
-        {masthead}
+        {masthead()}
         {landedDesks.map(({ comp, fixtures }, di) => (
           <div key={comp.id} className="mt-5">
             <CompLabel compId={comp.id}>{comp.shortName}</CompLabel>
@@ -303,14 +321,7 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
 
   return (
     <section className="mt-8">
-      {masthead}
-      {/* The replay (user ask, 2026-08-31): the ritual, again - phase wins
-          over the remembered reveal, so the stage returns without
-          unmarking the day. The draw ceremonies' own replay recipe. */}
-      <button type="button" onClick={() => { setRead(0); setPhase('broadcast'); }}
-        className="font-sans text-[9.5px] uppercase tracking-[.12em] text-muted mt-2">
-        Replay the results broadcast
-      </button>
+      {masthead(true)}
       {results.map(({ comp, fixtures }) => (
         <div key={comp.id} className="mt-5">
           <CompLabel compId={comp.id}>{comp.shortName}</CompLabel>
