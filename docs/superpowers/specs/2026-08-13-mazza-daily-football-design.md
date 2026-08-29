@@ -1467,3 +1467,11 @@ ceremonies' own). In-play and postponed matches never enter the queue — they a
 results — and print in the completed body's stop-press as ever. Completion marks the day
 revealed and the full body (tables, movement, stakes, airtime) prints beneath. Reduced
 motion collapses every beat to an instant landing; the tap pacing IS the ceremony.
+
+**§13.45 addendum — the announcer's breath (user notes, 2026-08-31).** Re-metered on the
+editor's ear: FOUR beats per line — home name… home score… away name… (the longest
+breath)… away score — the home score is its own breath, and slower throughout (0/700/1500/
+2500ms, rows rolling 3.4s apart). Each tap now reads a whole DESK without stopping (the
+stage names it: "Read the Premiership results"), rows staggering through the cadence;
+completion prints the body beneath the read card rather than yanking the reader out
+mid-cadence. Delays land inline per row; the beat classes carry only the landing.
