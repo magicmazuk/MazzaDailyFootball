@@ -133,3 +133,11 @@ test('the classified remembers its reveal per London day, and refolds on a new o
   usePrefs.getState().markClassifiedRevealed('2026-08-29');
   expect(usePrefs.getState().classifiedRevealedOn).toBe('2026-08-29');
 });
+
+test('the match story remembers its form — events or the wire — and toggles', () => {
+  expect(usePrefs.getState().matchStoryMode).toBe('match');
+  usePrefs.getState().toggleMatchStoryMode();
+  expect(usePrefs.getState().matchStoryMode).toBe('wire');
+  usePrefs.getState().toggleMatchStoryMode();
+  expect(usePrefs.getState().matchStoryMode).toBe('match');
+});

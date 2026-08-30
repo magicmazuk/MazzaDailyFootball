@@ -17,6 +17,7 @@ import TvBadge from '../../ui/TvBadge.jsx';
 import { aggScores, legLabel, tieLine } from '../../domain/legs.js';
 import { prettifyRound } from '../../domain/round.js';
 import { useFixtureHighlight } from './highlight.js';
+import { usePrefs } from '../../store/prefs.js';
 import PlayerSheet from '../player/PlayerSheet.jsx';
 import VideoCard from './VideoCard.jsx';
 
@@ -326,12 +327,61 @@ function TimelineRow({ e, fixture, comp, onOpenPlayer }) {
   );
 }
 
-function Timeline({ events, fixture, comp, onOpenPlayer }) {
-  if (!events?.length) return null;
+// The story toggle (spec 13.42 second addendum, the 13.44 glyph grammar):
+// dots are the events, bars are the wire - active in ink, idle in rule
+// tone, the choice persisted. Offered only when both readings exist.
+function StoryToggle({ story, onToggle }) {
+  const glyph = (kind, active, label) => (
+    <button key={label} type="button" aria-label={label} aria-pressed={active}
+      onClick={active ? undefined : onToggle}
+      className="p-1 -m-0.5 flex flex-col gap-[2px] items-center w-[18px]">
+      {kind === 'dots'
+        ? [0, 1, 2].map(i => (
+          <span key={i} className={`block w-[4px] h-[4px] rounded-full ${active ? 'bg-ink' : 'bg-rule'}`} />
+        ))
+        : [0, 1, 2].map(i => (
+          <span key={i} className={`block h-[2px] w-full rounded-sm ${active ? 'bg-ink' : 'bg-rule'}`} />
+        ))}
+    </button>
+  );
+  return (
+    <span className="flex gap-1.5 items-center normal-case tracking-normal">
+      {glyph('dots', story === 'match', 'The match')}
+      {glyph('bars', story === 'wire', 'The running report')}
+    </span>
+  );
+}
+
+function Timeline({ events, fixture, comp, onOpenPlayer, commentary = null, story = 'match', onToggleStory = null }) {
+  const wire = commentary ?? [];
+  const both = events?.length > 0 && wire.length > 0;
+  if (!events?.length && wire.length === 0) return null;
+  const reading = !events?.length ? 'wire' : (wire.length === 0 ? 'match' : story);
   return (
     <section className="mb-8 rise-in rise-in-3">
-      <SectionLabel>The match</SectionLabel>
-      {[...events].reverse().map((e, i) => (
+      <SectionLabel right={both && onToggleStory
+        ? <StoryToggle story={reading} onToggle={onToggleStory} /> : null}>
+        The match
+      </SectionLabel>
+      {reading === 'wire' && (
+        <>
+          {[...wire].reverse().map((e, i) => (
+            <div key={i} data-testid="wire-entry"
+              className="flex items-baseline gap-4 py-3 border-b border-rule/60">
+              <span className="font-sans text-[9.5px] text-accent tabular-nums w-7 shrink-0">
+                {(e.minute ?? '').replace(/'/g, '′')}
+              </span>
+              <span className={`text-[13px] flex-1 min-w-0${e.scoring ? ' font-semibold' : ''}`}>
+                {e.text}
+              </span>
+            </div>
+          ))}
+          <p className="font-sans text-[8.5px] uppercase tracking-[.14em] text-muted mt-3">
+            Commentary · ESPN
+          </p>
+        </>
+      )}
+      {reading === 'match' && [...events].reverse().map((e, i) => (
         <TimelineRow key={i} e={e} fixture={fixture} comp={comp} onOpenPlayer={onOpenPlayer} />
       ))}
     </section>
@@ -457,47 +507,6 @@ function MatchReport({ report, fixture }) {
 // first — the timeline's own convention on this page. Two honest tiers by
 // data reality: eng.1 prose reads as prose, Scottish machine-cut lines
 // print AS wire — never dressed up. FT only, absent when the payload
-// carried none. Pick B (user note 2026-08-30): the timeline is the one
-// events surface; the wire is texture, FOLDED beneath it — a lazy-once
-// Collapse in the accordion culture, every entry once opened (the 40-cap
-// retired with the fold; a collapse owns its own length). The minute
-// converts its straight apostrophe to a prime (′) here at render.
-function RunningReport({ commentary, fixture }) {
-  const [open, setOpen] = useState(false);
-  const [everOpened, setEverOpened] = useState(false);
-  if (fixture.status !== 'ft' || !commentary?.length) return null;
-  const entries = [...commentary].reverse();
-  return (
-    <section className="mb-8 rise-in rise-in-5">
-      <SectionLabel muted>The running report</SectionLabel>
-      <button type="button"
-        onClick={() => { setOpen(v => !v); setEverOpened(true); }}
-        className="font-sans text-[10px] uppercase tracking-[.14em] text-muted underline underline-offset-4 mt-1">
-        {open ? 'Fold the report away' : `Read the full report · ${entries.length} entries`}
-      </button>
-      <Collapse open={open}>
-        {everOpened && (
-          <div className="mt-2">
-            {entries.map((e, i) => (
-              <div key={i} data-testid="wire-entry"
-                className="flex items-baseline gap-4 py-3 border-b border-rule/60">
-                <span className="font-sans text-[9.5px] text-accent tabular-nums w-7 shrink-0">
-                  {(e.minute ?? '').replace(/'/g, '′')}
-                </span>
-                <span className={`text-[13px] flex-1 min-w-0${e.scoring ? ' font-semibold' : ''}`}>
-                  {e.text}
-                </span>
-              </div>
-            ))}
-            <p className="font-sans text-[8.5px] uppercase tracking-[.14em] text-muted mt-3">
-              Commentary · ESPN
-            </p>
-          </div>
-        )}
-      </Collapse>
-    </section>
-  );
-}
 
 // Post-match standout performers per side — up to three quiet
 // "label: player value" rows. Gated on full time explicitly, not just on
@@ -686,6 +695,9 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings, oth
   // attribution, own goals inverted), so the sheet's dossier can verify
   // against it (spec §13.37). Club may still be null (unattributed event).
   const [sheetPlayer, setSheetPlayer] = useState(null);
+  // The story toggle (spec 13.42 second addendum) - the reader's reading.
+  const matchStoryMode = usePrefs(st => st.matchStoryMode);
+  const toggleMatchStoryMode = usePrefs(st => st.toggleMatchStoryMode);
   const openPlayer = (id, club = null) => setSheetPlayer({ id, club });
   const headerFixture = fixture.status === 'live'
     ? withLiveScore(fixture, detail?.liveScore)
@@ -712,8 +724,9 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings, oth
             <Stats teamStats={detail?.teamStats} fixture={fixture} />
             <Standouts standouts={detail?.standouts} fixture={fixture} comp={comp}
               lineups={detail?.lineups} onOpenPlayer={openPlayer} />
-            <Timeline events={detail?.events} fixture={fixture} comp={comp} onOpenPlayer={openPlayer} />
-            <RunningReport commentary={detail?.commentary} fixture={fixture} />
+            <Timeline events={detail?.events} fixture={fixture} comp={comp} onOpenPlayer={openPlayer}
+              commentary={fixture.status === 'ft' ? detail?.commentary : null}
+              story={matchStoryMode} onToggleStory={toggleMatchStoryMode} />
             <Lineups lineups={detail?.lineups} fixture={fixture} comp={comp} onOpenPlayer={openPlayer} />
             <HeadToHead headToHead={detail?.headToHead} fixture={fixture} />
           </>)

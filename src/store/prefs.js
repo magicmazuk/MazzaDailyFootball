@@ -44,6 +44,12 @@ export const usePrefs = create(persist(
     // a new day folds the envelope again.
     classifiedRevealedOn: null,
     markClassifiedRevealed: day => set({ classifiedRevealedOn: day }),
+    // The match story's two readings (spec 13.42 second addendum): the
+    // structured events or the wire, the reader's choice kept.
+    matchStoryMode: 'match',
+    toggleMatchStoryMode: () => set(s => ({
+      matchStoryMode: s.matchStoryMode === 'match' ? 'wire' : 'match',
+    })),
     follow: club => set(s => ({ followed: { ...s.followed, [club.id]: club } })),
     unfollow: id => {
       if (id === CELTIC.id) return;
