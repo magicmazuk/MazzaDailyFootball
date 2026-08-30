@@ -24,13 +24,28 @@ const preferredVoice = () => {
   return voices.find(v => v.lang === 'en-GB') ?? null;
 };
 
-function utter(text, gen, onEnd) {
+function utter(text, gen, onStart, onEnd) {
   if (gen !== generation) return;
   const u = new SpeechSynthesisUtterance(text);
   const voice = preferredVoice();
   if (voice) u.voice = voice;
   u.rate = 0.9; // slowed with the visual re-meter (user's ear)
-  u.onend = () => { if (gen === generation) onEnd?.(); };
+  // The needle drop (user's ear, 2026-08-30): the engine has SPIN-UP
+  // latency on first play (worst on iOS) - the visual must land when the
+  // voice actually SOUNDS, not when we enqueue. onstart is that moment;
+  // the started flag makes the onend fallback idempotent on engines that
+  // skip onstart.
+  let started = false;
+  u.onstart = () => {
+    if (gen !== generation || started) return;
+    started = true;
+    onStart?.();
+  };
+  u.onend = () => {
+    if (gen !== generation) return;
+    if (!started) { started = true; onStart?.(); }
+    onEnd?.();
+  };
   globalThis.speechSynthesis.speak(u);
 }
 
@@ -45,13 +60,16 @@ export function speakCard(desks, { onDesk, onDone } = {}) {
     { text: `${desk.comp.shortName}.`, desk: i },
     ...desk.fixtures.map(f => ({ text: resultLine(f), desk: null })),
   ]);
+  // Warm the voice list - iOS returns [] until voiceschanged; asking now
+  // primes it so the first REAL utterance gets the en-GB voice.
+  globalThis.speechSynthesis.getVoices?.();
   const next = at => {
     if (gen !== generation) return;
     if (at >= lines.length) { onDone?.(); return; }
     const line = lines[at];
-    if (line.desk != null) onDesk?.(line.desk);
-    if (gen !== generation) return; // onDesk may have stopped us
-    utter(line.text, gen, () => next(at + 1));
+    utter(line.text, gen,
+      () => { if (line.desk != null) onDesk?.(line.desk); },
+      () => next(at + 1));
   };
   next(0);
 }
