@@ -62,12 +62,17 @@ function ResultRow({ compId, fixture: f }) {
 // (the longest breath)... away score. A whole desk reads per tap, each
 // row rolling on after the last; delays land inline per row so the desk
 // plays through without stopping. Settled desks print plain.
-const BEAT_MS = [0, 700, 1500, 2500];
-const ROW_MS = 3400;
+// Re-metered with the announcer's own pacing (user's ear, 2026-08-30):
+// the league title gets its OWN beat before the first result rolls - the
+// voice reads the desk name first, and the text now waits for it. And a
+// touch slower throughout.
+const TITLE_MS = 1600;
+const BEAT_MS = [0, 800, 1700, 2800];
+const ROW_MS = 3900;
 
 function BroadcastRow({ compId, fixture: f, cadenced, row = 0 }) {
   const beat = n => (cadenced
-    ? { className: ` cl-beat-${n}`, style: { animationDelay: `${row * ROW_MS + BEAT_MS[n - 1]}ms` } }
+    ? { className: ` cl-beat-${n}`, style: { animationDelay: `${TITLE_MS + row * ROW_MS + BEAT_MS[n - 1]}ms` } }
     : { className: '', style: undefined });
   const b1 = beat(1); const b2 = beat(2); const b3 = beat(3); const b4 = beat(4);
   return (
@@ -293,7 +298,7 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
       <section className="mt-8">
         {masthead()}
         {landedDesks.map(({ comp, fixtures }, di) => (
-          <div key={comp.id} className="mt-5">
+          <div key={comp.id} className={`mt-5${di === read - 1 ? ' cl-beat-1' : ''}`}>
             <CompLabel compId={comp.id}>{comp.shortName}</CompLabel>
             {fixtures.map((fixture, ri) => (
               <BroadcastRow key={fixture.id} compId={comp.id} fixture={fixture}

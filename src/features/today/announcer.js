@@ -29,7 +29,7 @@ function utter(text, gen, onEnd) {
   const u = new SpeechSynthesisUtterance(text);
   const voice = preferredVoice();
   if (voice) u.voice = voice;
-  u.rate = 0.95;
+  u.rate = 0.9; // slowed with the visual re-meter (user's ear)
   u.onend = () => { if (gen === generation) onEnd?.(); };
   globalThis.speechSynthesis.speak(u);
 }
