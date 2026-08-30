@@ -1504,3 +1504,25 @@ header (ESPN's summary header lagging its own events). While live, the header sc
 takes the events tally when events run AHEAD (events lead in ESPN's pipeline; the lore
 trusts their tallies), and trusts the header when events run behind (a chalked-off goal
 mid-removal) — asymmetric on purpose, one poll heals either way.
+
+## 13.47 The announcer (the broadcast, aloud)
+
+The user's ask (2026-08-30): press play and HEAR the classified check. The engine is the
+browser's own — the Web Speech API (speechSynthesis): £0, no key, no package, no network,
+on-device, en-GB voice preferred (iOS's default is precisely an official-sounding chap).
+
+**The design: audio IS the pacing engine.** In the broadcast, a small play control beside
+the stage. Playing, the announcer reads the card desk by desk — the desk's name, then each
+result as one utterance ("St Mirren, three. Motherwell, three.") — and each desk REVEALS
+as its reading begins, the visual cadence rolling under the voice. A score of 0 is SPOKEN
+as "nil" (displayed as 0 — the radio word, the print numeral). Pause cancels the speech
+and hands the stage back to the thumb at the current position; play resumes from there.
+The last desk's reading completes the broadcast as ever (day marked, body printed).
+
+**Laws.** The control appears only where speechSynthesis exists — never a dead button.
+No SSML, no expressive TTS: short utterances and punctuation ARE the cadence, per the
+user's own observation that the form is monotone by design. Known device truths, noted
+not fought: iOS needs a user gesture (the play button is one); voices vary per device
+(request en-GB, accept what the phone offers); a locked screen pauses it (the radio never
+played through a closed car door either); the silent-switch routing is a verify-on-device
+item. src/features/today/announcer.js wraps the API in a testable seam.
