@@ -1452,3 +1452,28 @@ test('no commentary means no glyphs — the match section stays plain, never a d
   </MemoryRouter>);
   expect(screen.queryByRole('button', { name: 'The running report' })).not.toBeInTheDocument();
 });
+
+// --- the header keeps up with its own dots (user report, 2026-08-30:
+// a 2' goal on the line, 0-0 above it — ESPN's header lagging its events) ---
+
+test('while live, the header score takes the events tally when events run AHEAD of the header', () => {
+  const lagging = { ...detail,
+    liveScore: { home: { teamId: 'Celtic', score: 0 }, away: { teamId: 'Rangers', score: 0 } },
+    events: [{ minute: "2'", type: 'Goal', player: 'Early Man', teamId: 'Rangers', scoringPlay: true }] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={lagging} />
+  </MemoryRouter>);
+  // header shows 0-1 (the dot's truth), not the lagging 0-0
+  const scores = screen.getAllByText(/^[0-9]$/, { selector: 'span' }).map(el => el.textContent);
+  expect(scores).toContain('1');
+});
+
+test('a chalked-off goal trusts the header: events BEHIND the header never pull it down', () => {
+  const chalked = { ...detail,
+    liveScore: { home: { teamId: 'Celtic', score: 2 }, away: { teamId: 'Rangers', score: 1 } },
+    events: [{ minute: "12'", type: 'Goal', player: 'One Goal', teamId: 'Celtic', scoringPlay: true }] };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={chalked} />
+  </MemoryRouter>);
+  expect(screen.getByText('2')).toBeInTheDocument();
+});
