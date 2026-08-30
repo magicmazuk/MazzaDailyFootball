@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useUpcomingBroadcasts } from '../../data/queries.js';
 import { usePrefs } from '../../store/prefs.js';
+import { announcerSupported, speakCard, stopSpeaking } from './announcer.js';
 import {
   editionState, movement, stakesLine, todaysCard, tonightsAirtime,
 } from '../../domain/edition.js';
@@ -144,6 +145,9 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
   // already revealed (either door marks it; a new edition day refolds).
   const [phase, setPhase] = useState('folded');
   const [read, setRead] = useState(0);
+  // The announcer (spec 13.47): while playing, the VOICE is the pacing
+  // engine - each desk reveals as its reading begins.
+  const [playing, setPlaying] = useState(false);
   const state = editionState(fixturesByComp, now);
   if (state == null) return null;
 
@@ -297,7 +301,7 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
             ))}
           </div>
         ))}
-        {!done && next && (
+        {!done && next && !playing && (
           <button type="button"
             onClick={() => {
               const n = read + 1;
@@ -306,6 +310,37 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
             }}
             className="block w-full text-center font-sans text-[10px] uppercase tracking-[.16em] text-accent py-6">
             Read the {next.comp.shortName} results
+          </button>
+        )}
+        {!done && announcerSupported() && (
+          <button type="button"
+            aria-label={playing ? 'Pause the broadcast' : 'Play the broadcast'}
+            onClick={() => {
+              if (playing) { stopSpeaking(); setPlaying(false); return; }
+              setPlaying(true);
+              const from = read;
+              speakCard(results.slice(from), {
+                onDesk: i => {
+                  const n = from + i + 1;
+                  setRead(n);
+                  if (n >= results.length) markRevealed(editionDay);
+                },
+                onDone: () => { setPlaying(false); markRevealed(editionDay); setRead(results.length); },
+              });
+            }}
+            className="block mx-auto text-accent p-2 mt-1">
+            {playing
+              ? (
+                <span className="flex gap-[3px]" aria-hidden>
+                  <span className="block w-[3px] h-[12px] bg-accent" />
+                  <span className="block w-[3px] h-[12px] bg-accent" />
+                </span>
+              )
+              : (
+                <svg viewBox="0 0 12 14" className="w-[11px] h-[13px]" aria-hidden>
+                  <path d="M1 1l10 6-10 6z" fill="currentColor" />
+                </svg>
+              )}
           </button>
         )}
         {!done && (
