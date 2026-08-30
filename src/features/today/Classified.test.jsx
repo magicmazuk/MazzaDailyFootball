@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, test, vi } from 'vitest';
@@ -369,4 +369,55 @@ test('the replay is a glyph beside the heading — accent, and only on the surfa
   expect(door.className).toContain('text-accent');
   expect(door.querySelector('svg')).not.toBeNull();
   expect(door.closest('h2, div')).toContainElement(screen.getByText('The Classified'));
+});
+
+// --- the announcer (spec §13.47): press play, hear the check -----------
+
+vi.mock('./announcer.js', () => ({
+  announcerSupported: vi.fn(() => true),
+  speakCard: vi.fn(),
+  stopSpeaking: vi.fn(),
+  resultLine: vi.fn(),
+}));
+import { announcerSupported, speakCard, stopSpeaking } from './announcer.js';
+
+test('the broadcast stage offers play; playing reads the REMAINING desks and reveals each as read', async () => {
+  refold();
+  const user = userEvent.setup();
+  renderClassified();
+  await user.click(screen.getByRole('button', { name: 'The results broadcast' }));
+  await user.click(screen.getByRole('button', { name: 'Play the broadcast' }));
+  expect(speakCard).toHaveBeenCalledTimes(1);
+  const [desks, handlers] = speakCard.mock.calls[0];
+  expect(desks.map(d => d.comp.shortName)).toEqual(['Premiership', 'Premier League']);
+  // the voice reveals desks as it reads them
+  act(() => handlers.onDesk(0));
+  expect(screen.getAllByTestId('broadcast-row')).toHaveLength(2);
+  act(() => handlers.onDesk(1));
+  expect(screen.getAllByTestId('broadcast-row')).toHaveLength(3);
+  // the final line completes the broadcast: day marked, body printed
+  act(() => handlers.onDone());
+  expect(usePrefs.getState().classifiedRevealedOn).toBe('2026-08-29');
+  expect(screen.getByText(/in play — result in a later edition/)).toBeInTheDocument();
+});
+
+test('pause hands the stage back to the thumb and cancels the voice', async () => {
+  refold();
+  const user = userEvent.setup();
+  renderClassified();
+  await user.click(screen.getByRole('button', { name: 'The results broadcast' }));
+  await user.click(screen.getByRole('button', { name: 'Play the broadcast' }));
+  await user.click(screen.getByRole('button', { name: 'Pause the broadcast' }));
+  expect(stopSpeaking).toHaveBeenCalled();
+  expect(screen.getByRole('button', { name: /^Read the .* results$/ })).toBeInTheDocument();
+});
+
+test('no speech engine, no play button — never a dead control', async () => {
+  refold();
+  announcerSupported.mockReturnValue(false);
+  const user = userEvent.setup();
+  renderClassified();
+  await user.click(screen.getByRole('button', { name: 'The results broadcast' }));
+  expect(screen.queryByRole('button', { name: 'Play the broadcast' })).toBeNull();
+  announcerSupported.mockReturnValue(true);
 });
