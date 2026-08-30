@@ -12,7 +12,7 @@ beforeEach(() => {
     constructor(text) { this.text = text; utterances.push(this); }
   });
   vi.stubGlobal('speechSynthesis', {
-    speak: u => { spoken.push(u.text); queueMicrotask(() => u.onend?.()); },
+    speak: u => { spoken.push(u.text); queueMicrotask(() => { u.onstart?.(); u.onend?.(); }); },
     cancel: vi.fn(),
     getVoices: () => [
       { lang: 'en-US', name: 'Samantha' },
@@ -71,4 +71,18 @@ test('stopSpeaking cancels the engine and the queue never continues', async () =
   await tick(); await tick(); await tick();
   expect(globalThis.speechSynthesis.cancel).toHaveBeenCalled();
   expect(spoken.length).toBeLessThanOrEqual(1);
+});
+
+
+test('the reveal waits for the needle drop — onDesk fires on the utterance STARTING, never on enqueue', async () => {
+  let held;
+  globalThis.speechSynthesis.speak = u => { spoken.push(u.text); held = u; };
+  const onDesk = vi.fn();
+  speakCard([{ comp: { shortName: 'Premiership' }, fixtures: [] }], { onDesk });
+  await tick();
+  // enqueued but not yet sounding: the page must not have moved
+  expect(spoken).toEqual(['Premiership.']);
+  expect(onDesk).not.toHaveBeenCalled();
+  held.onstart();
+  expect(onDesk).toHaveBeenCalledWith(0);
 });
