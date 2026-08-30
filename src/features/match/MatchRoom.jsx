@@ -76,6 +76,25 @@ function withLiveScore(fixture, liveScore) {
   return { ...fixture, home: overlay(fixture.home), away: overlay(fixture.away) };
 }
 
+// The header must keep up with its own dots (user report, 2026-08-30: a
+// 2' goal on the match line under a 0-0 header — ESPN's summary header
+// lagging its own events). Rule, asymmetric on purpose: when the events
+// tally runs AHEAD of the header score, the events win (events lead in
+// ESPN's pipeline, and the lore trusts their tallies to reproduce
+// scorelines); when events run BEHIND (a goal chalked off mid-removal),
+// the header stands and the stray dot clears on the next poll. Own goals
+// are already credited to the benefiting side in the events feed.
+function withEventsFloor(fixture, events) {
+  const scoring = (events ?? []).filter(e => e?.scoringPlay === true);
+  if (scoring.length === 0) return fixture;
+  const tally = teamId => scoring.filter(e => e.teamId === teamId).length;
+  const lift = side => {
+    const implied = tally(side.teamId);
+    return implied > (side.score ?? 0) ? { ...side, score: implied } : side;
+  };
+  return { ...fixture, home: lift(fixture.home), away: lift(fixture.away) };
+}
+
 // Both sides carry a penaltyScore only after a shootout; the higher one won.
 function penaltyResult(fixture) {
   const h = fixture.home.penaltyScore;
@@ -700,7 +719,7 @@ export default function MatchRoom({ fixture, comp, detail, videos, siblings, oth
   const toggleMatchStoryMode = usePrefs(st => st.toggleMatchStoryMode);
   const openPlayer = (id, club = null) => setSheetPlayer({ id, club });
   const headerFixture = fixture.status === 'live'
-    ? withLiveScore(fixture, detail?.liveScore)
+    ? withEventsFloor(withLiveScore(fixture, detail?.liveScore), detail?.events)
     : fixture;
   const round = prettifyRound(fixture.round);
   return (

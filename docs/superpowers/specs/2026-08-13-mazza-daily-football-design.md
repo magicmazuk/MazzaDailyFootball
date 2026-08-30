@@ -1494,3 +1494,13 @@ grammar on the section's own rule — dots for the events, bars for the wire, ac
 choice persisted (matchStoryMode). Glyphs appear only when BOTH readings exist (a
 commentary-less match stays plain; an events-less one reads as wire alone — never a dead
 control). The fold retires; the wire reading holds every entry with its ESPN credit.
+
+**§13.44/§13.23 Sunday notes (user reports, 2026-08-30, from live use).** (1) THE SCORE AS
+IT STOOD: every goal-wire row now prints the running score its goal created — the whole
+fixture chronology tallied to that moment (never the final score on a historical row) —
+with the incremented side's number in bold. teamId is already the benefiting side, so own
+goals tally honestly. (2) THE EVENTS FLOOR: the user caught a 2′ goal-dot under a 0-0
+header (ESPN's summary header lagging its own events). While live, the header score now
+takes the events tally when events run AHEAD (events lead in ESPN's pipeline; the lore
+trusts their tallies), and trusts the header when events run behind (a chalked-off goal
+mid-removal) — asymmetric on purpose, one poll heals either way.

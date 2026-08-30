@@ -44,7 +44,8 @@ test('the wire shows the newest goal with the GOAL mark, the line, scorer and pr
   render(<MemoryRouter><GoalWire fixtures={CARD} /></MemoryRouter>);
   expect(screen.getByText('GOAL')).toHaveClass('font-sans', 'text-[8.5px]', 'text-accent');
   // newest = the 12′ Kilmarnock goal — scorerless, so minute alone, no dash
-  expect(screen.getByText('Kilmarnock 0 Dundee United 1')).toBeInTheDocument();
+  // the scoreline renders as cells now (running-score spans)
+  expect(screen.getByRole('link').textContent).toMatch(/Kilmarnock\s*0\s*Dundee United\s*1/);
   expect(screen.getByText('12′')).toBeInTheDocument();
   // whole line doors into the match
   expect(screen.getByRole('link')).toHaveAttribute('href', '/match/sco.1/m3');
@@ -96,7 +97,7 @@ test('a scorerless goal in the stack prints minute alone — never a dash of gue
   render(<MemoryRouter><GoalWire fixtures={[CARD[2]]} mode="stack" /></MemoryRouter>);
   const row = screen.getByTestId('wire-row');
   expect(row.textContent).toContain('12′');
-  expect(row.textContent).toContain('Kilmarnock 0 Dundee United 1');
+  expect(row.textContent).toMatch(/Kilmarnock\s*0\s*Dundee United\s*1/);
 });
 
 // --- the goalflash (spec §13.44 addendum): arrivals flash, departures fade ---
@@ -140,4 +141,46 @@ test('in line mode a new goal seizes the line with the flash and resets the rota
   rerender(<MemoryRouter><GoalWire fixtures={withNew} /></MemoryRouter>);
   expect(screen.getByText(/Man 31′/)).toBeInTheDocument();
   expect(document.querySelector('.wire-flash')).not.toBeNull();
+});
+
+// --- the score as it stood (user note, 2026-08-30): each goal row carries
+// its own moment's scoreline, the incremented side in bold ---
+
+test('stack rows print the running score per goal, the scoring side bold', () => {
+  const seesaw = live('m7', 'St Mirren', 2, 'Motherwell', 2, '2026-08-30T14:00:00Z', [
+    { minute: "39'", clockValue: 2340, scorer: 'A Nsio', teamId: 'm7a', ownGoal: false, penalty: false },
+    { minute: "44'", clockValue: 2640, scorer: 'B John', teamId: 'm7h', ownGoal: false, penalty: false },
+    { minute: "45'+4'", clockValue: 2940, scorer: 'C Ramos', teamId: 'm7h', ownGoal: false, penalty: false },
+    { minute: "90'+3'", clockValue: 5580, scorer: 'D Kanga', teamId: 'm7a', ownGoal: false, penalty: false },
+  ]);
+  render(<MemoryRouter><GoalWire fixtures={[seesaw]} mode="stack" /></MemoryRouter>);
+  const texts = screen.getAllByTestId('wire-row').map(r => r.textContent);
+  // newest first, each row the score AS THAT GOAL MADE IT:
+  expect(texts[0]).toMatch(/St Mirren\s*2\s*Motherwell\s*2/); // Kanga
+  expect(texts[1]).toMatch(/St Mirren\s*2\s*Motherwell\s*1/); // Ramos
+  expect(texts[2]).toMatch(/St Mirren\s*1\s*Motherwell\s*1/); // John
+  expect(texts[3]).toMatch(/St Mirren\s*0\s*Motherwell\s*1/); // Nsio
+  // the incremented side's number is the bold one
+  const ramos = screen.getAllByTestId('wire-row')[1];
+  const bold = [...ramos.querySelectorAll('.font-semibold')].map(el => el.textContent);
+  expect(bold).toContain('2');
+  const kanga = screen.getAllByTestId('wire-row')[0];
+  expect([...kanga.querySelectorAll('.font-semibold')].map(el => el.textContent)).toContain('2');
+});
+
+test('running scores count the whole fixture chronology, not just the visible pool', () => {
+  const goals = [
+    { minute: "2'", clockValue: 120, scorer: 'Early', teamId: 'm8h', ownGoal: false, penalty: false },
+    { minute: "10'", clockValue: 600, scorer: 'Second', teamId: 'm8a', ownGoal: false, penalty: false },
+    { minute: "20'", clockValue: 1200, scorer: 'Third', teamId: 'm8h', ownGoal: false, penalty: false },
+  ];
+  const fx2 = live('m8', 'Aird', 2, 'Brora', 1, '2026-08-30T14:00:00Z', goals);
+  render(<MemoryRouter><GoalWire fixtures={[fx2]} mode="stack" /></MemoryRouter>);
+  const rows = screen.getAllByTestId('wire-row');
+  // newest first: Third made it 2-1; Second 1-1; Early 1-0
+  expect(rows[0].textContent).toContain('Aird2Brora1'.replace(/(\d)/g, '$1') ? 'Aird' : 'Aird');
+  const texts = rows.map(r => r.textContent);
+  expect(texts[0]).toMatch(/Aird\s*2\s*Brora\s*1/);
+  expect(texts[1]).toMatch(/Aird\s*1\s*Brora\s*1/);
+  expect(texts[2]).toMatch(/Aird\s*1\s*Brora\s*0/);
 });

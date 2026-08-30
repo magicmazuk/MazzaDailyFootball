@@ -34,7 +34,33 @@ const keyOf = ({ fixture, goal }) =>
 
 const prime = m => (m ?? '').replace(/'/g, '′');
 
-const scoreline = f => `${f.home.name} ${f.home.score} ${f.away.name} ${f.away.score}`;
+// The score AS THAT GOAL MADE IT (user note, 2026-08-30): tally the
+// fixture's whole goal chronology up to and including this one. teamId is
+// already the benefiting side (own-goal lore), so counting by side is
+// honest. Null clocks sort last; the fixture's final score is never used
+// for a historical row - each line is its own moment.
+export function runningScore(fixture, goal) {
+  const ordered = [...(fixture.goals ?? [])]
+    .sort((a, b) => (a.clockValue ?? Infinity) - (b.clockValue ?? Infinity));
+  let h = 0; let a = 0;
+  for (const g of ordered) {
+    if (g.teamId === fixture.home.teamId) h += 1; else a += 1;
+    if (g === goal) break;
+  }
+  return { h, a, scoredHome: goal.teamId === fixture.home.teamId };
+}
+
+function ScorePair({ fixture, goal }) {
+  const { h, a, scoredHome } = runningScore(fixture, goal);
+  return (
+    <>
+      <span className="flex-1 min-w-0 truncate">{fixture.home.name}</span>
+      <span className={`tabular-nums${scoredHome ? ' font-semibold' : ''}`}>{h}</span>
+      <span className="flex-1 min-w-0 truncate">{fixture.away.name}</span>
+      <span className={`tabular-nums${!scoredHome ? ' font-semibold' : ''}`}>{a}</span>
+    </>
+  );
+}
 
 function StackRow({ entry, phase }) {
   const { fixture, goal } = entry;
@@ -44,7 +70,9 @@ function StackRow({ entry, phase }) {
       className={`flex items-baseline gap-2 py-1.5 border-b border-rule/70${tone}`}>
       <span className="font-sans text-[8.5px] tracking-[.16em] text-accent font-semibold shrink-0 w-9">GOAL</span>
       <span className="font-sans text-[10px] text-muted tabular-nums shrink-0 w-8">{prime(goal.minute)}</span>
-      <span className="text-[12.5px] truncate flex-1 min-w-0">{scoreline(fixture)}</span>
+      <span className="text-[12.5px] flex-1 min-w-0 flex items-baseline gap-1.5">
+        <ScorePair fixture={fixture} goal={goal} />
+      </span>
       {goal.scorer && (
         <span className="font-sans text-[10px] text-muted shrink-0">{surnameOf(goal.scorer)}</span>
       )}
@@ -127,7 +155,9 @@ export default function GoalWire({ fixtures, mode = 'line' }) {
       <span key={`${keyOf(current)}-${at}`}
         className={`${fresh ? 'wire-flash' : 'xfade-in'} flex items-baseline gap-2 flex-1 min-w-0`}>
         <span className="font-sans text-[8.5px] tracking-[.16em] text-accent font-semibold shrink-0">GOAL</span>
-        <span className="text-[12.5px] truncate">{scoreline(fixture)}</span>
+        <span className="text-[12.5px] min-w-0 flex items-baseline gap-1.5">
+          <ScorePair fixture={fixture} goal={goal} />
+        </span>
         <span className="font-sans text-[10px] text-muted tabular-nums shrink-0">{who}</span>
       </span>
       {pool.length > 1 && (
