@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom';
 import AppShell from './ui/AppShell.jsx';
 import TodayScreen from './features/today/TodayScreen.jsx';
 import CalendarScreen from './features/calendar/CalendarScreen.jsx';
+import ClassifiedArchive from './features/today/ClassifiedArchive.jsx';
 import CompetitionsScreen from './features/competitions/CompetitionsScreen.jsx';
 import CompetitionScreen from './features/competition/CompetitionScreen.jsx';
 import TeamScreen from './features/team/TeamScreen.jsx';
@@ -16,6 +17,7 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route index element={<TodayScreen />} />
         <Route path="calendar" element={<CalendarScreen />} />
+        <Route path="classified/:day" element={<ClassifiedArchive />} />
         <Route path="calendar/:teamId" element={<CalendarScreen />} />
         <Route path="competitions" element={<CompetitionsScreen />} />
         <Route path="competition/:compId" element={<CompetitionScreen />} />

@@ -1526,3 +1526,13 @@ not fought: iOS needs a user gesture (the play button is one); voices vary per d
 (request en-GB, accept what the phone offers); a locked screen pauses it (the radio never
 played through a closed car door either); the silent-switch routing is a verify-on-device
 item. src/features/today/announcer.js wraps the API in a testable seam.
+
+## 13.48 The archive editions
+
+The user's ask (2026-08-31, mid-love for the broadcast): any day's classified from the
+calendar. A settled day's panel offers "The classified for this day →" (three results —
+the settled law's own bar) to /classified/:day, where the SAME Classified plays with
+`archive`: always folded on arrival (a ritual, not a memory — prefs never read or
+written), the broadcast and the announcer both work, and the body prints RESULTS ONLY —
+movement, stakes and airtime are today's arithmetic and would lie about a past day, so
+the archive is the edition AS READ. Reuse over machinery: one prop, one route, one door.

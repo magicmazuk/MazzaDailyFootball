@@ -96,6 +96,15 @@ export default function CalendarScreen() {
           {dayFixtures.length === 0 && (
             <p className="text-muted mt-3">No fixtures this day.</p>
           )}
+          {/* The archive editions (spec 13.48): a settled day's classified,
+              one door away - offered only when the day can hold an edition
+              (three results, the settled law's own bar). */}
+          {dayFixtures.filter(f => f.status === 'ft').length >= 3 && (
+            <Link to={`/classified/${selectedKey}`}
+              className="block font-sans text-[10px] uppercase tracking-[.14em] text-accent mt-3 mb-1">
+              The classified for this day →
+            </Link>
+          )}
           {dayFixtures.map(f => (
             <FixtureRow key={`${f.compId}-${f.id}`} fixture={f} followedIds={followedIds} />
           ))}
