@@ -70,7 +70,9 @@ export function speakCard(desks, { onDesk, onLine, onDone, deskGapMs = DESK_GAP_
   generation += 1;
   const gen = generation;
   const lines = desks.flatMap((desk, i) => [
-    { text: `${desk.comp.shortName}.`, desk: i, row: null },
+    // Spoken desks take the FULL registry name (user's ear, 2026-08-31:
+    // "WoSFL First" came out "wasfid") - print keeps the shortName.
+    { text: `${desk.comp.name ?? desk.comp.shortName}.`, desk: i, row: null },
     ...desk.fixtures.map((f, r) => ({ text: resultLine(f), desk: i, row: r })),
   ]);
   // Warm the voice list - iOS returns [] until voiceschanged; asking now

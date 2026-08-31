@@ -44,10 +44,10 @@ test('a result line speaks names and scores, nil for nought', () => {
 
 test('speakCard reads desk by desk — onDesk fires BEFORE its lines, onDone at the end, en-GB voice chosen', async () => {
   const desks = [
-    { comp: { shortName: 'Premiership' }, fixtures: [
+    { comp: { name: 'Scottish Premiership', shortName: 'Premiership' }, fixtures: [
       { home: { name: 'Celtic', score: 2 }, away: { name: 'Falkirk', score: 0 } },
     ] },
-    { comp: { shortName: 'Premier League' }, fixtures: [
+    { comp: { name: 'English Premier League', shortName: 'Premier League' }, fixtures: [
       { home: { name: 'Hull', score: 1 }, away: { name: 'Everton', score: 1 } },
     ] },
   ];
@@ -58,9 +58,9 @@ test('speakCard reads desk by desk — onDesk fires BEFORE its lines, onDone at 
   speakCard(desks, { onDesk, onLine, onDone, deskGapMs: 0 });
   await tick(); await tick(); await tick(); await tick(); await tick(); await tick();
   expect(spoken).toEqual([
-    'Premiership.',
+    'Scottish Premiership.',
     'Seltic, two. Falkirk, nil.',
-    'Premier League.',
+    'English Premier League.',
     'Hull, one. Everton, one.',
   ]);
   expect(order).toEqual(['desk0', 'line0.0', 'desk1', 'line1.0', 'done']);
