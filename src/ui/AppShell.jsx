@@ -9,8 +9,11 @@ const TABS = [
 ];
 
 export default function AppShell() {
+  // The sports desk (spec 13.49) is the one landscape edition - every
+  // other page keeps the phone frame the paper was set in.
+  const wide = useLocation().pathname === '/desk';
   return (
-    <div className="min-h-screen max-w-md mx-auto px-5 pt-7 pb-24">
+    <div className={`min-h-screen mx-auto px-5 pt-7 pb-24 ${wide ? 'max-w-[1120px]' : 'max-w-md'}`}>
       {/* The running head (spec §13.27, M-B): the paper's nameplate on
           every screen, one quiet row over a hairline. */}
       <header className="flex items-center pb-2.5 mb-5 border-b border-rule">
