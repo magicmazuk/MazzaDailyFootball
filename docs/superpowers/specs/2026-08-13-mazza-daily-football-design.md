@@ -1536,3 +1536,13 @@ the settled law's own bar) to /classified/:day, where the SAME Classified plays 
 written), the broadcast and the announcer both work, and the body prints RESULTS ONLY —
 movement, stakes and airtime are today's arithmetic and would lie about a past day, so
 the archive is the edition AS READ. Reuse over machinery: one prop, one route, one door.
+
+## 13.49 The sports desk (D-A, the back page)
+
+The iPad-beside-the-PS5 edition (picked from three mockups, 2026-08-31): /desk, a
+landscape three-column back page riding the existing 30s live poll, zero new fetches.
+Column one: live matches large — comp, accent minute, both lines, and the SCORERS beneath
+("Durán 4′ — Ross 51′", from fixture.goals). Column two: the goal wire (stack) and the
+day's full-times. Column three: the two headline tables as they stand, tonight's airtime
+at the foot. Quiet degrades in the house one-liners; columns stack on narrow screens.
+Bookmark it on the iPad and let the poll do the rest.
