@@ -32,9 +32,12 @@ test('support follows the API presence', () => {
 
 test('a result line speaks names and scores, nil for nought', () => {
   const fx = { home: { name: 'St Mirren', score: 3 }, away: { name: 'Motherwell', score: 3 } };
-  expect(resultLine(fx)).toBe('St Mirren, three. Motherwell, three.');
+  expect(resultLine(fx)).toBe('Saint Mirren, three. Motherwell, three.');
   const nil = { home: { name: 'Celtic', score: 2 }, away: { name: 'Falkirk', score: 0 } };
   expect(resultLine(nil)).toBe('Celtic, two. Falkirk, nil.');
+  // the pronunciation desk: St is spoken Saint, printed St
+  const saints = { home: { name: 'St Mirren', score: 3 }, away: { name: 'St Johnstone', score: 0 } };
+  expect(resultLine(saints)).toBe('Saint Mirren, three. Saint Johnstone, nil.');
   const big = { home: { name: 'A', score: 11 }, away: { name: 'B', score: 10 } };
   expect(resultLine(big)).toBe('A, 11. B, 10.');
 });
@@ -50,8 +53,9 @@ test('speakCard reads desk by desk — onDesk fires BEFORE its lines, onDone at 
   ];
   const order = [];
   const onDesk = vi.fn(i => order.push(`desk${i}`));
+  const onLine = vi.fn((i, r) => order.push(`line${i}.${r}`));
   const onDone = vi.fn(() => order.push('done'));
-  speakCard(desks, { onDesk, onDone });
+  speakCard(desks, { onDesk, onLine, onDone });
   await tick(); await tick(); await tick(); await tick(); await tick(); await tick();
   expect(spoken).toEqual([
     'Premiership.',
@@ -59,7 +63,7 @@ test('speakCard reads desk by desk — onDesk fires BEFORE its lines, onDone at 
     'Premier League.',
     'Hull, one. Everton, one.',
   ]);
-  expect(order).toEqual(['desk0', 'desk1', 'done']);
+  expect(order).toEqual(['desk0', 'line0.0', 'desk1', 'line1.0', 'done']);
 });
 
 test('stopSpeaking cancels the engine and the queue never continues', async () => {

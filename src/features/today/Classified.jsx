@@ -70,9 +70,12 @@ const TITLE_MS = 1600;
 const BEAT_MS = [0, 800, 1700, 2800];
 const ROW_MS = 3900;
 
-function BroadcastRow({ compId, fixture: f, cadenced, row = 0 }) {
+function BroadcastRow({ compId, fixture: f, cadenced, row = 0, voicePaced = false }) {
+  // Voice-paced rows land the moment their line SOUNDS - beats only, no
+  // title/row stagger (the voice already carries that timing).
   const beat = n => (cadenced
-    ? { className: ` cl-beat-${n}`, style: { animationDelay: `${TITLE_MS + row * ROW_MS + BEAT_MS[n - 1]}ms` } }
+    ? { className: ` cl-beat-${n}`,
+      style: { animationDelay: `${(voicePaced ? 0 : TITLE_MS + row * ROW_MS) + BEAT_MS[n - 1]}ms` } }
     : { className: '', style: undefined });
   const b1 = beat(1); const b2 = beat(2); const b3 = beat(3); const b4 = beat(4);
   return (
@@ -153,6 +156,10 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
   // The announcer (spec 13.47): while playing, the VOICE is the pacing
   // engine - each desk reveals as its reading begins.
   const [playing, setPlaying] = useState(false);
+  // While the voice paces, rows land per-LINE (the row-sync fix: CSS
+  // free-running drifted against a warming engine; voice-revealed rows
+  // cannot). -1 = title read, no rows yet.
+  const [voiceRow, setVoiceRow] = useState(-1);
   const state = editionState(fixturesByComp, now);
   if (state == null) return null;
 
@@ -300,10 +307,11 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
         {landedDesks.map(({ comp, fixtures }, di) => (
           <div key={comp.id} className={`mt-5${di === read - 1 ? ' cl-beat-1' : ''}`}>
             <CompLabel compId={comp.id}>{comp.shortName}</CompLabel>
-            {fixtures.map((fixture, ri) => (
-              <BroadcastRow key={fixture.id} compId={comp.id} fixture={fixture}
-                cadenced={di === read - 1} row={ri} />
-            ))}
+            {(playing && di === read - 1 ? fixtures.slice(0, voiceRow + 1) : fixtures)
+              .map((fixture, ri) => (
+                <BroadcastRow key={fixture.id} compId={comp.id} fixture={fixture}
+                  cadenced={di === read - 1} row={ri} voicePaced={playing} />
+              ))}
           </div>
         ))}
         {!done && next && !playing && (
@@ -324,12 +332,15 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
               if (playing) { stopSpeaking(); setPlaying(false); return; }
               setPlaying(true);
               const from = read;
+              setVoiceRow(-1);
               speakCard(results.slice(from), {
                 onDesk: i => {
                   const n = from + i + 1;
+                  setVoiceRow(-1);
                   setRead(n);
                   if (n >= results.length) markRevealed(editionDay);
                 },
+                onLine: (i, r) => setVoiceRow(r),
                 onDone: () => { setPlaying(false); markRevealed(editionDay); setRead(results.length); },
               });
             }}
