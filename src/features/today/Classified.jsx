@@ -143,7 +143,7 @@ function EditionTable({ comp, rows, deltas, followedIds }) {
   );
 }
 
-export default function Classified({ fixturesByComp, tables, followedIds = new Set(), now = new Date() }) {
+export default function Classified({ fixturesByComp, tables, followedIds = new Set(), now = new Date(), archive = false }) {
   // The one fetch of its own — called before the settled-law gate, as
   // hooks must be. Everything below the gate is pure print.
   const broadcasts = useUpcomingBroadcasts();
@@ -169,7 +169,11 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
   // An in-progress ceremony keeps its phase (completion marks the day but
   // must not yank the reader out mid-cadence); the remembered reveal only
   // short-circuits a FRESH fold.
-  const mode = phase !== 'folded' ? phase : (revealedOn === editionDay ? 'open' : 'folded');
+  // The archive (spec 13.48): a past edition is a RITUAL, not a memory -
+  // it always arrives folded, never reads or writes the day's reveal.
+  const mark = archive ? () => {} : markRevealed;
+  const mode = phase !== 'folded' ? phase
+    : (!archive && revealedOn === editionDay ? 'open' : 'folded');
 
   // The desk order (user note, 2026-08-30): the two headline leagues lead
   // the classified - Premiership then Premier League - before the lower
@@ -248,7 +252,7 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
           {totalResults} results in{inPlay > 0 ? ` · ${inPlay} still in play` : ''}
         </p>
         <div className="flex items-baseline gap-5 mt-3">
-          <button type="button" onClick={() => { setPhase('open'); markRevealed(editionDay); }}
+          <button type="button" onClick={() => { setPhase('open'); mark(editionDay); }}
             className="font-sans text-[10px] uppercase tracking-[.16em] text-accent">
             Reveal the card
           </button>
@@ -271,7 +275,7 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
       {inPlay > 0 && (
         <p className="text-[12.5px] italic text-muted mt-3">{stopPress(inPlay)}</p>
       )}
-      {tableBlocks.length > 0 && (
+      {!archive && tableBlocks.length > 0 && (
         <div className="mt-6">
           <p className="font-sans text-[9px] uppercase tracking-[.18em] text-muted mb-2">
             as it stands · today&apos;s movement
@@ -282,10 +286,10 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
           ))}
         </div>
       )}
-      {stakes && (
+      {!archive && stakes && (
         <p className="text-[12.5px] border-l-2 border-accent pl-2.5 mt-5">{stakes}</p>
       )}
-      {foot != null && foot.length > 0 && (
+      {!archive && foot != null && foot.length > 0 && (
         <p className="font-sans text-[9.5px] uppercase tracking-[.14em] text-muted border-t border-rule pt-2 mt-6">
           Tonight — {foot.map(a => [a.show, a.timeLabel, a.channel].filter(Boolean).join(' · ')).join(' / ')}
         </p>
@@ -319,7 +323,7 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
             onClick={() => {
               const n = read + 1;
               setRead(n);
-              if (n >= results.length) markRevealed(editionDay);
+              if (n >= results.length) mark(editionDay);
             }}
             className="block w-full text-center font-sans text-[10px] uppercase tracking-[.16em] text-accent py-6">
             Read the {next.comp.shortName} results
@@ -338,10 +342,10 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
                   const n = from + i + 1;
                   setVoiceRow(-1);
                   setRead(n);
-                  if (n >= results.length) markRevealed(editionDay);
+                  if (n >= results.length) mark(editionDay);
                 },
                 onLine: (i, r) => setVoiceRow(r),
-                onDone: () => { setPlaying(false); markRevealed(editionDay); setRead(results.length); },
+                onDone: () => { setPlaying(false); mark(editionDay); setRead(results.length); },
               });
             }}
             className="block mx-auto text-accent p-2 mt-1">
@@ -360,7 +364,7 @@ export default function Classified({ fixturesByComp, tables, followedIds = new S
           </button>
         )}
         {!done && (
-          <button type="button" onClick={() => { setPhase('open'); markRevealed(editionDay); }}
+          <button type="button" onClick={() => { setPhase('open'); mark(editionDay); }}
             className="block w-full text-center font-sans text-[9.5px] uppercase tracking-[.14em] text-muted underline underline-offset-4 pb-2">
             Reveal the rest
           </button>

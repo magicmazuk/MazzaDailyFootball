@@ -428,3 +428,18 @@ test('no speech engine, no play button — never a dead control', async () => {
   expect(screen.queryByRole('button', { name: 'Play the broadcast' })).toBeNull();
   announcerSupported.mockReturnValue(true);
 });
+
+// --- the archive editions (spec §13.48) ---------------------------------
+
+test('an archive edition always folds, never touches the reveal memory, and prints results only', async () => {
+  usePrefs.setState({ classifiedRevealedOn: '2026-08-29' }); // today already read
+  const user = userEvent.setup();
+  renderClassified({ archive: true });
+  // folded despite the remembered reveal — the archive is a ritual
+  expect(screen.getByRole('button', { name: 'Reveal the card' })).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Reveal the card' }));
+  // memory untouched, body is results-only: no movement, no stakes, no foot
+  expect(usePrefs.getState().classifiedRevealedOn).toBe('2026-08-29');
+  expect(screen.queryByText(/today's movement/)).not.toBeInTheDocument();
+  expect(screen.getAllByRole('link').map(l => l.getAttribute('href'))).toContain('/match/sco.1/t1');
+});
