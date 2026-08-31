@@ -13,7 +13,10 @@ const spokenScore = n => SMALL[n] ?? String(n);
 // The pronunciation desk (user's ear, 2026-08-31): the engine read
 // "St Mirren" as "Street Mirren". Spoken names get their radio forms;
 // print never changes. More idiosyncrasies join this map as ears find them.
-const spokenName = name => String(name).replace(/(^|\s)St\.?(?=\s)/g, '$1Saint');
+const spokenName = name => String(name)
+  .replace(/(^|\s)St\.?(?=\s)/g, '$1Saint')
+  // the engine says KEL-tic; the club says SELL-tic (user's ear, 2026-08-31)
+  .replace(/Celtic/g, 'Seltic');
 
 export const resultLine = f =>
   `${spokenName(f.home.name)}, ${spokenScore(f.home.score)}. `
@@ -58,7 +61,11 @@ function utter(text, gen, onStart, onEnd) {
 // Read the card desk by desk: the desk's name, then each result. onDesk
 // fires with the desk's index BEFORE its lines (the visual reveal lands
 // as the voice begins it); onDone fires after the last line.
-export function speakCard(desks, { onDesk, onLine, onDone } = {}) {
+// A longer breath BETWEEN desks (user's ear, 2026-08-31): hierarchy is
+// heard as silence before the next league's name.
+const DESK_GAP_MS = 1400;
+
+export function speakCard(desks, { onDesk, onLine, onDone, deskGapMs = DESK_GAP_MS } = {}) {
   if (!announcerSupported()) { onDone?.(); return; }
   generation += 1;
   const gen = generation;
@@ -73,9 +80,15 @@ export function speakCard(desks, { onDesk, onLine, onDone } = {}) {
     if (gen !== generation) return;
     if (at >= lines.length) { onDone?.(); return; }
     const line = lines[at];
-    utter(line.text, gen,
-      () => (line.row == null ? onDesk?.(line.desk) : onLine?.(line.desk, line.row)),
-      () => next(at + 1));
+    const speakIt = () => {
+      if (gen !== generation) return;
+      utter(line.text, gen,
+        () => (line.row == null ? onDesk?.(line.desk) : onLine?.(line.desk, line.row)),
+        () => next(at + 1));
+    };
+    // the desk gap: silence before every desk title after the first
+    if (line.row == null && at > 0 && deskGapMs > 0) setTimeout(speakIt, deskGapMs);
+    else speakIt();
   };
   next(0);
 }

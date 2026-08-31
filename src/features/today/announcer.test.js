@@ -34,7 +34,7 @@ test('a result line speaks names and scores, nil for nought', () => {
   const fx = { home: { name: 'St Mirren', score: 3 }, away: { name: 'Motherwell', score: 3 } };
   expect(resultLine(fx)).toBe('Saint Mirren, three. Motherwell, three.');
   const nil = { home: { name: 'Celtic', score: 2 }, away: { name: 'Falkirk', score: 0 } };
-  expect(resultLine(nil)).toBe('Celtic, two. Falkirk, nil.');
+  expect(resultLine(nil)).toBe('Seltic, two. Falkirk, nil.');
   // the pronunciation desk: St is spoken Saint, printed St
   const saints = { home: { name: 'St Mirren', score: 3 }, away: { name: 'St Johnstone', score: 0 } };
   expect(resultLine(saints)).toBe('Saint Mirren, three. Saint Johnstone, nil.');
@@ -55,11 +55,11 @@ test('speakCard reads desk by desk — onDesk fires BEFORE its lines, onDone at 
   const onDesk = vi.fn(i => order.push(`desk${i}`));
   const onLine = vi.fn((i, r) => order.push(`line${i}.${r}`));
   const onDone = vi.fn(() => order.push('done'));
-  speakCard(desks, { onDesk, onLine, onDone });
+  speakCard(desks, { onDesk, onLine, onDone, deskGapMs: 0 });
   await tick(); await tick(); await tick(); await tick(); await tick(); await tick();
   expect(spoken).toEqual([
     'Premiership.',
-    'Celtic, two. Falkirk, nil.',
+    'Seltic, two. Falkirk, nil.',
     'Premier League.',
     'Hull, one. Everton, one.',
   ]);
@@ -71,7 +71,7 @@ test('stopSpeaking cancels the engine and the queue never continues', async () =
     { home: { name: 'A', score: 1 }, away: { name: 'B', score: 0 } },
     { home: { name: 'C', score: 1 }, away: { name: 'D', score: 0 } },
   ] }];
-  speakCard(desks, { onDesk: () => stopSpeaking(), onDone: vi.fn() });
+  speakCard(desks, { onDesk: () => stopSpeaking(), onDone: vi.fn(), deskGapMs: 0 });
   await tick(); await tick(); await tick();
   expect(globalThis.speechSynthesis.cancel).toHaveBeenCalled();
   expect(spoken.length).toBeLessThanOrEqual(1);
@@ -82,11 +82,29 @@ test('the reveal waits for the needle drop — onDesk fires on the utterance STA
   let held;
   globalThis.speechSynthesis.speak = u => { spoken.push(u.text); held = u; };
   const onDesk = vi.fn();
-  speakCard([{ comp: { shortName: 'Premiership' }, fixtures: [] }], { onDesk });
+  speakCard([{ comp: { shortName: 'Premiership' }, fixtures: [] }], { onDesk, deskGapMs: 0 });
   await tick();
   // enqueued but not yet sounding: the page must not have moved
   expect(spoken).toEqual(['Premiership.']);
   expect(onDesk).not.toHaveBeenCalled();
   held.onstart();
   expect(onDesk).toHaveBeenCalledWith(0);
+});
+
+
+test('Celtic is spoken Seltic — the engine said Keltic once and never will again', () => {
+  const fx = { home: { name: 'Celtic', score: 1 }, away: { name: 'St Mirren', score: 0 } };
+  expect(resultLine(fx)).toBe('Seltic, one. Saint Mirren, nil.');
+});
+
+test('a breath falls before every desk after the first — the hierarchy heard as silence', async () => {
+  const delays = [];
+  const realSetTimeout = globalThis.setTimeout;
+  vi.stubGlobal('setTimeout', (fn, ms) => { delays.push(ms); return realSetTimeout(fn, 0); });
+  speakCard([
+    { comp: { shortName: 'Premiership' }, fixtures: [] },
+    { comp: { shortName: 'Premier League' }, fixtures: [] },
+  ], { onDesk: vi.fn(), onDone: vi.fn() });
+  await tick(); await tick(); await tick(); await tick();
+  expect(delays).toContain(1400);
 });
