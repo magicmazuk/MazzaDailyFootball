@@ -390,10 +390,17 @@ test('the broadcast stage offers play; playing reads the REMAINING desks and rev
   expect(speakCard).toHaveBeenCalledTimes(1);
   const [desks, handlers] = speakCard.mock.calls[0];
   expect(desks.map(d => d.comp.shortName)).toEqual(['Premiership', 'Premier League']);
-  // the voice reveals desks as it reads them
+  // the voice reveals the desk TITLE first (no rows), then each ROW as
+  // its line sounds - the row-sync law
   act(() => handlers.onDesk(0));
+  expect(screen.queryAllByTestId('broadcast-row')).toHaveLength(0);
+  act(() => handlers.onLine(0, 0));
+  expect(screen.getAllByTestId('broadcast-row')).toHaveLength(1);
+  act(() => handlers.onLine(0, 1));
   expect(screen.getAllByTestId('broadcast-row')).toHaveLength(2);
   act(() => handlers.onDesk(1));
+  expect(screen.getAllByTestId('broadcast-row')).toHaveLength(2);
+  act(() => handlers.onLine(1, 0));
   expect(screen.getAllByTestId('broadcast-row')).toHaveLength(3);
   // the final line completes the broadcast: day marked, body printed
   act(() => handlers.onDone());
