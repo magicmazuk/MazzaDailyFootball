@@ -23,6 +23,10 @@ import Collapse from '../../ui/Collapse.jsx';
 import { SkeletonBlock, SkeletonLines } from '../../ui/Skeleton.jsx';
 import { Splits } from './PlayerScreen.jsx';
 import { useDossier } from './dossier.js';
+import {
+  DRAG_LOCK_PX, SETTLE_EASE, SWIPE_THRESHOLD,
+  releaseIntent, releaseVelocity, rubberband, settleMs,
+} from './sheetPhysics.js';
 import { usePlayerVideos, youtubeKey } from '../match/video.js';
 import VideoCard from '../match/VideoCard.jsx';
 
@@ -32,9 +36,38 @@ const clampStyle = {
   display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
 };
 
-// A swipe's vertical distance (px) past which touchend commits to
-// expand/collapse rather than being read as a tap or a scroll nudge.
-const SWIPE_THRESHOLD = 40;
+// The panel's height when the DOM can't answer (jsdom, first paint) —
+// feeds rubberband dimension and the close flight's distance.
+const FALLBACK_HEIGHT = 320;
+
+// The sheet's live vertical offset, read from the COMPUTED transform —
+// mid-transition this is the interpolated on-screen value (the
+// presentation value, exactly what a grab should inherit — spec §13.50).
+// Browsers serve a matrix; jsdom hands back the authored translateY.
+function currentOffset(el) {
+  const t = getComputedStyle(el).transform;
+  if (!t || t === 'none') return 0;
+  const m3 = /^matrix3d\(([^)]+)\)/.exec(t);
+  if (m3) return parseFloat(m3[1].split(',')[13]) || 0;
+  const m2 = /^matrix\(([^)]+)\)/.exec(t);
+  if (m2) return parseFloat(m2[1].split(',')[5]) || 0;
+  const ty = /^translateY\((-?[\d.]+)px\)/.exec(t);
+  if (ty) return parseFloat(ty[1]) || 0;
+  return 0;
+}
+
+// Kills any inline flight — timer, transition, transform, suspended text
+// selection — so the class system owns the resting states again.
+function stopFlight(el, timerRef, flightRef) {
+  clearTimeout(timerRef.current);
+  flightRef.current = false;
+  if (!el) return;
+  el.style.transform = '';
+  el.style.transition = '';
+  el.style.willChange = '';
+  el.style.userSelect = '';
+  el.style.webkitUserSelect = '';
+}
 
 function usePrefersReducedMotion() {
   const getQuery = () => (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
@@ -126,36 +159,155 @@ export default function PlayerSheet({ comp, playerId, onClose, club = null }) {
     return () => { document.body.style.overflow = prior; };
   }, [open]);
 
-  const touchStartRef = useRef(null);
+  // The vaul physics (spec §13.50): 1:1 pointer tracking with the grab's
+  // offset, velocity-projected release, interruptible settles. The drag
+  // writes the transform straight to the element — no per-move re-render.
+  const sheetRef = useRef(null);
   const scrollRef = useRef(null);
+  // The live gesture; null between touches. Carries the grab point, any
+  // inherited mid-flight offset, the direction lock and velocity history.
+  const dragRef = useRef(null);
+  const settleTimer = useRef(null);
+  // True while an inline settle transition is flying — a pointer-down in
+  // that window freezes the sheet where it IS on screen.
+  const inFlight = useRef(false);
 
-  function handleTouchStart(e) {
-    const t = e.touches[0];
-    if (!t) return;
-    touchStartRef.current = { x: t.clientX, y: t.clientY };
+  // A fresh player (or a close) resets any leftover flight.
+  useEffect(() => {
+    dragRef.current = null;
+    stopFlight(sheetRef.current, settleTimer, inFlight);
+    return () => stopFlight(sheetRef.current, settleTimer, inFlight);
+  }, [playerId]);
+
+  // Hands the sheet to an inline transition whose duration inherits the
+  // finger's speed; cleanup on a TIMER (house law — jsdom and reduced
+  // motion can't fire transition events), running `then` as it lands.
+  function flyTo(targetPx, distance, velocity, then) {
+    const el = sheetRef.current;
+    if (!el) { then?.(); return; }
+    const ms = settleMs(distance, velocity);
+    inFlight.current = true;
+    el.style.userSelect = '';
+    el.style.webkitUserSelect = '';
+    el.style.transition = `transform ${ms}ms ${SETTLE_EASE}`;
+    el.style.transform = `translateY(${targetPx}px)`;
+    clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => {
+      stopFlight(el, settleTimer, inFlight);
+      then?.();
+    }, ms);
   }
 
-  function handleTouchEnd(e) {
-    const start = touchStartRef.current;
-    touchStartRef.current = null;
-    if (!start) return;
-    const t = e.changedTouches[0];
-    if (!t) return;
-    const dx = t.clientX - start.x;
-    const dy = t.clientY - start.y;
-    if (Math.abs(dx) > Math.abs(dy)) return; // horizontal-dominant swipe — ignore
+  function handlePointerDown(e) {
+    if (!open) return;
+    clearTimeout(settleTimer.current);
+    const el = sheetRef.current;
+    const baseY = el ? currentOffset(el) : 0;
+    if (el && inFlight.current) {
+      // The marquee vaul move: a grab mid-settle freezes the sheet at its
+      // on-screen position — a closing sheet can be caught and carried
+      // back up. Tracking resumes from exactly here.
+      el.style.transition = 'none';
+      el.style.transform = `translateY(${baseY}px)`;
+    }
+    inFlight.current = false;
+    dragRef.current = {
+      startX: e.clientX, startY: e.clientY, baseY, lock: null,
+      startedInScroller: scrollRef.current?.contains(e.target) ?? false,
+      samples: [{ y: e.clientY, t: performance.now() }],
+    };
+  }
 
-    if (dy <= -SWIPE_THRESHOLD) {
-      if (!expanded) { setExpanded(true); setEverExpanded(true); }
-    } else if (dy >= SWIPE_THRESHOLD) {
-      if (expanded) {
-        // A downward swipe over scrolled content is a scroll, not a
-        // collapse gesture — only collapse when already at the top.
-        if ((scrollRef.current?.scrollTop ?? 0) === 0) setExpanded(false);
-      } else {
-        onClose();
+  function handlePointerMove(e) {
+    const d = dragRef.current;
+    if (!d) return;
+    d.samples.push({ y: e.clientY, t: performance.now() });
+    if (d.samples.length > 12) d.samples.shift();
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    if (!d.lock) {
+      // ~10px of hysteresis before a direction commits — under it a touch
+      // is still a tap and children keep their clicks (no capture yet).
+      if (Math.abs(dx) < DRAG_LOCK_PX && Math.abs(dy) < DRAG_LOCK_PX) return;
+      if (Math.abs(dx) > Math.abs(dy)) { d.lock = 'h'; return; }
+      const atTop = (scrollRef.current?.scrollTop ?? 0) === 0;
+      // A vertical gesture born inside the splits scroller belongs to the
+      // scroll when content is scrolled above, or when it heads upward
+      // (reading down the list) — only a downward pull at the very top is
+      // a sheet gesture.
+      if (expanded && d.startedInScroller && (!atTop || dy < 0)) { d.lock = 'scroll'; return; }
+      d.lock = 'v';
+      const el = sheetRef.current;
+      if (el) {
+        try { el.setPointerCapture?.(e.pointerId); } catch { /* jsdom lacks capture */ }
+        el.style.transition = 'none';
+        el.style.willChange = 'transform';
+        el.style.userSelect = 'none';
+        el.style.webkitUserSelect = 'none';
       }
     }
+    if (d.lock !== 'v') return;
+    const el = sheetRef.current;
+    if (!el) return;
+    const offset = d.baseY + dy;
+    // Upward past the resting line rubber-bands (Apple's 0.55) — display
+    // only; the release decision reads raw travel.
+    const shown = offset < 0
+      ? -rubberband(-offset, el.getBoundingClientRect().height || FALLBACK_HEIGHT)
+      : offset;
+    el.style.transform = `translateY(${shown}px)`;
+  }
+
+  function handlePointerUp(e) {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d) return;
+    const el = sheetRef.current;
+    if (el) { el.style.userSelect = ''; el.style.webkitUserSelect = ''; }
+    if (d.lock === 'h' || d.lock === 'scroll') return;
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    if (!d.lock && Math.abs(dx) > Math.abs(dy)) return; // horizontal-dominant — ignore
+    const now = performance.now();
+    d.samples.push({ y: e.clientY, t: now });
+    const velocity = releaseVelocity(d.samples, now);
+    const absY = d.baseY + dy;
+    const atTop = (scrollRef.current?.scrollTop ?? 0) === 0;
+    const intent = releaseIntent({ absY, velocity, expanded, atTop });
+    // Only a gesture that actually moved the sheet needs a settle — a tap
+    // (or an undisplaced threshold release) must leave the styles alone.
+    const displaced = d.lock === 'v' || d.baseY !== 0;
+
+    if (intent === 'close') {
+      if (reducedMotion || !el) {
+        stopFlight(el, settleTimer, inFlight);
+        onClose();
+        return;
+      }
+      const height = el.getBoundingClientRect().height || FALLBACK_HEIGHT;
+      // onClose rides the settle timer: the content stays aboard for the
+      // flight down, and a mid-flight grab can still rescue the sheet.
+      flyTo(height, Math.max(height - absY, SWIPE_THRESHOLD), velocity, onClose);
+      return;
+    }
+    if (intent === 'expand') { setExpanded(true); setEverExpanded(true); }
+    if (intent === 'collapse') setExpanded(false);
+    if (displaced) {
+      if (reducedMotion) stopFlight(el, settleTimer, inFlight);
+      else flyTo(0, Math.abs(absY), velocity);
+    }
+  }
+
+  function handlePointerCancel() {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d) return;
+    const el = sheetRef.current;
+    if (el) { el.style.userSelect = ''; el.style.webkitUserSelect = ''; }
+    if (d.lock !== 'v' && d.baseY === 0) return;
+    // The browser claimed the gesture (native scroll won) — glide home.
+    if (reducedMotion || !el) { stopFlight(el, settleTimer, inFlight); return; }
+    flyTo(0, Math.abs(currentOffset(el)) || SWIPE_THRESHOLD, 0);
   }
 
   const keeper = bio ? isKeeper(bio) : false;
@@ -175,8 +327,15 @@ export default function PlayerSheet({ comp, playerId, onClose, club = null }) {
         <button type="button" aria-label="Dismiss" onClick={onClose} className="fixed inset-0 bg-ink/20 z-40" />
       )}
       <div
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
+        ref={sheetRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        // touch-action none keeps the browser's hands off gestures on the
+        // panel itself; the splits scroller is NOT in this chain for its
+        // own scrolling, so native scroll inside it stays alive (§13.50).
+        style={{ touchAction: 'none' }}
         className={`fixed inset-x-0 bottom-0 max-w-md mx-auto z-50 bg-paper border-t border-ink
           rounded-t-2xl px-5 pt-3.5 pb-7 flex flex-col ${
           open ? 'translate-y-0' : 'translate-y-full'} ${
