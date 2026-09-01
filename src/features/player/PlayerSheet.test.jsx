@@ -47,7 +47,7 @@ const outfieldStats = {
 
 const comp = byId('sco.1');
 
-// A sheet container query shared by the touch tests below — the outer
+// A sheet container query shared by the drag tests below — the outer
 // fixed div carries the translate-y-* class in both states, and nothing
 // else in the tree does.
 function sheetEl(container) {
@@ -162,18 +162,18 @@ test('clicking the handle again collapses back to the peek — Splits stay mount
   expect(within(headline).getByText('3')).toBeInTheDocument();
 });
 
-test('an upward swipe of 40px+ on the sheet expands it from the peek', () => {
+test('an upward drag of 40px+ on the sheet expands it from the peek', () => {
   usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
   const { container } = render(
     <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
   );
   const el = sheetEl(container);
-  fireEvent.touchStart(el, { touches: [{ clientX: 10, clientY: 500 }] });
-  fireEvent.touchEnd(el, { changedTouches: [{ clientX: 10, clientY: 380 }] });
+  fireEvent.pointerDown(el, { clientX: 10, clientY: 500 });
+  fireEvent.pointerUp(el, { clientX: 10, clientY: 380 });
   expect(screen.getByText('Attacking')).toBeInTheDocument();
 });
 
-test('a downward swipe of 40px+ while expanded and scrolled to top collapses back to the peek', () => {
+test('a downward drag of 40px+ while expanded and scrolled to top collapses back to the peek', () => {
   usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
   const onClose = vi.fn();
   const { container } = render(
@@ -183,8 +183,8 @@ test('a downward swipe of 40px+ while expanded and scrolled to top collapses bac
   fireEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
   expect(screen.getByText('Attacking')).toBeInTheDocument();
 
-  fireEvent.touchStart(el, { touches: [{ clientX: 10, clientY: 200 }] });
-  fireEvent.touchEnd(el, { changedTouches: [{ clientX: 10, clientY: 340 }] });
+  fireEvent.pointerDown(el, { clientX: 10, clientY: 200 });
+  fireEvent.pointerUp(el, { clientX: 10, clientY: 340 });
   // Content stays mounted (clipped to height 0 by Collapse) rather than
   // unmounting, so the close glide has real content to shut around
   // instead of an already-empty box (fix round 1, HIGH).
@@ -193,19 +193,29 @@ test('a downward swipe of 40px+ while expanded and scrolled to top collapses bac
   expect(onClose).not.toHaveBeenCalled();
 });
 
-test('the same downward swipe while already collapsed calls onClose instead', () => {
-  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
-  const onClose = vi.fn();
-  const { container } = render(
-    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={onClose} /></MemoryRouter>,
-  );
-  const el = sheetEl(container);
-  fireEvent.touchStart(el, { touches: [{ clientX: 10, clientY: 200 }] });
-  fireEvent.touchEnd(el, { changedTouches: [{ clientX: 10, clientY: 340 }] });
-  expect(onClose).toHaveBeenCalled();
+test('the same downward drag while already collapsed closes — onClose when the settle lands', () => {
+  vi.useFakeTimers();
+  try {
+    usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+    const onClose = vi.fn();
+    const { container } = render(
+      <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={onClose} /></MemoryRouter>,
+    );
+    const el = sheetEl(container);
+    fireEvent.pointerDown(el, { clientX: 10, clientY: 200 });
+    fireEvent.pointerUp(el, { clientX: 10, clientY: 340 });
+    // The sheet flies off with its content still aboard (320px is the
+    // jsdom fallback height); the caller hears onClose only on landing,
+    // so a mid-flight grab can still rescue it.
+    expect(el.style.transform).toBe('translateY(320px)');
+    expect(onClose).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(600);
+    expect(onClose).toHaveBeenCalled();
+    expect(el.style.transform).toBe('');
+  } finally { vi.useRealTimers(); }
 });
 
-test('a downward swipe while expanded but scrolled away from top is a scroll, not a collapse', () => {
+test('a downward drag while expanded but scrolled away from top is a scroll, not a collapse', () => {
   usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
   const onClose = vi.fn();
   const { container } = render(
@@ -216,23 +226,174 @@ test('a downward swipe while expanded but scrolled away from top is a scroll, no
   Object.defineProperty(scrollArea, 'scrollTop', { value: 50, configurable: true });
 
   const el = sheetEl(container);
-  fireEvent.touchStart(el, { touches: [{ clientX: 10, clientY: 200 }] });
-  fireEvent.touchEnd(el, { changedTouches: [{ clientX: 10, clientY: 340 }] });
+  fireEvent.pointerDown(el, { clientX: 10, clientY: 200 });
+  fireEvent.pointerUp(el, { clientX: 10, clientY: 340 });
   expect(screen.getByText('Attacking')).toBeInTheDocument();
   expect(onClose).not.toHaveBeenCalled();
 });
 
-test('a horizontal-dominant swipe on the sheet is ignored', () => {
+test('a horizontal-dominant drag on the sheet is ignored', () => {
   usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
   const onClose = vi.fn();
   const { container } = render(
     <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={onClose} /></MemoryRouter>,
   );
   const el = sheetEl(container);
-  fireEvent.touchStart(el, { touches: [{ clientX: 10, clientY: 400 }] });
-  fireEvent.touchEnd(el, { changedTouches: [{ clientX: 200, clientY: 360 }] });
+  fireEvent.pointerDown(el, { clientX: 10, clientY: 400 });
+  fireEvent.pointerUp(el, { clientX: 200, clientY: 360 });
   expect(screen.queryByText('Attacking')).not.toBeInTheDocument();
   expect(onClose).not.toHaveBeenCalled();
+});
+
+// ——— the vaul physics (spec §13.50) ———
+
+test('the sheet tracks the finger 1:1 — every move writes the transform, both directions', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
+  const el = sheetEl(container);
+  fireEvent.pointerDown(el, { clientX: 10, clientY: 500 });
+  fireEvent.pointerMove(el, { clientX: 10, clientY: 560 });
+  expect(el.style.transform).toBe('translateY(60px)');
+  // grab-and-reverse mid-gesture: the transform follows back up
+  fireEvent.pointerMove(el, { clientX: 12, clientY: 540 });
+  expect(el.style.transform).toBe('translateY(40px)');
+  // a cancelled gesture glides home rather than sticking
+  fireEvent.pointerCancel(el);
+  expect(el.style.transform).toBe('translateY(0px)');
+});
+
+test('an upward pull at the peek rubber-bands — resisted display, never 1:1 past the boundary', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
+  const el = sheetEl(container);
+  fireEvent.pointerDown(el, { clientX: 10, clientY: 500 });
+  fireEvent.pointerMove(el, { clientX: 10, clientY: 440 });
+  const m = /translateY\((-?[\d.]+)px\)/.exec(el.style.transform);
+  expect(m).not.toBeNull();
+  const y = parseFloat(m[1]);
+  expect(y).toBeLessThan(-20);
+  expect(y).toBeGreaterThan(-35); // 60px of pull shows ~30 against the 320px fallback
+});
+
+test('a 30px flick — under the distance line — projects past it and closes', () => {
+  vi.useFakeTimers();
+  const onClose = vi.fn();
+  let t = 0;
+  const perf = vi.spyOn(performance, 'now').mockImplementation(() => t);
+  try {
+    usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+    const { container } = render(
+      <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={onClose} /></MemoryRouter>,
+    );
+    const el = sheetEl(container);
+    fireEvent.pointerDown(el, { clientX: 10, clientY: 200 });
+    t = 16; fireEvent.pointerMove(el, { clientX: 10, clientY: 210 });
+    t = 32; fireEvent.pointerMove(el, { clientX: 10, clientY: 220 });
+    t = 48; fireEvent.pointerMove(el, { clientX: 10, clientY: 230 });
+    fireEvent.pointerUp(el, { clientX: 10, clientY: 230 });
+    vi.advanceTimersByTime(600);
+    expect(onClose).toHaveBeenCalled();
+  } finally { perf.mockRestore(); vi.useRealTimers(); }
+});
+
+test('the same 30px without momentum springs back — a settle transition home, no close', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const onClose = vi.fn();
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={onClose} /></MemoryRouter>,
+  );
+  const el = sheetEl(container);
+  fireEvent.pointerDown(el, { clientX: 10, clientY: 200 });
+  fireEvent.pointerMove(el, { clientX: 10, clientY: 215 });
+  fireEvent.pointerMove(el, { clientX: 10, clientY: 230 });
+  fireEvent.pointerUp(el, { clientX: 10, clientY: 230 });
+  expect(onClose).not.toHaveBeenCalled();
+  expect(el.style.transform).toBe('translateY(0px)');
+  expect(el.style.transition).toContain('transform');
+});
+
+test('a settling sheet can be grabbed mid-flight — frozen on pointer-down, then carried', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
+  const el = sheetEl(container);
+  // a release starts the glide home…
+  fireEvent.pointerDown(el, { clientX: 10, clientY: 500 });
+  fireEvent.pointerMove(el, { clientX: 10, clientY: 530 });
+  fireEvent.pointerUp(el, { clientX: 10, clientY: 530 });
+  expect(el.style.transition).toContain('transform');
+  // …and a fresh grab catches it: the animation dies on the spot
+  fireEvent.pointerDown(el, { clientX: 10, clientY: 400 });
+  expect(el.style.transition).toBe('none');
+  // tracking resumes from where the sheet was caught
+  fireEvent.pointerMove(el, { clientX: 10, clientY: 480 });
+  expect(el.style.transform).toBe('translateY(80px)');
+});
+
+test('a mid-flight catch captures the pointer at once — the carry can never be lost off-panel', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
+  const el = sheetEl(container);
+  el.setPointerCapture = vi.fn();
+  // a release starts a settle; the catch lands during it
+  fireEvent.pointerDown(el, { pointerId: 7, clientX: 10, clientY: 500 });
+  fireEvent.pointerMove(el, { pointerId: 7, clientX: 10, clientY: 530 });
+  fireEvent.pointerUp(el, { pointerId: 7, clientX: 10, clientY: 530 });
+  el.setPointerCapture.mockClear(); // the drag-lock capture — not under test
+  fireEvent.pointerDown(el, { pointerId: 8, clientX: 10, clientY: 400 });
+  // a catch is a grab, never a tap: capture engages on the down itself,
+  // so carry moves that exit the panel still reach it
+  expect(el.setPointerCapture).toHaveBeenCalledWith(8);
+});
+
+test('a hard flick down while expanded closes outright — past the peek entirely', () => {
+  vi.useFakeTimers();
+  const onClose = vi.fn();
+  let t = 0;
+  const perf = vi.spyOn(performance, 'now').mockImplementation(() => t);
+  try {
+    usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+    const { container } = render(
+      <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={onClose} /></MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Expand profile' }));
+    const el = sheetEl(container);
+    fireEvent.pointerDown(el, { clientX: 10, clientY: 200 });
+    t = 16; fireEvent.pointerMove(el, { clientX: 10, clientY: 230 });
+    t = 32; fireEvent.pointerMove(el, { clientX: 10, clientY: 260 });
+    fireEvent.pointerUp(el, { clientX: 10, clientY: 260 });
+    vi.advanceTimersByTime(600);
+    expect(onClose).toHaveBeenCalled();
+  } finally { perf.mockRestore(); vi.useRealTimers(); }
+});
+
+test('reduced motion still tracks 1:1 but every release settles instantly — no transition, sync close', () => {
+  const realMatchMedia = window.matchMedia;
+  window.matchMedia = vi.fn().mockReturnValue({
+    matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  });
+  try {
+    usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+    const onClose = vi.fn();
+    const { container } = render(
+      <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={onClose} /></MemoryRouter>,
+    );
+    const el = sheetEl(container);
+    fireEvent.pointerDown(el, { clientX: 10, clientY: 200 });
+    fireEvent.pointerMove(el, { clientX: 10, clientY: 250 });
+    expect(el.style.transform).toBe('translateY(50px)'); // direct manipulation is not an animation
+    fireEvent.pointerUp(el, { clientX: 10, clientY: 340 });
+    expect(onClose).toHaveBeenCalled();
+    expect(el.style.transform).toBe('');
+    expect(el.style.transition).toBe('');
+  } finally { window.matchMedia = realMatchMedia; }
 });
 
 test('the Full profile control is retired — the anchor bar alone expands (user trim, 2026-08-25)', async () => {

@@ -171,3 +171,9 @@ None block usage; candidates for a future 1.2 pass.
   EPL players — with the ESPN-404 lore meaning faces come from those sources, never ESPN.
 
 - ~~Highlights reel featured-tier misses~~ RESOLVED by the 13.41 nickname ledger (2026-08-29): Wolves/Spurs/Brighton prose now features. Remaining scope note only: clubs whose spoken name is a prefix of the registry name (Brighton & Hove Albion, Wolverhampton Wanderers) always print the plain tier - the synopsis never says the full name. Honest, never wrong; a uniqueness-checked first-token match could lift them if it rankles. Also scope: only each brand's LATEST episode joins - Saturday's results lose their line when Sunday's episode lands (episodes.json archive would extend it).
+
+- Nested-button hydration warning on TeamScreen (observed 2026-09-01 during §13.50 live
+  verification): the browser console prints React's "button cannot be a descendant of
+  button" on /team pages — a row button wrapping an inner button somewhere in the
+  next/last fixture cards. Pre-existing, cosmetic (no behavioural fault seen), but it is
+  invalid HTML and a screen-reader wart; worth a small unwrap pass when next in that file.

@@ -1546,3 +1546,42 @@ Column one: live matches large — comp, accent minute, both lines, and the SCOR
 day's full-times. Column three: the two headline tables as they stand, tonight's airtime
 at the foot. Quiet degrades in the house one-liners; columns stack on narrow screens.
 Bookmark it on the iPad and let the poll do the rest.
+
+## 13.50 The sheet in the hand (vaul physics)
+
+The user's ask (2026-09-01): "make the player sheet feel like vaul" — the apple-design
+skill's first outing. Physics only; the paper's visual law is untouched. No packages:
+vaul's actual recipe is pointer events, an inline transform written 1:1 during the drag,
+and a release transition on cubic-bezier(0.32, 0.72, 0, 1) — all platform.
+
+**Direct manipulation.** The sheet stays glued to the finger: pointerdown arms, ~10px of
+movement locks a direction (horizontal locks OUT — the gesture dies), and from then on
+every pointermove writes translateY straight to the element (no per-move re-render).
+Upward at the boundary rubber-bands (Apple's constant 0.55) — display only; the DECISION
+reads raw travel. Mouse drags work identically (pointer events unify), text selection is
+suspended for the drag's duration.
+
+**Release.** A short position/time history (last ~100ms) yields release velocity; the
+resting point is PROJECTED forward (exponential decay, deceleration 0.99 — the snappier
+of Apple's two shipped rates), and the projected point — not the release point — meets
+the same 40px threshold the sheet has always used. A slow 30px drift springs back; a
+30px flick projects past the line and commits. From the peek: down closes, up expands.
+While expanded at the top of the splits: down collapses; a hard flick (≥1.2 px/ms)
+closes outright. The settle is an inline transition whose duration is scaled to the
+remaining distance over the release velocity (clamped 180–420ms), so the animation
+inherits the finger's speed rather than restarting at a house tempo.
+
+**Interruptibility.** pointerdown mid-settle reads the LIVE computed transform, kills
+the transition, and resumes tracking from exactly where the sheet is — a closing sheet
+can be caught and carried back up; grab-hold-release decides by absolute position, so
+a caught sheet released low still closes and one carried home rests. Settle cleanup
+runs on TIMERS (house law), clearing inline styles so the class system owns the resting
+states; a fresh open resets any leftover flight.
+
+**The scroll seam.** The panel takes touch-action: none (its own gestures are ours);
+the inner splits scroller keeps native scrolling — a drag beginning there while content
+is scrolled, or moving upward, belongs to the scroll. The old law stands unchanged:
+collapse only commits with the scroller at its top. Reduced motion tracks 1:1 (direct
+manipulation is not an animation) but every release settles instantly, no transition.
+Pure arithmetic — rubberband, projection, velocity, intent — lives in
+src/features/player/sheetPhysics.js, unit-tested on its own.
