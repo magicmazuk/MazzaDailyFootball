@@ -11,14 +11,126 @@
     },
     "comp": "competition id from src/domain/competitions.js",
     "date": "kickoff date YYYY-MM-DD (UTC)",
-    "home": "home club name \u2014 case/punctuation insensitive",
-    "tv": "array of: Sky Sports | TNT Sports | BBC | ITV | Amazon Prime | Premier Sports | Premier Player"
+    "home": "home club name — case/punctuation insensitive",
+    "tv": "array of: Sky Sports | Sky Sports+ | TNT Sports | BBC | ITV | Amazon Prime | Premier Sports | Premier Player"
   },
   "listings": [
+    {
+      "comp": "sco.cis",
+      "date": "2026-08-15",
+      "home": "Aberdeen",
+      "tv": [
+        "Premier Player"
+      ]
+    },
+    {
+      "comp": "sco.cis",
+      "date": "2026-08-15",
+      "home": "Dundee United",
+      "tv": [
+        "Premier Sports"
+      ]
+    },
+    {
+      "comp": "sco.cis",
+      "date": "2026-08-15",
+      "home": "Dunfermline Athletic",
+      "tv": [
+        "Premier Player"
+      ]
+    },
+    {
+      "comp": "sco.cis",
+      "date": "2026-08-16",
+      "home": "Heart of Midlothian",
+      "tv": [
+        "Premier Player"
+      ]
+    },
+    {
+      "comp": "sco.cis",
+      "date": "2026-08-16",
+      "home": "Hibernian",
+      "tv": [
+        "Premier Player"
+      ]
+    },
+    {
+      "comp": "sco.cis",
+      "date": "2026-08-16",
+      "home": "Rangers",
+      "tv": [
+        "Premier Sports"
+      ]
+    },
+    {
+      "comp": "sco.cis",
+      "date": "2026-08-16",
+      "home": "Stenhousemuir",
+      "tv": [
+        "Premier Player"
+      ]
+    },
+    {
+      "comp": "uefa.champions",
+      "date": "2026-08-18",
+      "home": "Fenerbahce",
+      "tv": [
+        "Amazon Prime"
+      ]
+    },
+    {
+      "comp": "uefa.champions",
+      "date": "2026-08-18",
+      "home": "Levski Sofia",
+      "tv": [
+        "TNT Sports"
+      ]
+    },
+    {
+      "comp": "uefa.champions",
+      "date": "2026-08-19",
+      "home": "Celtic",
+      "tv": [
+        "TNT Sports"
+      ]
+    },
+    {
+      "comp": "uefa.champions",
+      "date": "2026-08-19",
+      "home": "NEC Nijmegen",
+      "tv": [
+        "TNT Sports"
+      ]
+    },
+    {
+      "comp": "uefa.champions",
+      "date": "2026-08-19",
+      "home": "Slovan Bratislava",
+      "tv": [
+        "TNT Sports"
+      ]
+    },
     {
       "comp": "eng.1",
       "date": "2026-08-21",
       "home": "Arsenal",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "sco.2",
+      "date": "2026-08-21",
+      "home": "Inverness Caledonian Thistle",
+      "tv": [
+        "BBC"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-08-22",
+      "home": "Brentford",
       "tv": [
         "Sky Sports"
       ]
@@ -32,11 +144,11 @@
       ]
     },
     {
-      "comp": "eng.1",
+      "comp": "sco.1",
       "date": "2026-08-22",
-      "home": "Brentford",
+      "home": "Dundee United",
       "tv": [
-        "Sky Sports"
+        "Premier Sports"
       ]
     },
     {
@@ -69,6 +181,14 @@
       "home": "Fulham",
       "tv": [
         "Sky Sports"
+      ]
+    },
+    {
+      "comp": "uefa.champions",
+      "date": "2026-08-25",
+      "home": "LASK Linz",
+      "tv": [
+        "Amazon Prime"
       ]
     },
     {
@@ -114,7 +234,7 @@
     {
       "comp": "eng.1",
       "date": "2026-08-30",
-      "home": "Sunderland",
+      "home": "Manchester United",
       "tv": [
         "Sky Sports"
       ]
@@ -122,7 +242,15 @@
     {
       "comp": "eng.1",
       "date": "2026-08-30",
-      "home": "Manchester United",
+      "home": "Sunderland",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "sco.1",
+      "date": "2026-08-30",
+      "home": "Aberdeen",
       "tv": [
         "Sky Sports"
       ]
@@ -137,22 +265,6 @@
     },
     {
       "comp": "sco.1",
-      "date": "2026-08-22",
-      "home": "Dundee United",
-      "tv": [
-        "Premier Sports"
-      ]
-    },
-    {
-      "comp": "sco.1",
-      "date": "2026-08-30",
-      "home": "Aberdeen",
-      "tv": [
-        "Sky Sports"
-      ]
-    },
-    {
-      "comp": "sco.1",
       "date": "2026-09-02",
       "home": "Falkirk",
       "tv": [
@@ -161,88 +273,32 @@
     },
     {
       "comp": "sco.1",
-      "date": "2026-09-05",
-      "home": "St Mirren",
-      "tv": [
-        "Sky Sports"
-      ]
-    },
-    {
-      "comp": "sco.1",
-      "date": "2026-09-20",
-      "home": "Celtic",
-      "tv": [
-        "Sky Sports"
-      ]
-    },
-    {
-      "comp": "sco.cis",
-      "date": "2026-08-15",
-      "home": "Aberdeen",
-      "tv": [
-        "Premier Player"
-      ]
-    },
-    {
-      "comp": "sco.cis",
-      "date": "2026-08-15",
-      "home": "Dunfermline Athletic",
-      "tv": [
-        "Premier Player"
-      ]
-    },
-    {
-      "comp": "sco.cis",
-      "date": "2026-08-15",
-      "home": "Dundee United",
-      "tv": [
-        "Premier Sports"
-      ]
-    },
-    {
-      "comp": "sco.cis",
-      "date": "2026-08-16",
-      "home": "Heart of Midlothian",
-      "tv": [
-        "Premier Player"
-      ]
-    },
-    {
-      "comp": "sco.cis",
-      "date": "2026-08-16",
+      "date": "2026-09-03",
       "home": "Hibernian",
       "tv": [
-        "Premier Player"
-      ]
-    },
-    {
-      "comp": "sco.cis",
-      "date": "2026-08-16",
-      "home": "Stenhousemuir",
-      "tv": [
-        "Premier Player"
-      ]
-    },
-    {
-      "comp": "sco.cis",
-      "date": "2026-08-16",
-      "home": "Rangers",
-      "tv": [
         "Premier Sports"
-      ]
-    },
-    {
-      "comp": "sco.2",
-      "date": "2026-08-21",
-      "home": "Inverness Caledonian Thistle",
-      "tv": [
-        "BBC"
       ]
     },
     {
       "comp": "eng.1",
       "date": "2026-09-04",
       "home": "Ipswich Town",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "sco.2",
+      "date": "2026-09-04",
+      "home": "Livingston",
+      "tv": [
+        "BBC"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-09-05",
+      "home": "Hull City",
       "tv": [
         "Sky Sports"
       ]
@@ -256,17 +312,9 @@
       ]
     },
     {
-      "comp": "eng.1",
+      "comp": "sco.1",
       "date": "2026-09-05",
-      "home": "Hull City",
-      "tv": [
-        "Sky Sports"
-      ]
-    },
-    {
-      "comp": "eng.1",
-      "date": "2026-09-06",
-      "home": "Everton",
+      "home": "St Mirren",
       "tv": [
         "Sky Sports"
       ]
@@ -281,10 +329,114 @@
     },
     {
       "comp": "eng.1",
-      "date": "2026-09-12",
-      "home": "Tottenham Hotspur",
+      "date": "2026-09-06",
+      "home": "Everton",
       "tv": [
         "Sky Sports"
+      ]
+    },
+    {
+      "comp": "sco.1",
+      "date": "2026-09-06",
+      "home": "St Johnstone",
+      "tv": [
+        "Premier Sports"
+      ]
+    },
+    {
+      "comp": "eng.league_cup",
+      "date": "2026-09-08",
+      "home": "AFC Bournemouth",
+      "tv": [
+        "Sky Sports+"
+      ]
+    },
+    {
+      "comp": "eng.league_cup",
+      "date": "2026-09-08",
+      "home": "Crystal Palace",
+      "tv": [
+        "Sky Sports+"
+      ]
+    },
+    {
+      "comp": "eng.league_cup",
+      "date": "2026-09-08",
+      "home": "Leyton Orient",
+      "tv": [
+        "Sky Sports+"
+      ]
+    },
+    {
+      "comp": "eng.league_cup",
+      "date": "2026-09-08",
+      "home": "Millwall",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "eng.league_cup",
+      "date": "2026-09-08",
+      "home": "Sunderland",
+      "tv": [
+        "Sky Sports+"
+      ]
+    },
+    {
+      "comp": "eng.league_cup",
+      "date": "2026-09-09",
+      "home": "Chelsea",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "sco.1",
+      "date": "2026-09-09",
+      "home": "St Johnstone",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "uefa.champions",
+      "date": "2026-09-09",
+      "home": "Liverpool",
+      "tv": [
+        "TNT Sports"
+      ]
+    },
+    {
+      "comp": "uefa.champions",
+      "date": "2026-09-09",
+      "home": "Napoli",
+      "tv": [
+        "TNT Sports"
+      ]
+    },
+    {
+      "comp": "uefa.champions",
+      "date": "2026-09-10",
+      "home": "Manchester United",
+      "tv": [
+        "TNT Sports"
+      ]
+    },
+    {
+      "comp": "sco.2",
+      "date": "2026-09-11",
+      "home": "Greenock Morton",
+      "tv": [
+        "BBC"
+      ]
+    },
+    {
+      "comp": "sco.cis",
+      "date": "2026-09-11",
+      "home": "Stenhousemuir",
+      "tv": [
+        "Premier Sports"
       ]
     },
     {
@@ -293,6 +445,30 @@
       "home": "Sunderland",
       "tv": [
         "TNT Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-09-12",
+      "home": "Tottenham Hotspur",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "sco.cis",
+      "date": "2026-09-12",
+      "home": "Kilmarnock",
+      "tv": [
+        "Premier Sports"
+      ]
+    },
+    {
+      "comp": "sco.cis",
+      "date": "2026-09-12",
+      "home": "Ross County",
+      "tv": [
+        "Premier Player"
       ]
     },
     {
@@ -312,6 +488,14 @@
       ]
     },
     {
+      "comp": "sco.cis",
+      "date": "2026-09-13",
+      "home": "Rangers",
+      "tv": [
+        "Premier Sports"
+      ]
+    },
+    {
       "comp": "eng.1",
       "date": "2026-09-14",
       "home": "Leeds United",
@@ -320,9 +504,114 @@
       ]
     },
     {
+      "comp": "eng.league_cup",
+      "date": "2026-09-15",
+      "home": "Ipswich Town",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "eng.league_cup",
+      "date": "2026-09-15",
+      "home": "Liverpool",
+      "tv": [
+        "Sky Sports",
+        "ITV"
+      ]
+    },
+    {
+      "comp": "eng.league_cup",
+      "date": "2026-09-15",
+      "home": "Peterborough United",
+      "tv": [
+        "Sky Sports+"
+      ]
+    },
+    {
+      "comp": "eng.league_cup",
+      "date": "2026-09-15",
+      "home": "Reading",
+      "tv": [
+        "Sky Sports+"
+      ]
+    },
+    {
+      "comp": "eng.league_cup",
+      "date": "2026-09-15",
+      "home": "West Ham United",
+      "tv": [
+        "Sky Sports+"
+      ]
+    },
+    {
+      "comp": "eng.league_cup",
+      "date": "2026-09-16",
+      "home": "Coventry City",
+      "tv": [
+        "Sky Sports+"
+      ]
+    },
+    {
+      "comp": "eng.league_cup",
+      "date": "2026-09-16",
+      "home": "Everton",
+      "tv": [
+        "Sky Sports+"
+      ]
+    },
+    {
+      "comp": "eng.league_cup",
+      "date": "2026-09-16",
+      "home": "Fleetwood Town",
+      "tv": [
+        "Sky Sports+"
+      ]
+    },
+    {
+      "comp": "eng.league_cup",
+      "date": "2026-09-16",
+      "home": "Manchester United",
+      "tv": [
+        "Sky Sports+"
+      ]
+    },
+    {
+      "comp": "eng.league_cup",
+      "date": "2026-09-17",
+      "home": "Manchester City",
+      "tv": [
+        "Sky Sports+"
+      ]
+    },
+    {
+      "comp": "uefa.europa",
+      "date": "2026-09-17",
+      "home": "Celtic",
+      "tv": [
+        "TNT Sports"
+      ]
+    },
+    {
       "comp": "eng.1",
       "date": "2026-09-18",
       "home": "Brentford",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "sco.2",
+      "date": "2026-09-18",
+      "home": "Queens Park",
+      "tv": [
+        "BBC"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-09-19",
+      "home": "Nottingham Forest",
       "tv": [
         "Sky Sports"
       ]
@@ -336,11 +625,11 @@
       ]
     },
     {
-      "comp": "eng.1",
+      "comp": "sco.1",
       "date": "2026-09-19",
-      "home": "Nottingham Forest",
+      "home": "Kilmarnock",
       "tv": [
-        "Sky Sports"
+        "Premier Sports"
       ]
     },
     {
@@ -360,51 +649,59 @@
       ]
     },
     {
-      "comp": "uefa.champions",
-      "date": "2026-08-18",
-      "home": "Fenerbahce",
+      "comp": "eng.1",
+      "date": "2026-09-20",
+      "home": "Manchester City",
       "tv": [
-        "Amazon Prime"
+        "Sky Sports"
       ]
     },
     {
-      "comp": "uefa.champions",
-      "date": "2026-08-18",
-      "home": "Levski Sofia",
-      "tv": [
-        "TNT Sports"
-      ]
-    },
-    {
-      "comp": "uefa.champions",
-      "date": "2026-08-19",
+      "comp": "sco.1",
+      "date": "2026-09-20",
       "home": "Celtic",
       "tv": [
-        "TNT Sports"
+        "Sky Sports"
       ]
     },
     {
-      "comp": "uefa.champions",
-      "date": "2026-08-19",
-      "home": "NEC Nijmegen",
+      "comp": "eng.1",
+      "date": "2026-10-10",
+      "home": "Arsenal",
       "tv": [
         "TNT Sports"
       ]
     },
     {
-      "comp": "uefa.champions",
-      "date": "2026-08-19",
-      "home": "Slovan Bratislava",
+      "comp": "eng.1",
+      "date": "2026-10-10",
+      "home": "Manchester United",
       "tv": [
-        "TNT Sports"
+        "Sky Sports"
       ]
     },
     {
-      "comp": "uefa.champions",
-      "date": "2026-08-25",
-      "home": "LASK Linz",
+      "comp": "eng.1",
+      "date": "2026-10-11",
+      "home": "Crystal Palace",
       "tv": [
-        "Amazon Prime"
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-10-11",
+      "home": "Hull City",
+      "tv": [
+        "Sky Sports"
+      ]
+    },
+    {
+      "comp": "eng.1",
+      "date": "2026-10-11",
+      "home": "Liverpool",
+      "tv": [
+        "Sky Sports"
       ]
     }
   ]

@@ -7,6 +7,9 @@ export const TV_LISTINGS = data.listings;
 
 const SHORT = {
   'Sky Sports': 'Sky',
+  // the EFL deal's stream-only ties: a distinct badge, never a promise
+  // of a linear channel
+  'Sky Sports+': 'Sky+',
   'TNT Sports': 'TNT',
   'BBC': 'BBC',
   'ITV': 'ITV',

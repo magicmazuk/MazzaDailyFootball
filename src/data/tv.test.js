@@ -35,6 +35,9 @@ test('empty listings leave every fixture with tv: []', () => {
 
 test('short labels', () => {
   expect(tvShortLabel('Sky Sports')).toBe('Sky');
+  // the stream-only ties of the EFL deal — a distinct badge, so the
+  // reader is never sent hunting a linear channel that hasn't got it
+  expect(tvShortLabel('Sky Sports+')).toBe('Sky+');
   expect(tvShortLabel('TNT Sports')).toBe('TNT');
   expect(tvShortLabel('BBC')).toBe('BBC');
   expect(tvShortLabel('ITV')).toBe('ITV');
