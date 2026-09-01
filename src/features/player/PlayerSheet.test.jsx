@@ -335,6 +335,24 @@ test('a settling sheet can be grabbed mid-flight — frozen on pointer-down, the
   expect(el.style.transform).toBe('translateY(80px)');
 });
 
+test('a mid-flight catch captures the pointer at once — the carry can never be lost off-panel', () => {
+  usePlayer.mockReturnValue({ bio: outfieldBio, stats: outfieldStats, isLoading: false, isError: false });
+  const { container } = render(
+    <MemoryRouter><PlayerSheet comp={comp} playerId="272624" onClose={() => {}} /></MemoryRouter>,
+  );
+  const el = sheetEl(container);
+  el.setPointerCapture = vi.fn();
+  // a release starts a settle; the catch lands during it
+  fireEvent.pointerDown(el, { pointerId: 7, clientX: 10, clientY: 500 });
+  fireEvent.pointerMove(el, { pointerId: 7, clientX: 10, clientY: 530 });
+  fireEvent.pointerUp(el, { pointerId: 7, clientX: 10, clientY: 530 });
+  el.setPointerCapture.mockClear(); // the drag-lock capture — not under test
+  fireEvent.pointerDown(el, { pointerId: 8, clientX: 10, clientY: 400 });
+  // a catch is a grab, never a tap: capture engages on the down itself,
+  // so carry moves that exit the panel still reach it
+  expect(el.setPointerCapture).toHaveBeenCalledWith(8);
+});
+
 test('a hard flick down while expanded closes outright — past the peek entirely', () => {
   vi.useFakeTimers();
   const onClose = vi.fn();

@@ -206,9 +206,13 @@ export default function PlayerSheet({ comp, playerId, onClose, club = null }) {
     if (el && inFlight.current) {
       // The marquee vaul move: a grab mid-settle freezes the sheet at its
       // on-screen position — a closing sheet can be caught and carried
-      // back up. Tracking resumes from exactly here.
+      // back up. Tracking resumes from exactly here. A catch is a grab,
+      // never a tap, so capture engages on the down itself: carry moves
+      // that exit the panel (a fast catch near its top edge) still reach
+      // it, and the gesture can never strand the sheet frozen askew.
       el.style.transition = 'none';
       el.style.transform = `translateY(${baseY}px)`;
+      try { el.setPointerCapture?.(e.pointerId); } catch { /* jsdom lacks capture */ }
     }
     inFlight.current = false;
     dragRef.current = {
