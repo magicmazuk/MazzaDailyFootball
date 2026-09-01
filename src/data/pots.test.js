@@ -38,6 +38,13 @@ test('the shortName matches when the display name does not', () => {
     { teamId: 'x', name: 'FC Bayern München', shortName: 'Bayern Munich' }, TABLE)).toBe(1);
 });
 
-test('the shipped table starts empty — every lookup null until the season is curated', () => {
-  expect(potFor('uefa.champions', side('Bayern Munich'))).toBeNull();
+test('the shipped 2026-27 table is curated — the draws are chipped for real', () => {
+  // one per comp, plus the feed-name discipline: entries carry ESPN's
+  // names (Internazionale, never the newspaper's "Inter Milan")
+  expect(potFor('uefa.champions', side('Bayern Munich'))).toBe(1);
+  expect(potFor('uefa.champions', side('Internazionale'))).toBe(1);
+  expect(potFor('uefa.europa', side('Celtic'))).toBe(2);
+  expect(potFor('uefa.europa.conf', side('Heart of Midlothian'))).toBe(4);
+  // a club in none of the three comps still errs null — never a guess
+  expect(potFor('uefa.champions', side('Rangers'))).toBeNull();
 });

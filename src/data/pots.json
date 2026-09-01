@@ -1,6 +1,154 @@
 {
   "_curation": "Pot placements per comp per season (spec §13.39). CURATED like tvListings — hand-entered when UEFA publishes them (the day of each league-phase draw), refreshed each season. Names match the ESPN display or short name, accent- and case-insensitive. Empty pots = the ceremony plays unchipped, exactly as before pots existed.",
-  "uefa.champions": { "season": "2026-27", "pots": {} },
-  "uefa.europa": { "season": "2026-27", "pots": {} },
-  "uefa.europa.conf": { "season": "2026-27", "pots": {} }
+  "uefa.champions": {
+    "season": "2026-27",
+    "pots": {
+      "1": [
+        "Paris Saint-Germain",
+        "Bayern Munich",
+        "Real Madrid",
+        "Liverpool",
+        "Internazionale",
+        "Manchester City",
+        "Arsenal",
+        "Barcelona",
+        "Atlético Madrid"
+      ],
+      "2": [
+        "Borussia Dortmund",
+        "AS Roma",
+        "Sporting CP",
+        "Aston Villa",
+        "FC Porto",
+        "Manchester United",
+        "Club Brugge",
+        "Real Betis",
+        "PSV Eindhoven"
+      ],
+      "3": [
+        "Feyenoord Rotterdam",
+        "Lille",
+        "Bodo/Glimt",
+        "Napoli",
+        "RB Leipzig",
+        "Villarreal",
+        "Fenerbahce",
+        "Shakhtar Donetsk",
+        "Galatasaray"
+      ],
+      "4": [
+        "Slavia Prague",
+        "Slovan Bratislava",
+        "VfB Stuttgart",
+        "AEK Athens",
+        "LASK Linz",
+        "Como",
+        "Lens",
+        "Viking FK",
+        "Sabah FK"
+      ]
+    }
+  },
+  "uefa.europa": {
+    "season": "2026-27",
+    "pots": {
+      "1": [
+        "Bayer Leverkusen",
+        "Benfica",
+        "Juventus",
+        "AC Milan",
+        "Lyon",
+        "AZ Alkmaar",
+        "Olympiacos",
+        "Real Sociedad",
+        "Marseille"
+      ],
+      "2": [
+        "Ferencvaros",
+        "Viktoria Plzen",
+        "Union St.-Gilloise",
+        "Dinamo Zagreb",
+        "RB Salzburg",
+        "Celtic",
+        "Sparta Prague",
+        "Stade Rennais",
+        "Anderlecht"
+      ],
+      "3": [
+        "SK Sturm Graz",
+        "Lech Poznan",
+        "Crystal Palace",
+        "AFC Bournemouth",
+        "Sunderland",
+        "NK Celje",
+        "Jagiellonia Bialystok",
+        "Omonia Nicosia",
+        "Celta Vigo"
+      ],
+      "4": [
+        "TSG Hoffenheim",
+        "Besiktas",
+        "Torreense",
+        "Hapoel Be'er",
+        "NEC Nijmegen",
+        "OFI Crete",
+        "Lillestrom",
+        "Levski Sofia",
+        "Ararat-Armenia"
+      ]
+    }
+  },
+  "uefa.europa.conf": {
+    "season": "2026-27",
+    "pots": {
+      "1": [
+        "Atalanta",
+        "Braga",
+        "Ajax Amsterdam",
+        "SC Freiburg",
+        "AS Monaco",
+        "F.C. København"
+      ],
+      "2": [
+        "FC Midtjylland",
+        "Red Star Belgrade",
+        "KAA Gent",
+        "Panathinaikos",
+        "Pafos",
+        "Brighton & Hove Albion"
+      ],
+      "3": [
+        "FC Lugano",
+        "Getafe",
+        "KuPS Kuopio",
+        "FC Twente",
+        "Lincoln Red Imps",
+        "Borac Banja Luka"
+      ],
+      "4": [
+        "Sint-Truidense",
+        "SK Brann",
+        "Heart of Midlothian",
+        "Kairat Almaty",
+        "Trabzonspor",
+        "CSU Craiova"
+      ],
+      "5": [
+        "Riga FC",
+        "Hajduk Split",
+        "Jablonec",
+        "FC Nordsjælland",
+        "AGF",
+        "Inter D'Escaldes"
+      ],
+      "6": [
+        "FC Thun",
+        "CSKA Sofia",
+        "Kauno Zalgiris",
+        "Mjällby AIF",
+        "Iberia 1999",
+        "Egnatia"
+      ]
+    }
+  }
 }
