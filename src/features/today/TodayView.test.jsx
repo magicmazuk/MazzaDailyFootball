@@ -41,6 +41,53 @@ test('renders sections it has and the masthead date, skips empty sections', () =
   expect(screen.queryByText('Later today')).toBeNull();
 });
 
+// §13.44 correction (user report, 2026-09-02, mid-match): Celtic 3-0 up
+// and not a line on the wire — the partition pulls favourites into
+// Your clubs BEFORE the live list, so the wire never saw their goals.
+// Favourites prioritise, never hide: the pool reads ALL live fixtures.
+test("the wire pools the favourite's goals — prioritised, never hidden", () => {
+  const celtic = {
+    ...fx('c1', 'Celtic', 'Aberdeen', 'live'),
+    minute: "41'", // a real minute — a null-minute live row prints "Live" itself and muddies the label query
+    goals: [{ minute: "14'", clockValue: 840, scorer: 'Camilo Durán', teamId: 'hc1', ownGoal: false, penalty: false }],
+  };
+  const neutral = { ...fx('n1', 'Falkirk', 'Rangers', 'live'), minute: "25'", goals: [] };
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-22T15:00:00Z')} followedIds={new Set(['hc1'])}
+        partition={{ yours: [celtic], live: [neutral], later: [], earlier: [], yesterday: [] }} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText(/Durán/)).toBeInTheDocument();
+});
+
+test('a lone live favourite still gets the wire — LIVE leads with no neutral rows at all', () => {
+  const celtic = {
+    ...fx('c1', 'Celtic', 'Aberdeen', 'live'),
+    minute: "41'",
+    goals: [{ minute: "34'", clockValue: 2040, scorer: 'Benjamin Nygren', teamId: 'hc1', ownGoal: false, penalty: false }],
+  };
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-22T15:00:00Z')} followedIds={new Set(['hc1'])}
+        partition={{ yours: [celtic], live: [], later: [], earlier: [], yesterday: [] }} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText('Live')).toBeInTheDocument();
+  expect(screen.getByText(/Nygren/)).toBeInTheDocument();
+});
+
+test('a lone live favourite with no goals yet strands no bare LIVE label', () => {
+  const celtic = { ...fx('c1', 'Celtic', 'Aberdeen', 'live'), minute: "41'", goals: [] };
+  render(
+    <MemoryRouter>
+      <TodayView date={new Date('2026-08-22T15:00:00Z')} followedIds={new Set(['hc1'])}
+        partition={{ yours: [celtic], live: [], later: [], earlier: [], yesterday: [] }} />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByText('Live')).toBeNull();
+});
+
 test('a completely quiet day says so', () => {
   render(
     <MemoryRouter>

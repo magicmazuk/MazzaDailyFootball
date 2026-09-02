@@ -1585,3 +1585,15 @@ collapse only commits with the scroller at its top. Reduced motion tracks 1:1 (d
 manipulation is not an animation) but every release settles instantly, no transition.
 Pure arithmetic — rubberband, projection, velocity, intent — lives in
 src/features/player/sheetPhysics.js, unit-tested on its own.
+
+**§13.44 correction — the wire and the favourite (user report, 2026-09-02, mid-match).**
+Celtic three up against Aberdeen and not a line on the wire: the Today partition pulls
+followed clubs into Your clubs BEFORE building the live list, so a wire fed only that list
+could never see a favourite's goals — the one club the reader cares most about was the one
+club the wire ignored. Favourites prioritise, never hide: the POOL now reads every live
+fixture (Your clubs' live ones first, then the neutral list — poolGoals orders by real time
+regardless), while the Live section's ROWS stay the neutral ones (the favourite's row keeps
+its place up in Your clubs, never duplicated). And when ONLY a favourite is live: the Live
+section now stands on its lead alone once the wire has a goal to say (leadStands) — but a
+goalless lone favourite strands no bare LIVE label. Verified against the very card that
+reported it: Celtic 3-0 riding the wire beside Falkirk's equaliser on Rangers.
