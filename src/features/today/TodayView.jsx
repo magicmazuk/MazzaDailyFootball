@@ -4,7 +4,7 @@ import NextUpRow from './NextUpRow.jsx';
 import MiniTable from './MiniTable.jsx';
 import DrawInvitation from './DrawInvitation.jsx';
 import Papers from './Papers.jsx';
-import GoalWire from './GoalWire.jsx';
+import GoalWire, { poolGoals } from './GoalWire.jsx';
 import { usePrefs } from '../../store/prefs.js';
 
 // The wire's two forms, one hairline toggle on the Live rule (spec 13.44
@@ -48,8 +48,11 @@ const groupOnTvByDay = fixtures => {
 // just Yesterday) — assigned per NAMED slot, not by this section's runtime
 // position among its visible siblings, so a section always rises with the
 // same delay regardless of which of its neighbours happen to be absent.
-function Section({ label, muted, fixtures, followedIds, riseIn, lead = null, labelRight = null }) {
-  if (!fixtures.length) return null;
+function Section({ label, muted, fixtures, followedIds, riseIn, lead = null, labelRight = null, leadStands = false }) {
+  // leadStands (§13.44 correction): a section whose LEAD has something to
+  // say renders even with no rows of its own — the lone live favourite's
+  // wire, whose fixture row lives up in Your clubs.
+  if (!fixtures.length && !leadStands) return null;
   return (
     <section className={`mt-8 first:mt-0 ${riseIn ?? ''}`}>
       <SectionLabel muted={muted} right={labelRight}>{label}</SectionLabel>
@@ -63,6 +66,12 @@ export default function TodayView({ partition, followedIds, date, asOf = null, n
   const goalWireMode = usePrefs(s => s.goalWireMode);
   const toggleGoalWireMode = usePrefs(s => s.toggleGoalWireMode);
   const { yours, live, later, earlier, yesterday } = partition;
+  // §13.44 correction (user report, 2026-09-02: Celtic 3-0 and the wire
+  // silent): the partition pulls favourites into Your clubs before the
+  // live list, so a wire fed only `live` never saw a followed club's
+  // goals. Favourites prioritise, never hide — the POOL reads every
+  // live fixture; the section's rows stay the neutral ones.
+  const liveAll = [...yours.filter(f => f.status === 'live'), ...live];
   const quiet = !yours.length && !live.length && !later.length && !earlier.length;
   return (
     <main>
@@ -92,7 +101,8 @@ export default function TodayView({ partition, followedIds, date, asOf = null, n
           as its lead; the toggle lives on the rule. */}
       <Section label="Live" fixtures={live} followedIds={followedIds} riseIn="rise-in rise-in-2"
         labelRight={<WireModeToggle mode={goalWireMode} onToggle={toggleGoalWireMode} />}
-        lead={<GoalWire fixtures={live} mode={goalWireMode} />} />
+        leadStands={poolGoals(liveAll).length > 0}
+        lead={<GoalWire fixtures={liveAll} mode={goalWireMode} />} />
       {classified && <div className="rise-in rise-in-1">{classified}</div>}
       {(yours.length > 0 || nextUp.length > 0) && (
         <section className="mt-8 first:mt-0 rise-in rise-in-1">
