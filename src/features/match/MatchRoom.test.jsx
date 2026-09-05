@@ -85,6 +85,45 @@ test('renders team stats when present', () => {
   expect(screen.getByText('58%')).toBeInTheDocument();
 });
 
+// §13.42 addendum — the untracked ground (user report, 2026-09-05):
+// ESPN keeps only the BOOK live at Scottish grounds — every play stat
+// sits at literal '0' until full time (live-probed at 45'+1': all-zero
+// shots/possession beside two real yellows; Tuesday's card fully
+// backfilled at FT). Printing the feed's zeros mid-match fabricates
+// "no shots yet". The possession pair is the tell — tracked football
+// always splits; both-zero means untracked.
+test('an untracked live boxscore prints only the counted rows and one honest line', () => {
+  const untracked = {
+    ...detail,
+    teamStats: [
+      { teamId: 'Celtic', name: 'Celtic', stats: { possessionPct: '0', totalShots: '0', shotsOnTarget: '0', wonCorners: '0', foulsCommitted: '0', saves: '0', offsides: '0', yellowCards: '1', redCards: '0' } },
+      { teamId: 'Rangers', name: 'Rangers', stats: { possessionPct: '0', totalShots: '0', shotsOnTarget: '0', wonCorners: '0', foulsCommitted: '0', saves: '0', offsides: '0', yellowCards: '2', redCards: '0' } },
+    ],
+  };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={untracked} />
+  </MemoryRouter>);
+  expect(screen.getByText('Stats')).toBeInTheDocument();
+  expect(screen.getByText('Yellow cards')).toBeInTheDocument(); // genuinely counted
+  expect(screen.queryByText('Shots')).not.toBeInTheDocument(); // the fabricated zero, suppressed
+  expect(screen.queryByText('Possession')).not.toBeInTheDocument();
+  expect(screen.getByText(/full time/)).toBeInTheDocument(); // the honest line
+});
+
+test('a fully zeroed untracked boxscore renders no Stats section at all — no stranded line', () => {
+  const dead = {
+    ...detail,
+    teamStats: [
+      { teamId: 'Celtic', name: 'Celtic', stats: { possessionPct: '0', totalShots: '0', yellowCards: '0', redCards: '0' } },
+      { teamId: 'Rangers', name: 'Rangers', stats: { possessionPct: '0', totalShots: '0', yellowCards: '0', redCards: '0' } },
+    ],
+  };
+  render(<MemoryRouter>
+    <MatchRoom fixture={fixture} comp={byId('sco.1')} detail={dead} />
+  </MemoryRouter>);
+  expect(screen.queryByText('Stats')).not.toBeInTheDocument();
+});
+
 test('renders team stats correctly even with away-first array order', () => {
   const detailAwayFirst = {
     ...detail,

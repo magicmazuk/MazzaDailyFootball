@@ -1597,3 +1597,15 @@ its place up in Your clubs, never duplicated). And when ONLY a favourite is live
 section now stands on its lead alone once the wire has a goal to say (leadStands) — but a
 goalless lone favourite strands no bare LIVE label. Verified against the very card that
 reported it: Celtic 3-0 riding the wire beside Falkirk's equaliser on Rangers.
+
+**§13.42 addendum — the untracked ground (user report, 2026-09-05, mid-card).** "Shots
+always 0, yellows fine": ESPN keeps only the BOOK live at Scottish grounds this season —
+every play stat a literal '0' until full time (live-probed at 45'+1': all-zero
+shots/possession beside two real yellows; Tuesday's card fully backfilled by FT — 27
+shots, 66.2%). Printing the feed's zeros fabricated "no shots at 45 minutes". The
+possession pair is the tell — tracked football always splits, both-zero means untracked —
+and it rides the SAME statSplit guard the bars already trust. Untracked: only genuinely
+counted rows print (the cards), under one honest line ("Only the book is kept live here —
+the full numbers land at full time"); an all-zero book renders no section at all, never a
+stranded line. Tracked grounds and settled matches are untouched — the grid heals itself
+the moment the numbers land.

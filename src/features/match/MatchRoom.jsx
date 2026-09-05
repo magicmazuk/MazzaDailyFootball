@@ -459,7 +459,15 @@ function Stats({ teamStats, fixture }) {
   const h = teamStats.find(t => t.teamId === fixture.home.teamId);
   const a = teamStats.find(t => t.teamId === fixture.away.teamId);
   if (!h || !a || h === a) return null;
-  const keys = Object.keys(STAT_LABELS).filter(k => h.stats[k] != null && a.stats[k] != null);
+  let keys = Object.keys(STAT_LABELS).filter(k => h.stats[k] != null && a.stats[k] != null);
+  // The untracked ground (§13.42 addendum, user report 2026-09-05): ESPN
+  // keeps only the BOOK live at some grounds — every play stat a literal
+  // '0' until full time, then backfilled. The possession pair is the
+  // tell (tracked football always splits; both-zero means untracked):
+  // print only rows genuinely counted, never the feed's fabricated
+  // zeros, and say so in one line. Heals itself when the numbers land.
+  const tracked = statSplit(h.stats.possessionPct, a.stats.possessionPct) != null;
+  if (!tracked) keys = keys.filter(k => Number(h.stats[k]) > 0 || Number(a.stats[k]) > 0);
   if (!keys.length) return null;
   // Possession rides the SAME guard as every stat row: a both-zero, blank
   // or unparseable pair renders no bar at all rather than a fabricated
@@ -468,6 +476,11 @@ function Stats({ teamStats, fixture }) {
   return (
     <section className="mb-8 rise-in rise-in-4">
       <SectionLabel muted>Stats</SectionLabel>
+      {!tracked && (
+        <p className="font-sans text-[11px] text-muted mb-2">
+          Only the book is kept live here — the full numbers land at full time.
+        </p>
+      )}
       {possession != null && (
         <div className="mb-5">
           <div className="flex justify-between font-sans text-[11px] mb-1.5">
